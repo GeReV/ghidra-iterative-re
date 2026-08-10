@@ -15,6 +15,10 @@ guesses.** Apply an inference, re-read, and the confirming read looks independen
 is not. Part 1 makes the loop safe. Part 2 is what to point it at in a game. Part 3 is
 the tool surface.
 
+**Confidence convention.** Claims marked *(doc)* come from Ghidra's own documentation but
+have not been executed. Unmarked claims were either measured live or are project history.
+Quoted numbers from one binary are examples for calibration, not properties of yours.
+
 **`references/api.md` holds the verified API surface** — class and method names checked
 against a real install, plus the offline doc paths to discover more. Read it before
 writing scripts; it exists because recalling Ghidra's API from memory produces plausible
@@ -34,20 +38,43 @@ checkpoint → apply (highest-certainty tier only) → cascade (scoped)
 
 Stop after two consecutive rounds produce nothing new — not when you run out of ideas.
 
+**Each stage, concretely:**
+
+| Stage | What it means |
+|---|---|
+| **checkpoint** | `checkpoint.py`-style: end transaction, save, snapshot, version-control step |
+| **apply** | Write only this round's certainty tier, tagged `SourceType.AI`, gated on an `apply` argument |
+| **cascade** | `analyzeChanges` after telling `AutoAnalysisManager` precisely what changed |
+| **verify invariants** | Diff the whole-program invariant and `raise` on change |
+| **harvest** | Read evidence back out, **excluding `SourceType.AI`**, into versioned evidence files |
+| **adjudicate** | Turn raw evidence rows into *decided* layout/ownership records: apply the confidence rule (how many structurally independent witness kinds agree), resolve conflicts between witnesses, and **record what you deliberately excluded and why**. This is the step that produces a `confidence` column. Excluded evidence must be written down — a later reader re-deriving from raw rows will otherwise reach a different answer and think yours is wrong. |
+
+**One round is not one session.** A round is a unit of *work* — it can span sessions, and a
+long round should be split across fresh contexts to avoid the naming drift described under
+failure modes. The loop's termination test ("two dry rounds") is about the work, not about
+how long any one agent context lives. Prefer many short executions inside one round over
+one long execution spanning several.
+
 **Quantify every round.** Emit a metrics row per checkpoint into an **append-only** file,
 with internal-consistency checks that **raise, not warn** (counts that must sum, sets that
-must be disjoint). Document each metric's definition in its own file and record renames —
+must be disjoint). A workable schema: `label`, `timestamp`, `program_version`,
+`functions_total`, then one column per population you are tracking (identified library,
+unclassified, types applied, evidence rows), so a row is a complete snapshot and any two
+rows are comparable. Document each metric's definition in its own file and record renames —
 definitions drift, and a metric silently redefined between rounds makes the whole history
-incomparable. This is what makes "did the round accomplish anything" answerable rather
-than a matter of impression.
+incomparable. This is what makes "did the round accomplish anything" answerable rather than
+a matter of impression.
 
 **Track replay debt honestly.** Keep a written record of which steps are *not* yet
 reproducible from a clean state and why. A pipeline nobody has replayed end-to-end is
 untested, however green each step looked when it ran.
 
 **Emit a C header from recovered types.** It is the bridge to a reimplementation, it is
-diffable outside Ghidra, and generating it forces every recovered layout to be complete
-and self-consistent rather than approximately right.
+diffable outside Ghidra, and generating it forces every recovered layout to be complete and
+self-consistent rather than approximately right. **Ghidra has this built in** —
+`ghidra.app.util.exporter.CppExporter` (the File → Export Program → C/C++ mechanism), whose
+`CPPResult` exposes `headerCode()` and `bodyCode()`. Use it or a deliberate subset of it;
+hand-rolling a header emitter is the exact failure this skill warns about elsewhere.
 
 **Apply in certainty order, never convenience order.** Ground truth from the binary
 first, then mechanical derivations from it, then inferences. A round that applies a guess
@@ -59,15 +86,30 @@ information all over the program."* The cascade propagates errors as well as fac
 
 ## The trust model — the load-bearing part
 
-Ghidra tracks provenance natively via `SourceType`. Priority, highest first:
+Ghidra tracks provenance natively via `SourceType`. Its real priority order is
+**`USER_DEFINED` > `IMPORTED` > `ANALYSIS` = `AI` > `DEFAULT`** — note the tie:
 
 | SourceType | Means | Usable as evidence? |
 |---|---|---|
 | `USER_DEFINED` | A human decided this | Yes, but record that a human is the source |
-| `IMPORTED` | From the binary: exports, demangler, debug info | **Yes — ground truth** |
-| `ANALYSIS` | Ghidra's analyzers inferred it | Yes, with the analyzer named |
-| `AI` | *"content produced through AI assistance"* — **yours** | **NEVER** |
+| `IMPORTED` | Created by the **importer** from the file itself: export-table labels, debug records | **Yes — ground truth** |
+| `ANALYSIS` | Anything an analyzer produced — **including the demangler's output** | Only with the producing mechanism named |
+| `AI` | *"content produced through AI assistance"* — **yours**. Ghidra ranks this **equal to `ANALYSIS`**, not below it | **NEVER** (see below) |
 | `DEFAULT` | `FUN_`/`DAT_` placeholders | No — absence of information |
+
+**"`AI` is never evidence" is a policy you impose, not something Ghidra enforces.**
+`SourceType.AI` and `SourceType.ANALYSIS` have *equal* priority — verified live:
+`AI.getPriority()` is 2 and `AI.isHigherPriorityThan(ANALYSIS)` is `False` in both
+directions. So Ghidra will let an AI-tagged symbol win against analyzer output exactly as
+often as the reverse, and any command that arbitrates via `isHigherPriorityThan` treats
+them as peers. The tier is a *label you can filter on*; the discipline has to live in your
+harvesters.
+
+**Do not assume demangled names are `IMPORTED`.** Measured on a PE with 981 mangled
+symbols: only **6** of 2640 functions carried `IMPORTED`, while **985** carried `ANALYSIS`.
+The raw export label is importer-created ground truth; the *demangled name applied to the
+function* is analyzer output one inference removed from it. Census your program before
+building a trust rule on a tier.
 
 **Tag every mutation you make `SourceType.AI`.** The anti-circularity rule then stops
 being a discipline and becomes a query filter:
@@ -96,26 +138,35 @@ Consequences:
   emit an explicit `unknown` for anything that matches nothing.
 - That fix immediately surfaced a real mislabel worth knowing generally: **a thunk
   inherits a plausible qualified name from its target while its own local symbol carries
-  `SourceType.DEFAULT`.** Elimination logic called those exports; they are thunks.
+  `SourceType.DEFAULT`.** Elimination logic called those exports; they are thunks. This is
+  detectable as a census discrepancy — here, 1649 functions at `DEFAULT` against 1646
+  `FUN_`-prefixed names, and the difference of 3 was exactly the thunks.
+
+**Census the tiers before designing around them.** One read-only pass counting
+`symbol.getSource()` over functions *and* over all symbols costs nothing and tells you
+which tiers are actually populated, whether the tier you plan to trust is the one carrying
+your ground truth, and whether name-based and tier-based counts disagree (they did here, by
+exactly the thunks). `SourceType.AI` is script-usable and orders as documented — verified:
+priority 2, equal to `ANALYSIS`, below `IMPORTED` and `USER_DEFINED`.
 
 ### Mutate through scripts, not MCP tools
 
-**Audited in GhidrAssistMCP source (`jtang613/GhidrAssistMCP@master`): every mutating
-tool hardcodes `SourceType.USER_DEFINED` — 18 occurrences across `RenameSymbolTool`,
-`CreateFunctionTool`, `CreateDataVarTool`, `SetFunctionPrototypeTool`, `StructTool`,
-`VariablesTool`. `SourceType.AI` appears nowhere.**
+**Audited in GhidrAssistMCP source (`symgraph/GhidrAssistMCP@master`): every mutating tool
+hardcodes `SourceType.USER_DEFINED` — 18 occurrences across `RenameSymbolTool` (9),
+`VariablesTool` (3), `StructTool` (3), `CreateFunctionTool`, `SetFunctionPrototypeTool`,
+`CreateDataVarTool`. `SourceType.AI` appears nowhere in the codebase.**
 
 An MCP mutation therefore launders your inference into the *highest* provenance tier,
 indistinguishable from a human decision and permanently uncleanable from evidence. **Do
 all mutation from scripts.** MCP read-only queries are fine. Audit any other MCP server
 the same way before trusting it.
 
-> **Revisit:** GhidrAssistMCP issue
-> <https://github.com/symgraph/GhidrAssistMCP/issues/66> is tracked as related to this;
-> unread at the time of writing. Check it before assuming the hardcoded
-> `SourceType.USER_DEFINED` behaviour is still current — if the server gains a
-> configurable or `AI` source type, mutation through MCP becomes viable and this rule can
-> relax.
+> **Revisit:** GhidrAssistMCP issue **#66, "Consider SourceType.AI for mutation tools"**
+> (<https://github.com/symgraph/GhidrAssistMCP/issues/66>) is **open** and proposes exactly
+> this change, reaching the same conclusion independently. Check its state before assuming
+> the hardcoded behaviour is still current — once the server can emit `SourceType.AI`,
+> mutation through MCP becomes viable and this rule relaxes to "verify what tier the tool
+> writes."
 
 ## Mutation safety
 
@@ -238,27 +289,36 @@ here is `IMPORTED`-grade, and analysis done without them is wasted effort.
    establish the source root and one subdirectory, not enough to reconstruct modules,
    because release builds compile most asserts out. Cheap to check, so always check; do
    not budget a phase around it before measuring.*
-2. **Exported and mangled symbols; leftover PDB, MAP, DWARF, or `.debug` data.** Mangled
-   C++ names carry class, member, virtualness, and full signature. Even a stripped retail
-   build often exports more than expected.
-3. **Other builds of the same game.** Demos, betas, console/other-platform ports,
+2. **Debug information, if any survives — check this before anything else, because it
+   dominates everything below it.** A shipped or leaked `.pdb` (Windows), DWARF, `.debug`
+   sections, or a `.map` file gives you names *and* full types *and* often line numbers
+   outright, collapsing most of this list into a single import. Ghidra has first-class PDB
+   support (`ghidra.app.util.bin.format.pdb`, and the install ships `docs/README_PDB.html`
+   describing the parser); DWARF has a full loader plus **debuginfod** download support as
+   of 12.1. Rarely present in retail game builds — but the payoff is so much larger than
+   every other source that checking costs nothing by comparison. Look for a `.pdb` path
+   string, `RSDS`/`NB10` signatures, and a CodeView debug directory entry. Also check
+   whether the *modding community* has one; leaked symbol files circulate for popular games.
+3. **Exported and mangled symbols.** Mangled C++ names carry class, member, virtualness,
+   and full signature. Even a stripped retail build often exports more than expected.
+4. **Other builds of the same game.** Demos, betas, console/other-platform ports,
    patched versions, and debug builds frequently ship symbols the retail build stripped.
    Diffing builds also isolates what a patch changed. Ghidra's **Version Tracking** and
    **BSim** exist for exactly this correlation.
-4. **Embedded scripting VMs.** Lua and custom interpreters register native functions by
+5. **Embedded scripting VMs.** Lua and custom interpreters register native functions by
    **name** in a table — a registration table is a free symbol table mapping strings to
    function pointers. Find the registrar, get hundreds of names at once.
-5. **Config / INI / CVar / console-command parsers.** A string→offset or string→setter
+6. **Config / INI / CVar / console-command parsers.** A string→offset or string→setter
    table names struct fields and globals directly, in the developers' own vocabulary.
-6. **Library and engine fingerprints.** Version strings, banners, and known code
+7. **Library and engine fingerprints.** Version strings, banners, and known code
    (Miles Sound System, Bink, RenderWare, Glide, DirectX, Havok, zlib, id/Build/Unreal
    lineage). Identifying an engine or middleware imports an entire published API surface
    at once. Ghidra's **Function ID (FID)** does byte-level library matching — but its
    results are **lower bounds**, silent on code that neither calls marker imports nor
    matches the corpus.
-7. **Localization tables, asset and archive filenames, resource IDs.** These name game
+8. **Localization tables, asset and archive filenames, resource IDs.** These name game
    *concepts*, which is what you want for struct and enum naming.
-8. **RTTI and vtable symbols**, where the language and build produced them
+9. **RTTI and vtable symbols**, where the language and build produced them
    (MSVC `??_7Class@@6B@` vftable symbols, `.?AV...@@` type descriptors, Itanium-ABI
    `_ZTV`). Absence is a measured finding — a build with `/GR-` has none, and that closes
    the cheapest naming route rather than meaning "look harder."
@@ -300,9 +360,12 @@ carefully reverse-engineering `strlen`. Two mechanisms, proven in this project, 
 are **independent** — run both:
 
 1. **Function ID (FID)** — byte-hash matching against Ghidra's library corpus, run as a
-   **descending threshold ladder** rather than at one cutoff. Results surface as FID
-   bookmarks with match types `single` / `multi` / `conflict`; **only `single` is safe to
-   act on.** Applying FID names can leave orphans that need a repair pass.
+   **descending threshold ladder** rather than at one cutoff. Its help documents exactly two
+   outcomes, **Single Match** and **Multiple Matches**, recorded in the comment and bookmark;
+   **only a Single Match is safe to act on.** Applying FID names can leave orphans that need
+   a repair pass. Note that FID's separate *"Function ID Conflict"* marking is **not** a
+   third match tier — it means a proposed name collided with an existing symbol at apply
+   time, which is a naming problem, not evidence about match quality.
 2. **Marker-import transitive closure** — seed from imports only a given library calls,
    then walk the call graph. Cheap and independent of any corpus.
 
@@ -427,6 +490,12 @@ Console and pre-modern targets are common in game RE, and three hazards there in
 assumptions the rest of this skill makes. Per-architecture detail:
 **`references/platforms-eras.md`**.
 
+- **Get endianness right at import, before anything else.** The same processor family runs
+  big-endian on some consoles and little-endian on others — PowerPC is BE on GameCube, Wii,
+  Xbox 360 and PS3; MIPS is LE on PS1/PS2/N64/PSP; SH-2 on Saturn is BE. Picking the wrong
+  language variant (`PowerPC:BE:32` vs the LE variant) silently garbles the entire
+  disassembly, and no amount of later analysis recovers from it. It is the cheapest possible
+  mistake to make and the most expensive to notice late.
 - **Register context must be set, or whole regions disassemble as garbage.** ARM/Thumb mode
   selection, MIPS `$gp`-relative data addressing, PowerPC TOC. Set the value over the
   address range and re-disassemble; don't fight individual instructions.
@@ -569,7 +638,7 @@ bitfield recovery, Objective-C call overriding, Jython-as-extension, JDK 21),
 - [Ghidra #650](https://github.com/NationalSecurityAgency/ghidra/issues/650), [#516](https://github.com/NationalSecurityAgency/ghidra/issues/516) — no automatic devirtualization
 - [Override Call Reference](https://grant-h.github.io/docs/ghidra/decompiler/classOverride.html) · [decompiler override.cc](https://github.com/NationalSecurityAgency/ghidra/blob/master/Ghidra/Features/Decompiler/src/decompile/cpp/override.cc)
 - [DemanglerCmd source](https://github.com/NationalSecurityAgency/ghidra/blob/master/Ghidra/Features/Base/src/main/java/ghidra/app/cmd/label/DemanglerCmd.java)
-- [GhidrAssistMCP source](https://github.com/jtang613/GhidrAssistMCP) — audited for `SourceType` usage
+- [GhidrAssistMCP source](https://github.com/symgraph/GhidrAssistMCP) — audited for `SourceType` usage; [issue #66](https://github.com/symgraph/GhidrAssistMCP/issues/66) proposes `SourceType.AI`
 - [LLM Agent-Assisted RE with Quantitative Readability Metrics](https://arxiv.org/html/2606.06838) — metric gaming, coverage, context rot
 - [Agentic RE: Building Custom AI Skills with Coding Agents, Recon 2026](https://cfp.recon.cx/recon-2026/talk/SHYHKM/)
 - [und3rf10w ghidra-scripting agent skill](https://skillsmp.com/creators/und3rf10w/ai-ghidra-tools/plugins-ghidra-skills-ghidra-scripting)

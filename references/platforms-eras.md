@@ -7,6 +7,15 @@ what you consult once one fires.
 
 ## Architectures and where they show up
 
+**Endianness first, before anything else.** The same processor family runs big-endian on
+some systems and little-endian on others, so the architecture alone does not determine the
+Ghidra language variant. Choosing wrong (`PowerPC:BE:32:default` vs the LE variant) silently
+garbles the whole disassembly, and nothing you do later recovers from it — you re-import.
+Big-endian: GameCube, Wii, Xbox 360, PS3 (PowerPC); Saturn (SH-2); Genesis, Amiga, classic
+Mac (68k); N64 in its common ROM byte order. Little-endian: PS1, PS2, PSP (MIPS); DS, GBA
+(ARM); all x86. Verify against known constants or a recognisable string rather than trusting
+the platform's reputation.
+
 | Architecture | Systems | Notes |
 |---|---|---|
 | x86 16-bit | DOS, early Windows | Segmented addressing; MZ/NE/LE formats; overlays common |

@@ -10,7 +10,9 @@ Shape: `?<member>@<Class>@@<access><callconv><return><args>Z`, classes innermost
 so `?Foo@Inner@Outer@@...` is `Outer::Inner::Foo`.
 
 The character immediately after `@@` encodes access **and virtualness** — the single most
-useful byte in the name:
+useful byte in the name. *(Standard MSVC `undname` encoding, not verified against this
+Ghidra install; the `Q` and `U` rows were confirmed live against a real binary, the rest are
+from the published scheme.)*
 
 | Char | Meaning |
 |---|---|
@@ -82,6 +84,28 @@ Itanium vtables carry an offset-to-top and RTTI pointer *before* slot 0, so the 
 address is not the first function pointer — unlike MSVC. Account for the header before
 computing slot indices.
 
+## Other toolchain families — do not assume MSVC or Itanium
+
+The two schemes above cover Windows and most Unix/modern-console targets, but not the
+console era this skill also targets:
+
+- **Metrowerks CodeWarrior** — the dominant compiler for **GameCube, Wii**, and a large
+  share of **PS2** titles, plus older Mac. Its C++ mangling is its own scheme, broadly
+  `name__<qualifiers><argtypes>` with `F` introducing the argument list and `__` separating
+  the member name from its class — e.g. `foo__3BarFi` for `Bar::foo(int)`. Ghidra's MSVC and
+  Itanium demanglers will **not** decode it, so mangled names may pass through unrecognised
+  and read as opaque garbage rather than as symbols. Its vtable and RTTI layout also differ.
+  If mangled-looking names in a GameCube/Wii/PS2 binary decode under neither shipped
+  demangler, suspect CodeWarrior before concluding the names are stripped.
+- **Watcom** — DOS-era games. Its own mangling, and `__watcall` register-based calling
+  conventions that differ from every convention listed under x86 elsewhere.
+- **Borland / Turbo C++** — DOS/early-Windows era, another distinct scheme.
+
+Practical consequence: **identify the compiler before interpreting symbols or calling
+conventions.** Rich data ("Rich header") in a PE, linker version fields, CRT banners, and the
+shape of function prologues all help. Getting this wrong makes every symbol look absent and
+every argument look misplaced.
+
 ## Modelling a C++ class in Ghidra
 
 ### Use `ClassUtils` — it is a convention, not a helper bag
@@ -93,7 +117,7 @@ ClassUtils.isVTable(dataType)
 ClassUtils.getVftDefaultEntry(dtm) / getVftEntrySize(dtm)     # vftable slot type/size
 ClassUtils.getVbtDefaultEntry(dtm) / getVbtEntrySize(dtm)     # virtual BASE table
 ClassUtils.getClassPath(classId)
-ClassUtils.getClassInternalsPath(composite)   # the "_internals" category convention
+ClassUtils.getClassInternalsPath(composite)   # category path for "class internals"
 ClassUtils.getSelfBaseType(composite)
 ClassUtils.getBaseClassDataTypePath(composite)
 ClassUtils.getReplacementPointers(dtm, structure)
@@ -138,10 +162,18 @@ constant after assignment (issues #650, #516). Escalating:
 3. **Override the call site** — add a primary reference of type
    `RefType.CALL_OVERRIDE_UNCONDITIONAL` at the indirect call (relatives:
    `JUMP_OVERRIDE_UNCONDITIONAL`, `CALLOTHER_OVERRIDE_CALL/JUMP`). Converts it to a direct
-   call. This is the mechanism Ghidra 12.1 used to clean up Objective-C `_objc_msgSend`.
+   call. Ghidra 12.1 did something equivalent for Objective-C — `WhatsNew.md` states that
+   `_objc_msgSend` calls "have been overridden to reference the actual target method (if
+   discoverable)" — though it does not name the mechanism, so treat the specific `RefType`
+   attribution as inference, not documented fact.
 
-**Mechanism 3 writes your inference into the call graph.** Tag it `SourceType.AI`, record
-it as an assertion, and never let a harvest read it back as fact.
+**Only mechanism 3 changes what the call *is*.** Mechanisms 1 and 2 make the table and its
+slots legible; the call site stays indirect and no call-graph edge appears. If you need
+readable decompilation, 1 and 2 suffice. If you need call-graph edges — call trees,
+reachability, "who can invoke this" — you need 3, per site.
+
+**Mechanism 3 writes your inference into the call graph.** Tag it `SourceType.AI`, record it
+as an assertion, and never let a harvest read it back as fact.
 
 ## Slot-index correspondence — free names, under one precondition
 

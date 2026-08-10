@@ -18,6 +18,7 @@ A Ghidra install carries a complete, exact-version API surface offline:
 | `docs/GhidraClass/{Beginner,Intermediate,AdvancedDevelopment,BSim,Debugger}/` | Course material; `Debugger/B2-Emulation`, `Debugger/B3-Scripting` are substantial |
 | `support/analyzeHeadlessREADME.md` | Headless automation reference |
 | `docs/CheatSheet.html`, `docs/ChangeHistory.md`, `docs/WhatsNew.md` | UI actions, version deltas |
+| `docs/README_PDB.html` | PDB parser — read this **first** on any Windows target, before assuming symbols are gone |
 | `docs/languages/` | Processor/Sleigh docs |
 
 Search these with Python, not shell text tools, if your environment proxies `grep`.
@@ -105,7 +106,7 @@ ClassUtils.getVftEntrySize(dtm)
 ClassUtils.getVbtDefaultEntry(dtm)        # virtual BASE table (virtual inheritance)
 ClassUtils.getVbtEntrySize(dtm)
 ClassUtils.getClassPath(classId)
-ClassUtils.getClassInternalsPath(composite)   # the "_internals" category convention
+ClassUtils.getClassInternalsPath(composite)   # category path for "class internals"
 ClassUtils.getSelfBaseType(composite)
 ClassUtils.getBaseClassDataTypePath(composite)
 ClassUtils.getReplacementPointers(dtm, structure)
@@ -150,10 +151,16 @@ it. Reading a signature from decompiler output is *not* evidence it is in the da
 `CALLOTHER_OVERRIDE_CALL`, `CALLOTHER_OVERRIDE_JUMP`, plus `COMPUTED_CALL`,
 `COMPUTED_JUMP`, `INDIRECTION`.
 
-Adding a primary reference of the appropriate override type at a call/jump site converts
-an indirect transfer into a direct one for the decompiler — the only way to devirtualize a
-vtable call, since Ghidra cannot prove a vtable pointer is constant after assignment.
-This writes *your inference into the call graph*: tag it and never harvest it back as fact.
+Adding a primary reference of the appropriate override type at a call/jump site converts an
+indirect transfer into a direct one for the decompiler.
+
+**Scope note.** Of the three mechanisms for making virtual dispatch readable (see
+`cpp-abi.md`), only this one changes what the *call* is: typing the vtable and marking it
+constant make the table and its slots **legible**, but the call site remains indirect and no
+call-graph edge appears. So this is the only route to true devirtualization, while the other
+two are usually enough if you only need readable output. Decide which you actually need —
+this one writes *your inference into the call graph*, so tag it `SourceType.AI` and never
+harvest it back as fact.
 
 Commands in `ghidra.app.cmd.refs`: `AddMemRefsCmd`, `AddOffsetMemRefCmd`,
 `AddShiftedMemRefCmd`, `AddRegisterRefCmd`, `AddStackRefCmd`, `EditRefTypeCmd`,
@@ -290,6 +297,27 @@ df.packFile(file, monitor)                    # .gzf snapshot of the PERSISTED s
 `packFile` serializes the last-**saved** state, so snapshot **after** save or the archive
 silently captures the previous version. `"File has unsaved changes"` from `checkin` is
 literal.
+
+## Debug information
+
+`ghidra.app.util.bin.format.pdb` (and `pdb` support generally) handles Windows PDB; the
+install ships `docs/README_PDB.html` describing the parser and
+`support/README_createPdbXmlFiles.txt` for the XML route.
+`ghidra.app.util.bin.format.dwarf` is a large, full DWARF implementation with
+`dwarf.line` (line numbers), `dwarf.external` and `sectionprovider`; Ghidra 12.1 added
+**debuginfod** downloads and a `$HOME/.cache/debuginfod_client` search. Golang and Swift
+metadata have their own packages (`format.golang.rtti`, `format.swift.types`), as does
+Objective-C (`format.objc`).
+
+**Check for debug info before doing anything else on a Windows or ELF target.** It
+subsumes most of the evidence-gathering this methodology otherwise does by hand.
+
+## Exporting
+
+`ghidra.app.util.exporter` — `CppExporter` is the File → Export Program → C/C++ mechanism;
+its `CPPResult` exposes `headerCode()` and `bodyCode()`. This is the built-in route to a C
+header of recovered types; prefer it (or a deliberate subset) over a hand-rolled emitter.
+Other exporters in the same package cover XML, HTML, ASCII, and binary.
 
 ## Headless automation
 
