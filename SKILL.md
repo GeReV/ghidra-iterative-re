@@ -15,6 +15,12 @@ guesses.** Apply an inference, re-read, and the confirming read looks independen
 is not. Part 1 makes the loop safe. Part 2 is what to point it at in a game. Part 3 is
 the tool surface.
 
+**`references/api.md` holds the verified API surface** — class and method names checked
+against a real install, plus the offline doc paths to discover more. Read it before
+writing scripts; it exists because recalling Ghidra's API from memory produces plausible
+names that do not exist, and because several of the most useful classes are absent from
+the public javadoc.
+
 ---
 
 # Part 1 — The loop (any binary)
@@ -138,6 +144,12 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
 - **A short name is not an identity.** Demangled short names collide across a hierarchy —
   an override shares its base's name, so two different tables can look identical. Join on
   **addresses**, not names.
+- **`Function.getName()` is unqualified; `getName(True)` includes the namespace.**
+  Comparing the wrong one against a namespace-qualified expectation makes a check
+  *structurally unable to match* — it reports 0/N forever and reads as a failing sweep
+  rather than a broken test. This exact bug produced four dead checks in this project.
+  Likewise raw mangled names and demangled short names are different string spaces that
+  never intersect; converting one to the other is required before comparison.
 
 ## Assertion discipline under iteration
 
@@ -232,6 +244,14 @@ by a constructor; a dispatch table is indexed by a variable at a call site. Veri
 any authoritative naming (vftable symbols, RTTI) before believing an interpretation.
 
 ### If it *is* C++, and you want names in the decompiler
+
+**First: `ghidra.program.model.gclass.ClassUtils` exists.** Ghidra has a built-in
+convention for modelling C++ classes with vtables — `isVTable()`,
+`getVftDefaultEntry()`/`getVftEntrySize()`, `getVbtDefaultEntry()` for *virtual base*
+tables under virtual inheritance, `getClassInternalsPath()` for its `_internals` category
+layout, `getSelfBaseType()`, `getBaseClassDataTypePath()`, `getReplacementPointers()`.
+Follow it and your results interoperate with Ghidra's PDB/RTTI machinery; hand-roll and
+they sit parallel to it. Check `ClassUtils` before building any vftable struct by hand.
 
 Ghidra does not devirtualize automatically — it cannot prove a vtable pointer is constant
 after assignment (issues #650, #516). Three explicit mechanisms, escalating:
@@ -343,15 +363,23 @@ We wrote a vtable sweeper from scratch without checking that the first item exis
 | Need | Built-in |
 |---|---|
 | Find function-pointer / vtable tables | `Search → For Address Tables` |
+| Model a C++ class with vtables | `ClassUtils` / `ClassID` (`ghidra.program.model.gclass`) — a whole convention, don't hand-roll |
+| MSVC RTTI structures | `RTTI0DataType`…`RTTI4DataType`, `MSDataTypeUtils` (`ghidra.app.util.datatype.microsoft`) |
 | Infer struct fields from access patterns | Auto Create / Auto Fill in Structure; **Auto Fill in Class Structure** for a known `this` |
+| Set data constant / volatile | `MutabilitySettingsDefinition`: `NORMAL`/`CONSTANT`/`VOLATILE`/`WRITABLE` |
 | Parse C headers into the program | `CParserUtils.parseHeaderFiles(...)` (C only, not C++) |
 | Open a `.gdt` type archive with no tool | `FileDataTypeManager.openFileArchive(file, false)` |
+| **Decompile many functions** | `ParallelDecompiler.decompileFunctions(...)` — never loop `DecompInterface` serially over a whole program |
+| **Record `__FILE__` / source-path evidence** | `program.getSourceFileManager().addSourceMapEntry(file, line, range)` — queryable both ways, not a comment |
+| Custom function-start signatures, library fingerprints | `ghidra.util.bytesearch`: `DittedBitSequence`, `PatternPairSet`, `MemoryBytePatternSearcher` |
 | Find more functions in undefined bytes | `RandomForestFunctionFinderPlugin` (MachineLearning extension) — trains on functions already found |
 | Identify library code | Function ID (FID); **BSim** for similarity search across corpora |
-| Compare two builds | Version Tracking, BSim |
+| Compare two builds / match stripped against symbolled | Version Tracking, BSim, `ghidra.program.model.correlate` (`HashedFunctionAddressCorrelation`, `MnemonicHashCalculator`) |
 | Unrecovered switch / jumptable | `FindUnrecoveredSwitchesScript.java`, `SwitchOverride.java` |
 | Non-returning-function damage | `FixupNoReturnFunctionsScript.java` |
-| Run a routine without the game | `EmulatorHelper` |
+| Run a routine without the game | `EmulatorHelper` (`ghidra.app.emulator`) |
+| **Enforce a non-mutating pass** | `analyzeHeadless -readOnly` — makes evidence-only a harness guarantee, not a discipline |
+| Batch/pipeline runs | `analyzeHeadless -process -preScript -postScript -noanalysis` |
 | Preview bytes without committing | Disassembled View window |
 
 ## Operating rules (MCP)
