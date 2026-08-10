@@ -1,0 +1,161 @@
+# C++ ABI reference: mangling, vtables, and modelling them in Ghidra
+
+Lookup detail for C++ targets. `SKILL.md` carries the triggers — *establish the
+inheritance model before relying on slot positions*, *check `ClassUtils` before
+hand-rolling a vftable struct* — and this file is what you consult once one fires.
+
+## MSVC mangled names
+
+Shape: `?<member>@<Class>@@<access><callconv><return><args>Z`, classes innermost-first,
+so `?Foo@Inner@Outer@@...` is `Outer::Inner::Foo`.
+
+The character immediately after `@@` encodes access **and virtualness** — the single most
+useful byte in the name:
+
+| Char | Meaning |
+|---|---|
+| `A` / `B` | private, non-virtual |
+| `E` / `F` | **private virtual** |
+| `I` / `J` | protected, non-virtual |
+| `M` / `N` | **protected virtual** |
+| `Q` / `R` | public, non-virtual |
+| `U` / `V` | **public virtual** |
+| `S` | public **static** |
+| `Y` | free function (no class) |
+
+A function occupying a vtable slot must carry a virtual specifier (`E`/`F`/`M`/`N`/`U`/`V`).
+A `Q` or `S` in a slot means your table is not a vtable, or your slot attribution is wrong.
+
+### Special names (`??` prefix)
+
+| Symbol | Meaning |
+|---|---|
+| `??0Class@@` | constructor |
+| `??1Class@@` | destructor |
+| `??2` / `??3` | `operator new` / `operator delete` |
+| `??_7Class@@6B@` | **vftable** — its address IS the class's vtable, slot 0 |
+| `??_7Derived@@6BBase@@@` | **secondary vftable** → multiple inheritance |
+| `??_8Class@@7B@` | **vbtable** (virtual base table) → **virtual inheritance** |
+| `??_9` | **vcall thunk** → MI dispatch adjustment |
+| `??_B` | function-local static initialisation guard (**not** inheritance) |
+| `??_C` | string literal |
+| `??_E` / `??_G` | vector / **scalar deleting destructor** |
+| `??_R0`…`??_R4` | RTTI descriptors (absent when built `/GR-`) |
+
+**Inheritance-model test.** Only unqualified `??_7Class@@6B@` forms present, with **no
+`??_8` and no `??_9`**, is positive evidence of a plain single-inheritance chain — the
+precondition for any slot-index reasoning.
+
+### The destructor trap, learned the hard way
+
+**A virtual destructor's vtable slot holds the compiler-generated *scalar deleting
+destructor* thunk (`??_G`), not `~Class` itself.** So `~Class` never appearing as a raw
+vtable target is *expected ABI behaviour, not a scan gap*. In this project a
+mangled-vs-vtable cross-check scored 188/199, and every one of the 11 misses was this.
+Budget for it before concluding a sweep is incomplete.
+
+### Comparing names — the string-space trap
+
+Raw mangled names (`?Sleep@CGobject@@QAEXXZ`) and Ghidra's demangled short names (`Sleep`)
+are **different string spaces that never intersect**. A check comparing one against the
+other reports 0/N forever and reads as a failing sweep rather than a broken test. Convert
+first. Likewise `Function.getName()` is unqualified while `getName(True)` includes the
+namespace.
+
+Ghidra 12.1 added Microsoft demangler **output options** controlling user-defined-type tags
+(`struct` etc. in argument positions) and anonymous-namespace presentation
+(`_anon_ABCD01234` vs the generic form). Both affect whether demangled and non-demangled
+symbols land in the same namespace, so they affect name-based joins.
+
+## Itanium ABI (GCC/Clang — Linux, most consoles' modern toolchains)
+
+| Symbol | Meaning |
+|---|---|
+| `_Z...` | mangled function |
+| `_ZTV<class>` | vtable |
+| `_ZTI` / `_ZTS` | typeinfo / typeinfo name |
+| `_ZTT` | VTT — **virtual inheritance present** |
+| `_ZThn...` / `_ZTv...` | non-virtual / virtual adjustor thunks → **multiple inheritance** |
+| `_ZGV` | guard variable |
+
+Itanium vtables carry an offset-to-top and RTTI pointer *before* slot 0, so the symbol
+address is not the first function pointer — unlike MSVC. Account for the header before
+computing slot indices.
+
+## Modelling a C++ class in Ghidra
+
+### Use `ClassUtils` — it is a convention, not a helper bag
+
+`ghidra.program.model.gclass.ClassUtils` / `ClassID`:
+
+```python
+ClassUtils.isVTable(dataType)
+ClassUtils.getVftDefaultEntry(dtm) / getVftEntrySize(dtm)     # vftable slot type/size
+ClassUtils.getVbtDefaultEntry(dtm) / getVbtEntrySize(dtm)     # virtual BASE table
+ClassUtils.getClassPath(classId)
+ClassUtils.getClassInternalsPath(composite)   # the "_internals" category convention
+ClassUtils.getSelfBaseType(composite)
+ClassUtils.getBaseClassDataTypePath(composite)
+ClassUtils.getReplacementPointers(dtm, structure)
+ClassUtils.getReplacementType(structure)
+ClassUtils.hasClassAttribute(structure)
+ClassUtils.createVxTableDescriptionOffsetTag(ptrOffsetInClass)
+ClassUtils.validateVtableDescriptionOffsetTag(description)
+```
+
+Following these keeps recovered classes interoperable with Ghidra's PDB and RTTI
+machinery. Hand-rolled structs sit parallel to it and cannot be consumed by it.
+
+Related: `SymbolTable.createClass(parent, name, sourceType)` creates a `GhidraClass`, which
+Ghidra auto-associates with a struct of the same name.
+
+### Getting virtual method names into the decompiler
+
+Ghidra's official recipe (from `improvingDisassemblyAndDecompilation.pdf`):
+
+1. Create a **`FunctionDefinitionDataType`** per virtual method, calling convention
+   `__thiscall`.
+2. Create a **`<Class>_vftable` structure** whose fields are those function definitions
+   **in slot order**, each field **named** after its method.
+3. Make the **class struct's first field a pointer** to that vftable struct.
+4. Then `Auto Fill in Structure` on a known `this` fills remaining fields from access
+   patterns.
+
+Shortcut for finding the tables in the first place: `Search → For Address Tables`, then
+apply the definitions to the pointers and `Data → Create Structure`.
+
+### Devirtualization — three explicit mechanisms
+
+Ghidra does **not** devirtualize automatically; it cannot prove a vtable pointer is
+constant after assignment (issues #650, #516). Escalating:
+
+1. **Name the slots** — the recipe above. Yields `this->vtable->Method(...)` rendering.
+2. **Mark the vtable data `CONSTANT`** (`MutabilitySettingsDefinition`: `NORMAL`,
+   `CONSTANT`, `VOLATILE`, `WRITABLE`; per-data via Settings or per-block via Memory Map).
+   *The decompiler shows the contents of constant memory rather than a pointer to it* —
+   which is what lets it read through the table. `.rdata` genuinely is read-only, so this
+   is factually correct rather than a hack.
+3. **Override the call site** — add a primary reference of type
+   `RefType.CALL_OVERRIDE_UNCONDITIONAL` at the indirect call (relatives:
+   `JUMP_OVERRIDE_UNCONDITIONAL`, `CALLOTHER_OVERRIDE_CALL/JUMP`). Converts it to a direct
+   call. This is the mechanism Ghidra 12.1 used to clean up Objective-C `_objc_msgSend`.
+
+**Mechanism 3 writes your inference into the call graph.** Tag it `SourceType.AI`, record
+it as an assertion, and never let a harvest read it back as fact.
+
+## Slot-index correspondence — free names, under one precondition
+
+Under single inheritance, a derived class's vtable is its base's slot sequence with
+overrides substituted in place and new virtuals appended. Therefore: **if a base table's
+slot *i* holds a named exported virtual, and a derived table's slot *i* holds `FUN_xxxx`,
+that function is the override of that method** — name it `Derived::Method`. This is ABI
+mechanics, not inference.
+
+Preconditions, all of which must be checked, not assumed:
+
+- Single inheritance (the `??_8`/`??_9`/qualified-`??_7` test above).
+- Correct slot alignment between the tables — join on **target addresses**, not demangled
+  short names, since an override shares its base's name and makes different tables look
+  identical.
+- The base table must be complete; a table truncated by an undefined-function pointer
+  shifts nothing but hides slots beyond the truncation.

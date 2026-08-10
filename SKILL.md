@@ -374,39 +374,34 @@ is used**, not by its shape: a C++ vtable's address gets stored into offset 0 of
 by a constructor; a dispatch table is indexed by a variable at a call site. Verify against
 any authoritative naming (vftable symbols, RTTI) before believing an interpretation.
 
-### If it *is* C++, and you want names in the decompiler
+### If it *is* C++
 
-**First: `ghidra.program.model.gclass.ClassUtils` exists.** Ghidra has a built-in
-convention for modelling C++ classes with vtables — `isVTable()`,
-`getVftDefaultEntry()`/`getVftEntrySize()`, `getVbtDefaultEntry()` for *virtual base*
-tables under virtual inheritance, `getClassInternalsPath()` for its `_internals` category
-layout, `getSelfBaseType()`, `getBaseClassDataTypePath()`, `getReplacementPointers()`.
-Follow it and your results interoperate with Ghidra's PDB/RTTI machinery; hand-roll and
-they sit parallel to it. Check `ClassUtils` before building any vftable struct by hand.
+Three things to know here; the mechanics are in **`references/cpp-abi.md`**.
 
-Ghidra does not devirtualize automatically — it cannot prove a vtable pointer is constant
-after assignment (issues #650, #516). Three explicit mechanisms, escalating:
-
-1. **Name the slots** (Ghidra's official recipe): a `FunctionDefinition` data type per
-   virtual method with `__thiscall`; a `<Class>_vftable` struct whose fields are those
-   definitions **in slot order**, each **named** after its method; the class struct's
-   first field a pointer to that vftable struct.
-2. **Mark the vtable data constant** so the decompiler reads *through* it instead of
-   showing a pointer to it.
-3. **Override the call site** — `RefType.CALL_OVERRIDE_UNCONDITIONAL` (also
-   `JUMP_OVERRIDE_UNCONDITIONAL`, `CALLOTHER_OVERRIDE_CALL/JUMP`) turns an indirect call
-   into a direct one. This is how Ghidra 12.1 cleaned up Objective-C `_objc_msgSend`.
-
-Mechanism 3 writes *your inference into the call graph*. Tag it, record it, and never let
-a harvest read it back as fact.
+- **`ClassUtils` exists** (`ghidra.program.model.gclass`) — Ghidra has a *convention* for
+  modelling C++ classes with vtables, including virtual base tables. Follow it and your
+  results interoperate with Ghidra's PDB/RTTI machinery; hand-roll and they sit parallel to
+  it, unusable by it. **Check it before building any vftable struct by hand.**
+- **Ghidra does not devirtualize automatically** — it cannot prove a vtable pointer is
+  constant after assignment (issues #650, #516). But three explicit mechanisms do work,
+  escalating: name the slots via a vftable struct, mark the table `CONSTANT` so the
+  decompiler reads *through* it, or override the call site with
+  `RefType.CALL_OVERRIDE_UNCONDITIONAL`. The last one **writes your inference into the call
+  graph** — tag it `SourceType.AI` and never let a harvest read it back as fact.
+- **Slot-index correspondence gives free names**, under single inheritance: if a base
+  table's slot *i* is a named exported virtual and a derived table's slot *i* is `FUN_xxxx`,
+  that function *is* the override. ABI mechanics, not inference — but check the
+  preconditions in the reference, and expect virtual destructors to sit in slots as
+  compiler-generated deleting-destructor thunks rather than as `~Class`.
 
 ## Data shapes characteristic of games
 
-- **Fixed-point arithmetic.** On pre-FPU and console targets, an integer multiply
-  followed by a shift is Q16.16-style fixed point, not a bug and not an int. Ghidra will
-  show no float type; the shift amount tells you the binary point.
-- **FPU era.** x87 stack code decompiles awkwardly and its register-stack discipline
-  matters for reading arguments; SSE-era code looks entirely different for the same math.
+- **Fixed-point arithmetic.** On pre-FPU and console targets, an integer multiply followed
+  by a shift is fixed-point math — not a bug, not an integer computation. No float type will
+  appear anywhere. Q-format mechanics: `references/platforms-eras.md`.
+- **FPU era changes what an instruction tells you.** x87 runs on a register *stack*, so
+  argument order needs tracking; SSE packs four lanes, so one instruction may touch four
+  fields and instruction width is not field width. Detail: `references/platforms-eras.md`.
 - **Entity pools and handles.** Fixed-size object arrays with active flags or freelists,
   and opaque handle types (often `index | generation<<n`) rather than pointers. A 4-byte
   "object id" scalar passed everywhere is a handle, and its bit split is worth recovering.
@@ -428,23 +423,23 @@ a harvest read it back as fact.
 
 ## Platform breadth
 
-Ghidra supports far more than PE/x86, and console targets are common in game RE: MIPS
-(PS1/PS2/N64/PSP), PowerPC (GameCube/Wii/Xbox 360/PS3), SH-2 (Saturn), 68k
-(Genesis/Amiga/Mac), ARM (GBA/DS/mobile), x86 (DOS/Windows).
+Console and pre-modern targets are common in game RE, and three hazards there invalidate
+assumptions the rest of this skill makes. Per-architecture detail:
+**`references/platforms-eras.md`**.
 
-- **Register context matters for correct disassembly.** MIPS `$gp`-relative addressing,
-  ARM/Thumb mode selection, and similar per-region processor state must be set or whole
-  regions disassemble as garbage. Set register values over an address range rather than
-  fighting the output.
-- **Overlays.** PS1 and DOS games routinely load different code to the same address.
-  Model these as Ghidra **overlay memory blocks**, or analysis of one overlay silently
-  corrupts another. An address alone is not an identity in an overlaid program.
-- **Bank switching** on cartridge systems has the same consequence.
-- **Memory-mapped hardware registers.** Label them from platform documentation and mark
-  them **volatile**; a write to a known VDP/GPU/DMA register identifies surrounding code
-  instantly, and volatility stops the decompiler optimizing repeated accesses away.
-- **Loaders.** Console ROM and executable formats often need a community loader
-  extension; failing that, import raw with a correct base address and memory map.
+- **Register context must be set, or whole regions disassemble as garbage.** ARM/Thumb mode
+  selection, MIPS `$gp`-relative data addressing, PowerPC TOC. Set the value over the
+  address range and re-disassemble; don't fight individual instructions.
+- **An address is not an identity in an overlaid or bank-switched program.** PS1 and DOS
+  games load different code to the same address; cartridge systems bank ROM into a window.
+  Model each as a Ghidra **overlay memory block**, and note that this breaks
+  address-keyed evidence — **every join key must become *(overlay space, address)***, and a
+  whole-program function count stops being a population. Audit any evidence file for this
+  before trusting it.
+- **Mark memory-mapped hardware registers `VOLATILE`.** Otherwise the decompiler may fold
+  repeated reads into one and silently delete the poll loop you were reading. Labelling one
+  recognised VDP/GPU/DMA register also identifies the surrounding code instantly — often the
+  fastest way into an unknown console binary.
 
 ## Runtime observation — the primitive games give you for free
 
