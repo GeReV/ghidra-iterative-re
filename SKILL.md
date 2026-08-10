@@ -267,6 +267,31 @@ here is `IMPORTED`-grade, and analysis done without them is wasted effort.
 strings is what the authors called these things. Name recovered entities to match it, not
 to match your model of the game.
 
+### Run the cheap test for each before budgeting work on it
+
+Every item above is a *hypothesis about your binary*, and each has a one-command test.
+Run the whole column first: a measured zero is a finding, and it stops you planning a
+phase around a source that isn't there. The right-hand column is what these returned on
+one 1999-era MSVC/x86 retail game binary — illustrating that yields differ wildly and
+must be measured, not assumed.
+
+| Source | Test | Example yield |
+|---|---|---|
+| MSVC RTTI | strings `.?AV`, `type_info` | **0** — built `/GR-`, closing the cheapest naming route |
+| Exported vftable symbols | strings `??_7` | **14** authoritative class→vtable pairs |
+| Virtual / multiple inheritance | strings `??_8`, `??_9` | **0** — plain single inheritance |
+| Assert source paths | strings `.cpp`, `.c`, `.h`, drive-letter prefixes | **1** `.cpp`, **1** `.h` — source root only |
+| Mangled export symbols | count symbols starting `?` | **981**, carrying class + virtualness + full signature |
+| Embedded scripting VM | strings `lua`, `Lua_`, registration-table shapes | not yet run |
+| Config / CVar parser | strings for known setting keys, `.ini`, `.cfg` | not yet run |
+| Middleware / engine | version banners, known import sets | Miles Sound System and DirectInput identified |
+| Debug/PDB residue | `.pdb` paths, `RSDS`/`NB10` signatures, `.debug` sections | not yet run |
+| Localization / string tables | large contiguous string blocks, id→string arrays | not yet run |
+
+Record every result, including the zeros, and distinguish **measured-zero** ("searched,
+absent") from **not-yet-run**. Conflating those is how a project convinces itself a source
+was exhausted when it was never tried.
+
 ## Separating library code from game code
 
 A statically-linked game binary mixes engine, CRT, middleware, and game code with no
@@ -313,6 +338,24 @@ format documented by a modder and merely *assumed* is a hypothesis.
 Do not force an OOP reading onto a program that isn't OOP. Era matters: pre-C++ and
 early-C++ game code dispatches through plain function-pointer tables far more often than
 through vtables, and the recovery mechanics are the same while the *semantics* are not.
+
+**Establish the inheritance model before relying on slot positions.** A derived class's
+vtable shares a prefix with its base only under single inheritance, so any naming or
+ownership scheme built on slot index depends on it. For MSVC this is three cheap string
+searches, not an assumption:
+
+| Search | Meaning if found |
+|---|---|
+| `??_8` | **vbtable** — virtual inheritance is present; slot prefixes are not reliable |
+| `??_9` | **vcall thunk** — multiple-inheritance dispatch adjustment |
+| `??_7Derived@@6BBase@@@` (qualified form) | a **secondary** vftable, i.e. multiple inheritance |
+
+Only the unqualified `??_7Class@@6B@` form appearing, with no `??_8` and no `??_9`,
+is positive evidence of a plain single-inheritance chain. (Measured on one 1999 MSVC game
+binary: 14 unqualified vftables, zero `??_8`, zero `??_9` — single inheritance confirmed
+for every class carrying an exported vftable symbol, which is a floor for the rest.)
+Itanium-ABI equivalents: `_ZTV` vtables, `_ZTT` VTT for virtual inheritance, `_ZThn`/`_ZTv`
+thunks.
 
 Shapes to expect, all of which look alike in `.rodata`:
 
