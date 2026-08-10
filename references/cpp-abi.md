@@ -50,11 +50,23 @@ precondition for any slot-index reasoning.
 
 ### The destructor trap, learned the hard way
 
-**A virtual destructor's vtable slot holds the compiler-generated *scalar deleting
-destructor* thunk (`??_G`), not `~Class` itself.** So `~Class` never appearing as a raw
-vtable target is *expected ABI behaviour, not a scan gap*. In this project a
-mangled-vs-vtable cross-check scored 188/199, and every one of the 11 misses was this.
-Budget for it before concluding a sweep is incomplete.
+**A virtual destructor's vtable slot holds a compiler-generated *deleting destructor*
+thunk, not `~Class` itself.** So `~Class` never appearing as a raw vtable target is
+*expected ABI behaviour, not a scan gap*. In this project a mangled-vs-vtable cross-check
+scored 188/199, and every one of the 11 misses was this. Budget for it before concluding a
+sweep is incomplete.
+
+**Which thunk it is must be measured, not assumed — this reference previously asserted
+`??_G` and the binary disagreed.** Decompile one and read the flag parameter:
+
+| Branch present | Thunk | Mangling |
+|---|---|---|
+| `flags & 1` only, no loop | **scalar** deleting destructor | `??_G` |
+| `flags & 2` array loop striding by the object size, count at `*(this-4)`, **plus** `flags & 1` | **vector** deleting destructor | `??_E` |
+
+Measured on this 1999 MSVC binary: **all nine** anchored classes' slot-38 targets are the
+**vector** form, with per-class strides (0x38, 0x2a8, 0x578, …). Naming them "scalar" would
+have asserted what the decompiled body disproves. The array branch is the discriminator.
 
 ### Comparing names — the string-space trap
 
