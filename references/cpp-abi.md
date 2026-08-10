@@ -203,3 +203,13 @@ Preconditions, all of which must be checked, not assumed:
   identical.
 - The base table must be complete; a table truncated by an undefined-function pointer
   shifts nothing but hides slots beyond the truncation.
+
+  **A truncated table does not merely hide slots — it forges a depth, and depth is what
+  ancestry arguments are built on.** Measured here: a 47-slot table was recorded as 42
+  because slot 42's target had real instructions but no defined `Function`. At 42 it looked
+  *shallower* than the 47-slot classes it actually equals, and a "which table shares the
+  most slots while being strictly shallower" test therefore promoted it to a nearer
+  ancestor of four classes — inverting the ancestry. At its true 47 it is not a candidate
+  at all. Before any depth comparison, verify each table's extent independently of the
+  sweep that produced it: walk past the recorded end and check whether code pointers
+  continue, and where the incoming references actually fall.

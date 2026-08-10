@@ -49,6 +49,31 @@ Stop after two consecutive rounds produce nothing new — not when you run out o
 | **harvest** | Read evidence back out, **excluding `SourceType.AI`**, into versioned evidence files |
 | **adjudicate** | Turn raw evidence rows into *decided* layout/ownership records: apply the confidence rule (how many structurally independent witness kinds agree), resolve conflicts between witnesses, and **record what you deliberately excluded and why**. This is the step that produces a `confidence` column. Excluded evidence must be written down — a later reader re-deriving from raw rows will otherwise reach a different answer and think yours is wrong. |
 
+### Cascade is the stage that gets skipped — build a forcing function
+
+**Measured on this project: an agent that knows this loop still skipped `cascade` on two
+consecutive applies.** Nothing failed, nothing warned, and the round looked complete. The
+damage was subtle and specific: the "did the decompiler improve?" measurement was taken
+against a program that had **never been re-analyzed**, so a stated finding rested on an
+unverified read. (Re-running the cascade afterwards happened to confirm the finding — which
+is exactly why the omission was invisible.)
+
+It is the easiest stage to skip because it is the only one with no artifact. `apply` writes
+symbols, `verify` raises, `harvest` writes CSVs — but `cascade` produces nothing you can
+look at afterwards and notice missing. So make its absence visible:
+
+- **Every mutating script ends by notifying `AutoAnalysisManager` what changed and calling
+  `analyzeChanges`** — or prints, explicitly, why no cascade applies (a repo-CSV-only
+  apply, for instance). Silence is indistinguishable from forgetting.
+- **Never measure the payoff of an apply before the cascade has run.** "I applied types and
+  the decompiler looks the same" is not a finding until the analyzer has seen the change.
+- **Bracket the cascade with the same invariant as the apply.** `analyzeChanges` is the
+  operation most able to cause silent collateral damage, and re-analysis can *undo*
+  curation — so also re-assert that what you applied is still there. Checking function
+  count alone would not notice a re-analysis that cleared every struct you just applied.
+- Record it in the round's metrics like any other stage, so a round with applies and no
+  cascade is visible in the history rather than only in memory.
+
 **One round is not one session.** A round is a unit of *work* — it can span sessions, and a
 long round should be split across fresh contexts to avoid the naming drift described under
 failure modes. The loop's termination test ("two dry rounds") is about the work, not about
