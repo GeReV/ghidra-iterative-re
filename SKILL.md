@@ -34,6 +34,21 @@ checkpoint → apply (highest-certainty tier only) → cascade (scoped)
 
 Stop after two consecutive rounds produce nothing new — not when you run out of ideas.
 
+**Quantify every round.** Emit a metrics row per checkpoint into an **append-only** file,
+with internal-consistency checks that **raise, not warn** (counts that must sum, sets that
+must be disjoint). Document each metric's definition in its own file and record renames —
+definitions drift, and a metric silently redefined between rounds makes the whole history
+incomparable. This is what makes "did the round accomplish anything" answerable rather
+than a matter of impression.
+
+**Track replay debt honestly.** Keep a written record of which steps are *not* yet
+reproducible from a clean state and why. A pipeline nobody has replayed end-to-end is
+untested, however green each step looked when it ran.
+
+**Emit a C header from recovered types.** It is the bridge to a reimplementation, it is
+diffable outside Ghidra, and generating it forces every recovered layout to be complete
+and self-consistent rather than approximately right.
+
 **Apply in certainty order, never convenience order.** Ground truth from the binary
 first, then mechanical derivations from it, then inferences. A round that applies a guess
 before an available certainty has corrupted every round after it.
@@ -63,6 +78,26 @@ A round's own applications then structurally cannot become evidence for the clai
 motivated them. Verify the filter fires: tag one known symbol `AI`, confirm it drops out
 of the harvest.
 
+### `SourceType` is necessary but not sufficient
+
+**Confirmed live in this project: `SourceType` cannot distinguish two different naming
+sources that share a tier.** A genuine PE-export demangled name and a name harvested by a
+string heuristic both carry `SourceType.ANALYSIS` — indistinguishable by tier alone. So
+the tier tells you *how trustworthy the class of source is*, not *which source it was*.
+
+Consequences:
+
+- Keep **per-address evidence files** recording which mechanism produced each name, and
+  consult them before any tier-based inference.
+- **Never infer provenance by elimination.** "Not default-named and not in a library
+  namespace, therefore a real export" is a landmine: on the next regeneration it silently
+  relabels heuristically-derived names as binary ground truth, destroying the very
+  distinction the column exists to carry. Cross-reference the evidence files first and
+  emit an explicit `unknown` for anything that matches nothing.
+- That fix immediately surfaced a real mislabel worth knowing generally: **a thunk
+  inherits a plausible qualified name from its target while its own local symbol carries
+  `SourceType.DEFAULT`.** Elimination logic called those exports; they are thunks.
+
 ### Mutate through scripts, not MCP tools
 
 **Audited in GhidrAssistMCP source (`jtang613/GhidrAssistMCP@master`): every mutating
@@ -74,6 +109,13 @@ An MCP mutation therefore launders your inference into the *highest* provenance 
 indistinguishable from a human decision and permanently uncleanable from evidence. **Do
 all mutation from scripts.** MCP read-only queries are fine. Audit any other MCP server
 the same way before trusting it.
+
+> **Revisit:** GhidrAssistMCP issue
+> <https://github.com/symgraph/GhidrAssistMCP/issues/66> is tracked as related to this;
+> unread at the time of writing. Check it before assuming the hardcoded
+> `SourceType.USER_DEFINED` behaviour is still current — if the server gains a
+> configurable or `AI` source type, mutation through MCP becomes viable and this rule can
+> relax.
 
 ## Mutation safety
 
@@ -144,6 +186,14 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
 - **A short name is not an identity.** Demangled short names collide across a hierarchy —
   an override shares its base's name, so two different tables can look identical. Join on
   **addresses**, not names.
+- **Population counts depend on the symbol filter, silently.** In this project
+  `getExternalFunctions()` returned 134 imports, not the expected 136, because two of them
+  exist only as `SymbolType.Label` and not as `Function` symbols — so that API cannot see
+  them at all. Verify a population before building on its size.
+- **A hand-written seed list can contain structurally inert entries.** Of 28 marker
+  imports seeded into a call-graph closure, 2 were unreachable by the mechanism consuming
+  them, so the effective seed set was 26. Check that each seed is actually visible to the
+  API that will consume it, and report the effective count, not the written one.
 - **`Function.getName()` is unqualified; `getName(True)` includes the namespace.**
   Comparing the wrong one against a namespace-qualified expectation makes a check
   *structurally unable to match* — it reports 0/N forever and reads as a failing sweep
@@ -178,11 +228,16 @@ Ordered by payoff. Do these before you interpret a single function — every nam
 here is `IMPORTED`-grade, and analysis done without them is wasted effort.
 
 1. **Assert / debug strings containing source paths.** `__FILE__` in an assert macro
-   embeds the **original source file path**, often with line numbers. This reconstructs
-   the developer's module decomposition — directory names are subsystems, filenames are
-   translation units — and it is the single highest-value string sweep in game RE. A
-   function containing `"c:\\proj\\ai\\pathfind.cpp"` belongs to the pathfinding module,
-   whatever it is called.
+   embeds the **original source file path**, often with line numbers. Where it survives
+   this reconstructs the developer's module decomposition — directory names are
+   subsystems, filenames are translation units — and a function containing
+   `"c:\\proj\\ai\\pathfind.cpp"` belongs to the pathfinding module whatever it is called.
+   Record hits as **source map entries** (see `references/api.md`), not comments.
+   *Calibration: yield varies enormously with build settings. Sweeping a 1999-era retail
+   game binary here returned exactly one `.cpp` path and one `.h` name — enough to
+   establish the source root and one subdirectory, not enough to reconstruct modules,
+   because release builds compile most asserts out. Cheap to check, so always check; do
+   not budget a phase around it before measuring.*
 2. **Exported and mangled symbols; leftover PDB, MAP, DWARF, or `.debug` data.** Mangled
    C++ names carry class, member, virtualness, and full signature. Even a stripped retail
    build often exports more than expected.
@@ -211,6 +266,39 @@ here is `IMPORTED`-grade, and analysis done without them is wasted effort.
 **Use the developers' vocabulary.** Terminology from the game's own UI, manual, and
 strings is what the authors called these things. Name recovered entities to match it, not
 to match your model of the game.
+
+## Separating library code from game code
+
+A statically-linked game binary mixes engine, CRT, middleware, and game code with no
+section boundary between them. Partitioning them early is what stops later phases from
+carefully reverse-engineering `strlen`. Two mechanisms, proven in this project, and they
+are **independent** — run both:
+
+1. **Function ID (FID)** — byte-hash matching against Ghidra's library corpus, run as a
+   **descending threshold ladder** rather than at one cutoff. Results surface as FID
+   bookmarks with match types `single` / `multi` / `conflict`; **only `single` is safe to
+   act on.** Applying FID names can leave orphans that need a repair pass.
+2. **Marker-import transitive closure** — seed from imports only a given library calls,
+   then walk the call graph. Cheap and independent of any corpus.
+
+Caveats that cost real time here, all of which generalize:
+
+- **Both mechanisms share one blind spot**: library code that neither calls a marker
+  import nor byte-matches the FID corpus is invisible to both. Every count is a **LOWER
+  BOUND**, never a population estimate. "Unclassified" does not mean "game."
+- **A missing FID match is silent by construction.** There is no "almost matched"
+  signal to inspect, so absence of a hit is not evidence of absence of library code.
+- **Transitive closure is where swallowing risk lives.** Closure from CRT seeds nearly
+  absorbed named game code; guard it explicitly, cap it, and check whether the cap is
+  structural. Do not reuse closure for a second library just because it worked once.
+- **Derive a game-side exclusion set from the binary's own exported class names** and
+  treat a match against it as an *absolute* exclusion — never reclassify a function as
+  library because its name looks library-ish.
+- **Report an `unknown_library` bucket rather than forcing every match into a known
+  one.** An empty unknown bucket must be an honest result, not a closed-out one.
+- **A sweep that renames only the functions it itself named leaves earlier-named ones
+  behind**, so namespace-based counters silently undercount. Decide whether you are
+  classifying *new* findings or *all* findings, and say which.
 
 ## External corroboration is legitimate evidence — cite it as such
 
