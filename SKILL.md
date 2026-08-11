@@ -145,6 +145,11 @@ A round's own applications then structurally cannot become evidence for the clai
 motivated them. Verify the filter fires: tag one known symbol `AI`, confirm it drops out
 of the harvest.
 
+**The filter is needed before a harvester's *second* run, not its first** — which is why
+it is so often missing. Written before any apply exists, a harvester is correct; it turns
+circular the moment it is re-run after one, with nothing in it having changed. See
+"Harvesting traps" for the measured case and the assertion that catches it.
+
 ### `SourceType` is necessary but not sufficient
 
 **Confirmed live in this project: `SourceType` cannot distinguish two different naming
@@ -257,6 +262,25 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   from**, treat earlier evidence as **append-only**, and teach post-apply harvesters to
   accept the post-apply shape. Regenerating after an apply can silently drop whole
   witness categories while looking like a clean re-run.
+
+- **The sharper version of that trap: the second run harvests *your own* output.** Stale
+  evidence is the mild failure. The severe one is a harvester that re-reads names *this
+  agent applied* and files them as findings — because those names then feed whatever
+  decides the next apply, closing the loop on itself.
+
+  It hides well for a structural reason: **a harvester written before any apply exists is
+  correct when written, and only becomes circular the first time it is re-run after one.**
+  Nothing changes in the harvester, no test fails, and the output looks richer than before.
+  Measured here: re-running a slot-symbol sweep after a naming apply would have folded 8
+  agent-applied names back into the very file feeding the calibration gate and the naming
+  rule — i.e. into the inputs deciding what to name next.
+
+  So the `SourceType.AI` exclusion is not a property you add once to "the harvesters" — it
+  is a property every harvester needs *before its second run*. Audit them at the moment the
+  round's first apply lands, not when they are written. Treat an agent-sourced name as
+  **identical to no name at all**: absent from evidence, and still an open candidate. Then
+  assert it: after any re-harvest, check that every address in your applied-names ledger
+  comes back unnamed in the fresh evidence, and fail if one does not.
 - **Distinguish measured-zero from structural-zero.** "I looked and found nothing" and
   "there was nothing to look at" are different findings. Emit counters that separate them.
 - **A short name is not an identity.** Demangled short names collide across a hierarchy —
