@@ -41,7 +41,7 @@ A `Q` or `S` in a slot means your table is not a vtable, or your slot attributio
 | `??_9` | **vcall thunk** → MI dispatch adjustment |
 | `??_B` | function-local static initialisation guard (**not** inheritance) |
 | `??_C` | string literal |
-| `??_E` / `??_G` | vector / **scalar deleting destructor** |
+| `??_E` / `??_G` | vector / scalar deleting destructor — **MSVC puts `??_E` in the vtable**, Clang puts `??_G` (see the destructor trap below) |
 | `??_R0`…`??_R4` | RTTI descriptors (absent when built `/GR-`) |
 
 **Inheritance-model test.** Only unqualified `??_7Class@@6B@` forms present, with **no
@@ -56,17 +56,40 @@ thunk, not `~Class` itself.** So `~Class` never appearing as a raw vtable target
 scored 188/199, and every one of the 11 misses was this. Budget for it before concluding a
 sweep is incomplete.
 
-**Which thunk it is must be measured, not assumed — this reference previously asserted
-`??_G` and the binary disagreed.** Decompile one and read the flag parameter:
+**For MSVC the slot holds the VECTOR deleting destructor (`??_E`), not the scalar one.**
+This reference previously asserted `??_G`; that is wrong for MSVC and the error is worth
+understanding, because it is the single most likely thing to mislead you here:
 
-| Branch present | Thunk | Mangling |
-|---|---|---|
-| `flags & 1` only, no loop | **scalar** deleting destructor | `??_G` |
-| `flags & 2` array loop striding by the object size, count at `*(this-4)`, **plus** `flags & 1` | **vector** deleting destructor | `??_E` |
+> *"MSVC's virtual tables always contain a pointer to the vector deleting destructor for
+> classes with virtual destructors … because clang always puts a pointer to a scalar
+> deleting destructor to the vtable."* — [LLVM PR #170337](https://github.com/llvm/llvm-project/pull/170337)
 
-Measured on this 1999 MSVC binary: **all nine** anchored classes' slot-38 targets are the
-**vector** form, with per-class strides (0x38, 0x2a8, 0x578, …). Naming them "scalar" would
-have asserted what the decompiled body disproves. The array branch is the discriminator.
+So **the two toolchains genuinely differ**, and "the slot holds `??_G`" is true of
+Clang/Itanium-style output and false of MSVC. Check which compiler produced your binary
+before trusting either statement.
+
+The flags parameter, which is how you identify the form from a decompiled body
+([Chen](https://devblogs.microsoft.com/oldnewthing/20040203-00/?p=40763),
+[Shilon](https://ofekshilon.com/2014/06/09/on-vector-deleting-destructors-and-some-newdelete-internals/)):
+
+| Test | Meaning |
+|---|---|
+| `flags & 1` | also free the memory |
+| `flags & 2` | destroying an **array**; otherwise a single object |
+
+The element count is *"hidden in front of the vector"* — stored immediately before the
+array, which is why the array branch reads it from `*(this - 4)` on 32-bit.
+
+**One function serves both roles**: the vector deleting destructor behaves as a scalar one
+when `flags & 2 == 0`, so the presence of the `& 2` branch identifies the *generated form*,
+not what a particular call site does. (Shilon notes he has *"never seen a vector deleting
+destructor called with flags different from 3"* in practice.)
+
+Confirmed on one 1999 MSVC binary: all nine anchored classes' slot-38 targets carry the
+`& 2` array branch with per-class strides (0x38, 0x2a8, 0x578, …) — consistent with the
+rule above. Note the binary exported **no `??_E` or `??_G` symbol at all** (only `??_7` and
+`??_B`), so it could not adjudicate its own naming; the identification came from the body
+shape plus the documented MSVC rule, not from a symbol.
 
 ### Comparing names — the string-space trap
 
