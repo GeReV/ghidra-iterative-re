@@ -505,6 +505,14 @@ Three things to know here; the mechanics are in **`references/cpp-abi.md`**.
   that function *is* the override. ABI mechanics, not inference — but check the
   preconditions in the reference, and expect virtual destructors to sit in slots as
   compiler-generated deleting-destructor thunks rather than as `~Class`.
+- **Get parentage from constructors, not from table similarity.** Similarity is symmetric
+  and inheritance is not, so ranking candidate bases by shared slots needs *something* to
+  supply direction — and using depth for it is a trap: a derived class that adds no new
+  virtuals has exactly its base's slot count, so a "parent must be strictly shallower" rule
+  makes the real parent ineligible and silently returns the **grandparent**, self-consistently.
+  A constructor stores each base's vftable into offset 0 in turn, which *is* directional.
+  Mechanics and the measured failure: `references/cpp-abi.md`, "Recovering *which* class
+  derives from which".
 
 ## Data shapes characteristic of games
 

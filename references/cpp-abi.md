@@ -207,9 +207,68 @@ Preconditions, all of which must be checked, not assumed:
   **A truncated table does not merely hide slots — it forges a depth, and depth is what
   ancestry arguments are built on.** Measured here: a 47-slot table was recorded as 42
   because slot 42's target had real instructions but no defined `Function`. At 42 it looked
-  *shallower* than the 47-slot classes it actually equals, and a "which table shares the
-  most slots while being strictly shallower" test therefore promoted it to a nearer
-  ancestor of four classes — inverting the ancestry. At its true 47 it is not a candidate
-  at all. Before any depth comparison, verify each table's extent independently of the
-  sweep that produced it: walk past the recorded end and check whether code pointers
-  continue, and where the incoming references actually fall.
+  *shallower* than the 47-slot classes it actually equals, and a depth-ranking test
+  therefore promoted it to a nearer ancestor of four classes — inverting the ancestry. At
+  its true 47 it is not a candidate at all. Before any depth comparison, verify each
+  table's extent independently of the sweep that produced it: walk past the recorded end
+  and check whether code pointers continue, and where the incoming references actually fall.
+
+## Recovering *which* class derives from which
+
+The `??_8`/`??_9` test above establishes the inheritance **model** (single vs virtual vs
+multiple). It does not tell you the **graph** — who derives from whom. Those are different
+questions and the second one has a trap.
+
+### Slot similarity ranks; it does not order
+
+The tempting approach is to compare tables: a derived table shares its base's slot prefix,
+so rank candidate bases by how many leading slot targets they share. That works as a
+*tie-break* and fails as a *primary source*, because **similarity is symmetric and
+inheritance is not**. Nothing in "these two tables share 43 slots" says which is the
+parent. Depth is then used to supply the missing direction — and that is where it goes
+wrong.
+
+> **Never require the parent to be strictly shallower than the child.** A derived class
+> that adds **no new virtuals** has *exactly* its base's slot count. The rule feels safe —
+> it prevents sibling cycles — but it makes a same-depth parent **structurally ineligible**,
+> so the ranking silently returns the *grandparent* and every check downstream agrees with
+> it, because the grandparent really is an ancestor.
+>
+> Measured on one binary: three 47-slot classes were assigned to their 38-slot grandparent
+> because their real parent was also 47 slots, differing only at its own destructor slot
+> and one other. Nothing failed. The chain was self-consistent, passed a cycle check, and
+> passed a 100%-agreement correspondence gate — the wrong answer is compatible with all of
+> them, because an ancestor's slots correspond too.
+
+### Constructors carry the direction
+
+Use the binary's own construction order instead. A constructor builds its bases first, so
+with the base constructor inlined it **stores each base's vftable into offset 0 of the
+object in turn**, before storing its own:
+
+> **{ classes whose `??0`/`??1` stores table V } == V's class + its descendants**
+
+That relation is *directional*, comes from code plus exported symbols rather than from
+shape comparison, and is cheap: find `MOV dword ptr [reg], <imm32 == V>` with no
+displacement, take the containing function, and read its mangled name.
+
+Combine them in the right order: **ancestry decides who is eligible, similarity picks the
+nearest among them.** Then a same-depth parent is admitted naturally and no depth rule is
+needed anywhere.
+
+Caveats, both load-bearing:
+
+- **It is a LOWER BOUND.** Inlining depth varies, so a missing pair proves nothing while a
+  present pair is strong. Never read absence as evidence of non-ancestry.
+- **A base's vftable store and a first-member-subobject store look identical** — both write
+  a vftable to offset 0. Guard with the ABI invariant that a base is never *deeper* than
+  its derived class, and treat a cycle in the relation as proof the detection is matching
+  something else.
+
+### How to tell you got it right
+
+A corrected graph should make an *independent* measurement better, not just different.
+Here, re-deriving raised the slot-correspondence sample count 89 → 107 while agreement
+stayed at 100%: the new samples came from the newly-corrected edges, so wrong parentage
+would have shown up as disagreement. Consistency proves little on its own; a rival
+measurement improving is worth much more.
