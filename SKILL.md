@@ -350,6 +350,16 @@ here is `IMPORTED`-grade, and analysis done without them is wasted effort.
    whether the *modding community* has one; leaked symbol files circulate for popular games.
 3. **Exported and mangled symbols.** Mangled C++ names carry class, member, virtualness,
    and full signature. Even a stripped retail build often exports more than expected.
+   **Data exports name GLOBALS, with static types** (`?pRendEng@@3PAVCRendEng@@A` ==
+   `CRendEng *pRendEng`) — parse the PE export directory for non-code targets, don't
+   stop at functions. And when an exe exports symbols at all, ask WHO imports them:
+   a companion DLL importing back from the exe (a plugin renderer, say) is itself a
+   symbol source, and its import thunks explain writes to exe globals that no exe-side
+   store accounts for. Corollary, measured the hard way: **before hypothesizing about a
+   global's identity, query the symbol table AT its address** — a reconnaissance here
+   built a loader-record theory for a pointer whose `IMPORTED`-grade label had been
+   sitting on the address since import. The symbol lookup is the cheapest evidence
+   there is; references-first analysis skips it silently.
 4. **Other builds of the same game.** Demos, betas, console/other-platform ports,
    patched versions, and debug builds frequently ship symbols the retail build stripped.
    Diffing builds also isolates what a patch changed. Ghidra's **Version Tracking** and
@@ -391,6 +401,8 @@ must be measured, not assumed.
 | Virtual / multiple inheritance | strings `??_8`, `??_9` | **0** — plain single inheritance |
 | Assert source paths | strings `.cpp`, `.c`, `.h`, drive-letter prefixes | **1** `.cpp`, **1** `.h` — source root only |
 | Mangled export symbols | count symbols starting `?` | **981**, carrying class + virtualness + full signature |
+| Data exports (globals) | PE export directory entries outside `.text` | **73** typed named globals; the singletons (`pRendEng`, `pWorld`, …) and the allocator family |
+| Companion-DLL linkage | shipped DLLs' import tables naming the exe | **2 renderer plugins** importing 46/47 exe symbols — the whole renderer API vocabulary |
 | Embedded scripting VM | strings `lua`, `Lua_`, registration-table shapes | not yet run |
 | Config / CVar parser | strings for known setting keys, `.ini`, `.cfg` | not yet run |
 | Middleware / engine | version banners, known import sets | Miles Sound System and DirectInput identified |
