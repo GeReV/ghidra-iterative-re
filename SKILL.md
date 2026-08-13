@@ -355,7 +355,12 @@ here is `IMPORTED`-grade, and analysis done without them is wasted effort.
    stop at functions. And when an exe exports symbols at all, ask WHO imports them:
    a companion DLL importing back from the exe (a plugin renderer, say) is itself a
    symbol source, and its import thunks explain writes to exe globals that no exe-side
-   store accounts for. Corollary, measured the hard way: **before hypothesizing about a
+   store accounts for. The stronger version, measured here: a DLL that imports a
+   registry object and its insert/hash helpers is REGISTERING into an exe-side runtime
+   registry — so when a name-keyed registry has members no exe string explains, sweep
+   the companion binaries' strings against the ids before concluding the names are
+   lost (13 of 15 mystery handler ids in one registry were class names present only
+   in the plugin DLL). Corollary, measured the hard way: **before hypothesizing about a
    global's identity, query the symbol table AT its address** — a reconnaissance here
    built a loader-record theory for a pointer whose `IMPORTED`-grade label had been
    sitting on the address since import. The symbol lookup is the cheapest evidence
