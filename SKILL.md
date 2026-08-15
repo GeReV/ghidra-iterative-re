@@ -283,6 +283,17 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   comes back unnamed in the fresh evidence, and fail if one does not.
 - **Distinguish measured-zero from structural-zero.** "I looked and found nothing" and
   "there was nothing to look at" are different findings. Emit counters that separate them.
+  **Print the zeros**: a census listing only the kinds that fired cannot be told apart
+  from one where a kind is dead, so enumerate every expected witness kind with its count
+  including `0`, and say which zeros are known limitations of the scanner.
+- **Measure a proposed mechanism's REACH before building it.** A cheap probe that counts
+  how many targets a route could possibly reach costs minutes and routinely refutes the
+  round you were about to spend a day on. Two measured examples from one session: a plan
+  to lay out ~229 classes died when a five-line count showed only 56 were reachable at
+  all and 12 of the 16 usable ones were already done; and an interprocedural type
+  inference died when its own calibration — the cases where the inference could be
+  checked against ground truth — disagreed 18 times in 54. Run the counting probe first;
+  a refuted round is a cheap round.
 - **A short name is not an identity.** Demangled short names collide across a hierarchy —
   an override shares its base's name, so two different tables can look identical. Join on
   **addresses**, not names.
@@ -312,6 +323,32 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   enforces this for harvesters; apply it by hand elsewhere.
 - **Never verify against an artifact measured wrong**, including its unchecked parts.
 - Test verification logic against poisoned *copies of files*, never the live program.
+- **Name the QUANTITY a corroboration bar applies to, and check that quantity.**
+  "Two independent witnesses" for a field's *type* is not "two witnesses that the
+  field is accessed" — and the loose reading passes silently while reading as the
+  strict one in every report. Measured: a rule requiring two witnesses counted
+  *accesses to a cell* and then took the type from however few of them carried type
+  evidence, so a lone pointer-shaped access among 131 decided the cell was a pointer
+  "on 90 witnesses". It was an id. Eighteen of twenty applied type upgrades failed
+  the corrected bar. Whenever a bar says "N of X", write down what X is.
+- **Calibrate a witness by POSITIVE AGREEMENT, not only by absence of contradiction.**
+  Require a new evidence source to *reproduce facts already established by other
+  machinery* before it may speak about unknowns. A contradiction-only check passes
+  a source that is silently misclassifying everything: measured, a classifier
+  compared against the wrong vocabulary (`"float"` where the API returns
+  `"x87_float"`) sent all 538 float accesses down the integer branch, and only the
+  "you must reproduce the known float cells" arm caught it. Absence of disagreement
+  is not agreement.
+- **A contradiction needs a competing CLAIM, not merely a different string.** An
+  opaque block (`uint8_t[N]`) is the *absence* of a claim about its interior, and a
+  vector-typed member's components genuinely are floats — so an access disagreeing
+  with either is expected, not contradictory. A conflict rule that does not model
+  "no claim here" fires on correct data and trains you to widen it.
+- **A check that fires may be a defect in the CHECK.** Validating a decided artifact
+  with a *stronger* predicate than the calibrated rule that produced it rejects rows
+  the producing sweep legitimately attributed. Before loosening a rule or editing
+  data, ask which predicate the artifact was derived under — this is the mirror of
+  "a calibration population must share the fire population's code shape."
 
 ---
 
@@ -682,6 +719,23 @@ We wrote a vtable sweeper from scratch without checking that the first item exis
   of Part 1. Search these with Python if your shell's text tools are proxied or unreliable.
 - Ghidra writes the host filesystem with plain `open()`. Windows-hosted Ghidra driven from
   WSL: script source needs Windows paths (`C:\...`); read the same files at `/mnt/c/...`.
+- **Compare against the API's own returned value, never a hand-written literal.** Ghidra
+  names `UnsignedShortDataType` **`ushort`**, not `uint16_t`; a literal in an end-state
+  check aborted a *correct* apply after its write had committed, destroying that run's
+  before/after measurement. Derive the expected string from the same object you write
+  (`dt.getName()`), and treat a helper's return vocabulary as API too — one classifier
+  returns `x87_float`/`x87_int` where `float`/`int` were assumed, and the mismatch was
+  silent.
+- **`state` is a reserved `GhidraScript` global** (the `GhidraState`). Assigning a string
+  to it raises `ClassCastException` from PyGhidra's property setter, reported at a line
+  far from the one that looks wrong. Others in the same namespace: `currentProgram`,
+  `currentAddress`, `monitor`, `script`.
+- **Never derive a path from `__file__` in a script you install.** The installed copy
+  lives in Ghidra's user script directory, where `dirname(__file__)/..` resolves outside
+  your repo entirely — measured: a header generator read `C:\Users\<you>\symbols`, so
+  its compile check (the only step recomputing offsets from a C compiler rather than from
+  the project's own arithmetic) had *never once run*. Resolve paths from a shared
+  constants module.
 
 ## Failure modes to design against
 

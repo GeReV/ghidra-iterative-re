@@ -288,6 +288,30 @@ Caveats, both load-bearing:
   its derived class, and treat a cycle in the relation as proof the detection is matching
   something else.
 
+### Typing `this` from a call site — an UPPER BOUND on depth
+
+Tempting shortcut, once some registers are typed: at a direct `CALL` whose `ECX` holds a
+provably typed object, the callee's `this` is that type. It is the `__thiscall` contract
+and it reaches non-exported bodies that have no signature of their own. **Measured on one
+binary, it is wrong a third of the time**, and the failures are two recognisable shapes:
+
+- **The caller holds a DERIVED pointer and calls an INHERITED method.** Inferred
+  `CVehicle*`, declared `CBasicUnit*`; inferred `CStructure*`, declared `CBasicGobject*`.
+  So an inferred receiver type is an **upper bound on depth** — the mirror of the
+  lower-bound rule above, and the same direction problem as the destructor stride.
+- **The callee is not `__thiscall` at all**, so `ECX` was never `this`: a private
+  *static* member (`?F@C@@CA...`) inherited a caller's register type. Where the callee is
+  exported you can filter this by convention — and where it is *not* exported, which is
+  exactly the population the shortcut exists to reach, you cannot.
+
+Two consequences. First, calibrate it before use: many inferred callees are themselves
+exported and carry a mangled declaring class, so the inference can be checked against
+ground truth for free (36 agreed, 18 disagreed — refuted). Second, the depth error is
+survivable where the *offset* decides ownership: on a single-inheritance chain each
+offset lies in exactly one class's own range, so attributing an access by offset rather
+than by receiver type is correct even when the receiver is named too deep. Attribute
+by offset; use the receiver only to pick the chain.
+
 ### How to tell you got it right
 
 A corrected graph should make an *independent* measurement better, not just different.
