@@ -13,6 +13,27 @@ guesses.** Apply an inference, re-read, and the confirming read looks independen
 is not. This skill is mostly about making the loop safe against that, and against
 Ghidra's silent collateral damage.
 
+## Status: work in progress
+
+This is a living document, not a finished reference. It is still being written *by* the
+project that uses it — every round of that work either adds a rule or corrects one, and
+that has not converged.
+
+Concretely, what that means for you:
+
+- **Rules get withdrawn.** Several claims here replaced earlier ones that measurement
+  refuted. Assume the same will happen to some of what is currently written.
+- **Coverage is uneven.** It is deepest where the source project went deep — MSVC/x86
+  PE, C++ single inheritance, class layout recovery. Other platforms and toolchains get
+  a reference file's worth of triggers, not battle-tested procedure.
+- **It reorganizes.** `SKILL.md` has been restructured more than once and sections may
+  move or split; don't deep-link into it.
+- Claims marked *(doc)* are from Ghidra's documentation and **have not been executed**.
+
+Corrections are more welcome than additions, particularly if you have a measurement that
+contradicts something here. See [Provenance](#provenance-and-how-to-read-the-numbers) for
+why the specific numbers in it are not thresholds.
+
 ## What's in it
 
 | File | Contents |
