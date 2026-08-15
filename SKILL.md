@@ -534,6 +534,39 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
   vector-typed member's components genuinely are floats — so an access disagreeing
   with either is expected, not contradictory. A conflict rule that does not model
   "no claim here" fires on correct data and trains you to widen it.
+- **A check can be UNPASSABLE as easily as unfireable — and it spends the whole time
+  looking like a real failure.** The unfireable check is the famous one; its mirror is a
+  check no run could ever satisfy, which reports a working witness as broken and sends
+  you to debug the witness. Measured: a calibration required a pointer-detecting route to
+  fire on a cell some *other* route had independently proved is a pointer. In the tool's
+  narrow mode the one comparable cell existed, but every access to it came from function
+  bodies that mode's own population rule excluded — so the satisfying evidence was
+  unreachable by construction, and the same code passed 56-of-121 in wide mode. Two habits
+  fall out, both cheap:
+  - **Make a failing gate NAME both populations it compared.** "Never overlapped" and
+    "disjoint by construction" are the same message and completely different findings;
+    printing the two sets turned a day of suspecting the route into one read.
+  - **Before believing a gate that says a witness is broken, ask whether the population
+    it grades can CONTAIN the satisfying evidence.** If it cannot, the honest outcome is
+    to scope the check to where it can speak — and to *assert the exclusion*, so it
+    retires itself when the population changes, rather than outliving its reason.
+  Do not fix such a check by enlarging the evidence it grades: widening the narrow mode's
+  population would have made it pass, and would have changed the population of the route
+  that produced an already-applied type.
+- **A check with two modes must be demonstrated in BOTH, or the mode you skipped stops
+  being reproducible in silence.** The calibration above was added by a round that ran
+  only the wide mode, quoted wide numbers in its commit message, and regenerated only the
+  wide artifacts. The narrow mode was not re-run for four commits; its committed artifacts
+  quietly stopped matching its own code, and the check had *never executed there at all*
+  until an unrelated stability harness ran it. Whenever a round touches a code path shared
+  by two configurations, run both before committing.
+- **A check that lives inside an `if not SELFTEST:` block is not covered by the selftest,
+  whatever the selftest's count says.** Three calibrations sat outside the poisonable
+  function, so a confident "4/4 demonstrated firing" described the other four and nothing
+  warned. Extract a check into a function taking its inputs **and its mode flag** as
+  parameters — the flag is what lets one mode demonstrate the other's branch, and in this
+  case the narrow mode's real rows demonstrated the wide branch's raise with no poison at
+  all.
 - **A witness written before an apply must be RE-VALIDATED after it.** The decompiler's
   output is an *input* to most witnesses, and your own struct and type applies change it —
   so a witness can be invalidated by a round that never touched it. Measured: a destructor
