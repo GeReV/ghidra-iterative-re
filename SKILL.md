@@ -281,6 +281,34 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   **identical to no name at all**: absent from evidence, and still an open candidate. Then
   assert it: after any re-harvest, check that every address in your applied-names ledger
   comes back unnamed in the fresh evidence, and fail if one does not.
+
+  **The oldest harvester is the most dangerous one**, and it is worth naming that explicitly
+  because it inverts the intuition that old code is safe. The sweep that ran first, before
+  any apply existed, is the one whose author had no reason to write the filter — so it is
+  both the most trusted artifact in the project and the only one with no protection. Measured
+  on a second occasion here, years of rounds later: the original vtable sweep was regenerated
+  and **578 of 578** changed function names joined, *by address*, to the agent's own applied-
+  names ledger — 0 from any other source. The committed artifact was found to have already
+  captured 8 such names from an earlier round. **Join by address, never by name**, or the
+  audit itself inherits the collision problem below.
+- **Fix a wrong artifact at its DERIVATION, not by patching the rows.** When a defect in
+  committed evidence is proven, the tempting round is to amend the data — it is smaller,
+  and the diff is reviewable. But a patched artifact stops being re-derivable, which is the
+  property that made it evidence; the producing rule stays wrong; and the next regeneration
+  silently reintroduces the whole defect. Measured here: a boundary rule that mistook a
+  constant-propagated virtual-call reference for a table start had forged 7 tables. Patching
+  the 55 affected rows and fixing the rule cost the same effort — the rule fix also fixed
+  the *next* regeneration, and turned the 7 known cases into a live calibration gate.
+- **Separate program drift from the change under test, or you cannot read the diff.**
+  Re-running a harvester that was written many rounds ago never reproduces its committed
+  output, because the program has moved underneath it — so "regenerate and diff" conflates
+  two entirely different populations of change. Run the **old** rule first and diff *that*
+  against the committed artifact (pure drift, adjudicated alone), then diff the **new** rule
+  against the old rule's fresh output (your change, and nothing else). Keep the old rule
+  reachable behind an argument for exactly this. Here the naive one-step diff showed ~29748
+  rows changed and was unreadable; the two-step version resolved it into "a post-processing
+  step I had forgotten to apply", "578 rows of self-harvested names" (above), and finally
+  the **55 rows** the change was actually supposed to make.
 - **Distinguish measured-zero from structural-zero.** "I looked and found nothing" and
   "there was nothing to look at" are different findings. Emit counters that separate them.
   **Print the zeros**: a census listing only the kinds that fired cannot be told apart
@@ -294,6 +322,20 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   inference died when its own calibration — the cases where the inference could be
   checked against ground truth — disagreed 18 times in 54. Run the counting probe first;
   a refuted round is a cheap round.
+
+  **And measure reach over the whole population, not over the census you already have** —
+  an existing census is often a lower bound *by construction*, in a way its summary line
+  does not admit. One here enumerated adjacent pairs of recovered tables, so any instance
+  whose tail fell below the noise-filter threshold was dropped before the census could see
+  it; scoping the round from its 7 findings would have been scoping from a filtered view.
+  The whole-population probe happened to confirm exactly 7 and 0 new, which is the outcome
+  that makes the check look unnecessary and is precisely why it has to be run.
+- **Do not classify a population member by what it is NOT.** "Not a table start, therefore
+  interior to a table" is only sound if the tables tile the region — and recovered runs
+  almost never tile anything (262 gaps totalling ~37KB here). The wrong label is invisible
+  because it is usually right. Compute the actual extents and emit the third bucket
+  (`start` / `interior` / `gap`); the gap cases are where the surprises live, since an
+  address in a gap may sit inside something the noise filter discarded entirely.
 - **A short name is not an identity.** Demangled short names collide across a hierarchy —
   an override shares its base's name, so two different tables can look identical. Join on
   **addresses**, not names.
@@ -344,6 +386,33 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   vector-typed member's components genuinely are floats — so an access disagreeing
   with either is expected, not contradictory. A conflict rule that does not model
   "no claim here" fires on correct data and trains you to widen it.
+- **An expected COUNT must be derived from the artifact, never written as a literal.**
+  A hardcoded population size is correct on the day it is typed and silently wrong
+  forever after, and because it usually lives in a *summary line* rather than an
+  assertion, nothing fails — the round just reports a denominator from an earlier era
+  of the project. Two instances here: a test asserting "3 upgrades applied" that went
+  stale when a fourth route added rows, and a sweep reporting "198 of **289**
+  unanchored tables" that kept saying 289 after 7 of those tables were merged out of
+  existence. Compute it (`len(tables) - len(anchors)`), and treat a literal in a
+  report as the same defect as a literal in a check.
+- **When a gate fires during a round, ISOLATE before attributing it to your change.**
+  The reflex is to assume the work in progress broke it, and that reflex is expensive
+  in both directions: it can send you rewriting something correct, or — worse — get
+  the failure quietly written off as "expected fallout from this round" and dropped.
+  Re-run the same check against the **pre-change state**. Here a size sweep raised on
+  a class's ambiguous destructor stride in the middle of an unrelated amendment;
+  re-running it against the pre-round artifact produced byte-identical output
+  including the same raise, which exonerated the round in one step and converted the
+  failure into a separate, honestly-recorded open item. The control run is usually
+  minutes, and it is the difference between a finding and a guess.
+- **A run that RAISED must not have its output promoted.** Scripts commonly write
+  their artifacts before the final verification stage, so a failing run can leave
+  perfectly plausible files on disk — already regenerated, already looking current,
+  and now disagreeing with the last verified state for reasons nobody recorded. After
+  any raise, diff the artifacts and revert the ones that run touched. This is the
+  same shape as the apply whose post-write check crashed: the write survives the
+  failure, so the failure has to be treated as reaching the *files*, not just the
+  exit status.
 - **A check that fires may be a defect in the CHECK.** Validating a decided artifact
   with a *stronger* predicate than the calibrated rule that produced it rejects rows
   the producing sweep legitimately attributed. Before loosening a rule or editing
