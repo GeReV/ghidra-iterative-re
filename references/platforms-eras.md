@@ -93,10 +93,15 @@ audio chips, controller ports, timers.
 
 ## Calling conventions worth recognising
 
-- **x86**: `__cdecl` (caller cleans, args pushed **right-to-left** — so the *last* argument
-  is furthest from the `CALL`, which defeats naive backward walks for the first argument),
+- **x86**: `__cdecl` (caller cleans, args pushed **right-to-left** — so the *first* argument
+  is pushed **last**, i.e. nearest the `CALL` and easiest to recover by a backward walk;
+  it is the *last* argument that sits furthest away and is hard to reach),
   `__stdcall` (callee cleans), `__thiscall` (`this` in `ECX`, MSVC), `__fastcall`
   (`ECX`/`EDX` then stack).
+  *An earlier revision of this file stated that backwards.* And a caveat that matters more
+  than the direction: at `/O2` MSVC frequently writes arguments with `MOV [ESP+N], …`
+  instead of `PUSH`, so a walk that counts pushes under-reads the argument list entirely
+  rather than reading it in the wrong order.
 - **Large struct returns**: MSVC passes a hidden return-storage pointer, so a by-value
   return of a big struct appears as `T * f(this, T *__return_storage_ptr__)`. This changes
   a function's signature the moment you apply the struct type — a known source of

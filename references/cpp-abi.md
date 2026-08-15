@@ -6,27 +6,68 @@ hand-rolling a vftable struct* — and this file is what you consult once one fi
 
 ## MSVC mangled names
 
-Shape: `?<member>@<Class>@@<access><callconv><return><args>Z`, classes innermost-first,
-so `?Foo@Inner@Outer@@...` is `Outer::Inner::Foo`.
+Shape for a **non-static member function**:
 
-The character immediately after `@@` encodes access **and virtualness** — the single most
-useful byte in the name. *(Standard MSVC `undname` encoding, not verified against this
-Ghidra install; the `Q` and `U` rows were confirmed live against a real binary, the rest are
-from the published scheme.)*
+```
+?<member>@<Class>@@ <access> <cv> <callconv> <return> <args> Z
+```
+
+classes innermost-first, so `?Foo@Inner@Outer@@...` is `Outer::Inner::Foo`.
+
+**The `<cv>` character is easy to miss and its absence corrupts everything after it.**
+`?Sleep@CGobject@@QAEXXZ` parses as `Q` (public non-virtual) `A` (cv-qualifier: none) `E`
+(**`__thiscall`**) `X` `X` `Z` — *not* `Q` + `A`(=`__cdecl`). A parser written against a
+grammar with no cv slot reads the cv byte as the calling convention and reports
+`__cdecl` for **every `__thiscall` method in the binary**. Static members and free
+functions have no `this` and so no cv byte.
+
+Calling conventions (Ghidra's `MDCallingConvention`): `A`/`B` `__cdecl`, `C`/`D` `__pascal`,
+**`E`/`F` `__thiscall`**, `G`/`H` `__stdcall`, `I`/`J` `__fastcall`.
+
+The access character immediately after `@@` encodes access, virtualness **and staticness** —
+the single most useful byte in the name. *(Full table from Ghidra's own
+`MicrosoftDmang` source, `MDTypeInfoParser.java`. Earlier revisions of this file listed only
+8 of the 13 rows, which silently mis-classified private/protected statics and had no entry
+at all for adjustor thunks.)*
 
 | Char | Meaning |
 |---|---|
 | `A` / `B` | private, non-virtual |
+| `C` / `D` | private **static** |
 | `E` / `F` | **private virtual** |
+| `G` / `H` | private **adjustor thunk** |
 | `I` / `J` | protected, non-virtual |
+| `K` / `L` | protected **static** |
 | `M` / `N` | **protected virtual** |
+| `O` / `P` | protected **adjustor thunk** |
 | `Q` / `R` | public, non-virtual |
+| `S` / `T` | public **static** |
 | `U` / `V` | **public virtual** |
-| `S` | public **static** |
-| `Y` | free function (no class) |
+| `W` / `X` | public **adjustor thunk** |
+| `Y` / `Z` | free function (no class) |
 
-A function occupying a vtable slot must carry a virtual specifier (`E`/`F`/`M`/`N`/`U`/`V`).
-A `Q` or `S` in a slot means your table is not a vtable, or your slot attribution is wrong.
+**Data symbols have their own code, and it decides OWNERSHIP:** `0`/`1`/`2` =
+private/protected/public **static class member**, **`3` = true global**, `4` = static local,
+`5` = guard, `6` = vftable (or RTTI4), `7` = vbtable, `8` = RTTI. So `?pRendEng@@3PAV…` is a
+global, while `?Table@CFoo@@2PAV…` is `CFoo`'s static member — and calling the second a
+global is an ownership error of the same family as mis-attributing a field. Measured on one
+binary: **50 class statics against 17 true globals**, i.e. the naive reading is wrong for
+the majority.
+
+**Vtable slots.** Under **single inheritance**, a function occupying a vtable slot carries a
+virtual specifier (`E`/`F`/`M`/`N`/`U`/`V`), and a `Q` or `S` in a slot means your table is
+not a vtable or your slot attribution is wrong. **Under multiple inheritance that rule is
+false**: a secondary vtable's slot holds an **adjustor thunk** (`G`/`H`, `O`/`P`, `W`/`X`) —
+a stub that fixes `this` by a fixed offset and jumps to the real override, e.g.
+`sub ecx,8; jmp CDerived::Foo`, mangled `?Foo@CDerived@@W7AEXXZ`. So the rule holds only
+given the inheritance-model test below, and a slot-index naming scheme run on an MI binary
+would name the *stub* while the real override stayed anonymous.
+
+**Adjustor-thunk absence is therefore a second, independent inheritance-model test.** A
+census of access characters costs one pass: zero `G/H/O/P/W/X` corroborates single
+inheritance from a different direction than "no `??_8`, no `??_9`", because under single
+inheritance `this` never needs adjusting and there is nothing for a thunk to do. Measured on
+one binary: 0 of 1094 mangled symbols — agreeing with the `??_8`/`??_9` zero.
 
 ### Special names (`??` prefix)
 
@@ -41,8 +82,21 @@ A `Q` or `S` in a slot means your table is not a vtable, or your slot attributio
 | `??_9` | **vcall thunk** → MI dispatch adjustment |
 | `??_B` | function-local static initialisation guard (**not** inheritance) |
 | `??_C` | string literal |
+| `??_D` | vbase destructor |
 | `??_E` / `??_G` | vector / scalar deleting destructor — **MSVC puts `??_E` in the vtable**, Clang puts `??_G` (see the destructor trap below) |
+| `??_F` | default-constructor closure |
+| `??_H` / `??_I` | **vector constructor / destructor iterator** — the ABI's own witness that a member is an embedded **array**, and a far cheaper one than deriving element size from loop strides |
+| `??_O` | copy-constructor closure |
+| `??_S` | local vftable |
+| `??_U` / `??_V` | `operator new[]` / `operator delete[]` — note an **array** allocation's size includes the count prefix, so it is not `n * sizeof(T)`; relevant wherever allocation size is used as a size bound |
 | `??_R0`…`??_R4` | RTTI descriptors (absent when built `/GR-`) |
+
+**`.?AV` is not only an RTTI signal.** MSVC emits `_TypeDescriptor` records for types named
+in `catch` and `throw` **independently of `/GR`**. So a measured zero says *neither
+polymorphic RTTI nor typed C++ EH* — a stronger finding than "no RTTI" — and `.?AV` present
+in a `/GR-` build is exception data, whose surrounding structures are `FuncInfo`, not
+`??_R0`. That `FuncInfo` is itself worth harvesting: its unwind map **names a destructor per
+stack object with that object's frame offset**, and its try/catch map names caught types.
 
 **Inheritance-model test.** Only unqualified `??_7Class@@6B@` forms present, with **no
 `??_8` and no `??_9`**, is positive evidence of a plain single-inheritance chain — the

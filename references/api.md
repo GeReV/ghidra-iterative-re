@@ -52,8 +52,11 @@ currentProgram.getSourceFileManager()
 `getReferencesFrom(addr)`, `getSymbolAt(addr)`, `createLabel(addr, name, makePrimary)`,
 `getScriptArgs()`, `createFunction(entry, name)`, `disassemble(addr)`.
 
-**Count functions consistently.** `getFunctions(True)` excludes external/thunk-to-DLL
-functions; `getFunctionCount()` includes them. They differ, so record which you used.
+**Count functions consistently.** `getFunctionCount()` **includes** external functions;
+`getFunctions(boolean)` returns **non-external** functions only. They differ, so record
+which you used — and note two things the obvious reading gets wrong: the boolean is
+**direction** (`true` = ascending address order), *not* a filter, and an internal
+thunk-to-DLL (a `JMP [IAT]` stub with an entry point in `.text`) **is** returned by it.
 
 ## Symbols, namespaces, classes
 
@@ -274,8 +277,18 @@ symbols, or identifying library code. Tutorials in `docs/GhidraClass/BSim/`.
 
 ## Emulation
 
-`ghidra.app.emulator`: `EmulatorHelper`, `Emulator`, `DefaultEmulator`,
-`EmulatorConfiguration`, `MemoryAccessFilter`, `FilteredMemoryState`.
+**Current:** `ghidra.pcode.emu` — `PcodeEmulator`, `PcodeMachine`, `PcodeThread`,
+`EmulatorUtilities`, `PcodeEmulationCallbacks`. `PcodeMachine.inject(Address, sleigh)`
+stubs out imports the emulator cannot execute, which is what makes an era-typical Win32
+binary emulable at all. Worked examples ship in
+`Ghidra/Features/SystemEmulation/ghidra_scripts/` (`StandAloneEmuExampleScript.java`,
+`EmuDeskCheckScript.java`).
+
+**Deprecated:** `ghidra.app.emulator` (`EmulatorHelper`, `Emulator`, `DefaultEmulator`,
+`EmulatorConfiguration`, `MemoryAccessFilter`, `FilteredMemoryState`). 12.1.2's own stub for
+`EmulatorHelper` says *"This is part of the older p-code emulation system… deprecated::
+Please use `PcodeEmulator` instead."* Keep it only for `enableMemoryWriteTracking()` /
+`getTrackedMemoryWriteSet()`, which have no direct replacement.
 
 Run a routine without the target running — decompression, checksum, decryption, table
 generation. Set registers and memory, run to an address, read results. Course material:
@@ -300,9 +313,12 @@ literal.
 
 ## Debug information
 
-`ghidra.app.util.bin.format.pdb` (and `pdb` support generally) handles Windows PDB; the
-install ships `docs/README_PDB.html` describing the parser and
-`support/README_createPdbXmlFiles.txt` for the XML route.
+**`ghidra.app.util.bin.format.pdb2.pdbreader` is the CURRENT reader** — a pure-Java,
+cross-platform implementation (~600 files) driven by the **`PdbUniversalAnalyzer`**, so it
+works off-Windows and needs no DIA SDK. The older `ghidra.app.util.bin.format.pdb`,
+`docs/README_PDB.html` and `support/README_createPdbXmlFiles.txt` describe the **legacy**
+native `pdb.exe`/XML route, whose README still predicts the pure-Java implementation that
+has since arrived. Prefer `pdb2`; reach for the legacy path only if Universal fails.
 `ghidra.app.util.bin.format.dwarf` is a large, full DWARF implementation with
 `dwarf.line` (line numbers), `dwarf.external` and `sectionprovider`; Ghidra 12.1 added
 **debuginfod** downloads and a `$HOME/.cache/debuginfod_client` search. Golang and Swift
@@ -314,10 +330,24 @@ subsumes most of the evidence-gathering this methodology otherwise does by hand.
 
 ## Exporting
 
-`ghidra.app.util.exporter` — `CppExporter` is the File → Export Program → C/C++ mechanism;
-its `CPPResult` exposes `headerCode()` and `bodyCode()`. This is the built-in route to a C
-header of recovered types; prefer it (or a deliberate subset) over a hand-rolled emitter.
-Other exporters in the same package cover XML, HTML, ASCII, and binary.
+**For a C header of recovered TYPES, use `ghidra.program.model.data.DataTypeWriter(dtm,
+writer)`** — public, supported, and documented as *"A class used to convert data types into
+ANSI-C. The ANSI-C code should compile on most platforms."*
+
+**Do not try to use `CppExporter.CPPResult`.** It is a **private nested record**
+(`record CPPResult(Address, String headerCode, String bodyCode, List<String> globals)`),
+not reachable from a script and absent from the javadoc; `CppExporter` itself **decompiles
+the whole program** as a side effect and is driven by options `CREATE_C_FILE`,
+`CREATE_HEADER_FILE`, `USE_CPP_STYLE_COMMENTS`, `EMIT_TYPE_DEFINITONS` (Ghidra's typo),
+`EMIT_REFERENCED_GLOBALS`. Its type emission delegates to `DataTypeWriter` anyway.
+
+**No built-in emits compile-time offset assertions**, so wrap the generated types with
+`_Static_assert(offsetof(T,f)==K)` and `sizeof` checks yourself and compile them — that
+compile is the only step that recomputes offsets from the C object model rather than from
+your own arithmetic.
+
+Other exporters in `ghidra.app.util.exporter` cover XML, HTML, ASCII and binary; the SARIF
+exporter lives in `Ghidra/Features/Sarif`.
 
 ## Headless automation
 
@@ -330,8 +360,12 @@ Other exporters in the same package cover XML, HTML, ASCII, and binary.
 
 Two matter for methodology:
 
-- **`-readOnly`** makes a non-mutating round *enforced by the harness* rather than by
-  discipline — the mechanical way to guarantee an evidence-only pass.
+- **`-readOnly`** guarantees only that changes are **not persisted**: the README says
+  imported files "will NOT be saved" and that in `-process` mode any changes "are
+  **discarded**". It does **not** prevent mutation during the run, so a script can still
+  apply names and a later `-postScript` in the same chain can still harvest them. It is a
+  containment mechanism, not an anti-circularity one — do not treat it as a guarantee that
+  a pass was evidence-only.
 - **`-process`** operates on a program already in a project, so a headless pipeline can
   drive the same database an interactive session uses, with `-preScript`/`-postScript`
   bracketing.
