@@ -1,0 +1,3 @@
+# Claude Code drops scratch state into a skill directory when the skill is
+# invoked from a symlinked install. Never part of the skill.
+/.claude/
