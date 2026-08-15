@@ -66,7 +66,7 @@ Some of the load-bearing ideas:
 Clone it, then link it into your skills directory:
 
 ```sh
-git clone https://github.com/<you>/ghidra-iterative-re.git
+git clone https://github.com/GeReV/ghidra-iterative-re.git
 ln -s "$PWD/ghidra-iterative-re" ~/.claude/skills/ghidra-iterative-re
 ```
 
