@@ -558,7 +558,31 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
   the repo, now underivable, for **sixteen program versions**. The apply that
   invalidated the evidence was the one the evidence had justified. Whenever you
   rename a component, a field or a type, ask which witnesses match on that spelling
-  and re-run them in the same round.
+  and re-run them in the same round. Two follow-ups measured when that one was
+  repaired, both of which outlive the rename:
+  - **The rename was not what hid it — the SILENCE was.** A witness that abstains
+    per-item needs a guard separating a *legitimate* abstention from a broken
+    route, or the two print the same line forever. Here a genuinely partial
+    registration (one component, nothing to decide) and a complete four-component
+    one that failed to match were reported identically, which is what bought the
+    defect sixteen versions. This is the unfireable-check rule one level down: not
+    "the witness produced no rows" but "the witness declined *this* row", and the
+    fix is the same shape — enumerate why. Derive the guard's threshold from the
+    constants (the known types' component counts), never a literal, or the next
+    type added leaves the guard behind.
+  - **A correspondence you DECLARED is not a match you measured.** The broken route
+    had bridged the two spellings with a hand-written alias; the repaired one
+    matches literally, but only because the component now carries the
+    registration's own name. Either way the name tests nothing — count, offsets and
+    kinds are what discriminate the types. Write that down where the comparison
+    lives, or a later reader banks the string equality as a second witness. Same
+    family as the disambiguator rule below: the tautology is invisible because
+    every report still describes it as agreement.
+  - **Repair at the narrowest scope that fixes it.** The tempting fix was to drop
+    name matching altogether, making the route rename-proof forever — and it
+    decided exactly the same rows, i.e. bought a broader fire population for no
+    measured gain. Robustness belongs in the guard, not in a loosened rule; a
+    widened rule is a decided-artifact change wearing a bugfix's clothes.
 - **Run every read-only sweep after every apply and require byte-identical output.**
   This is the only cheap defence against the whole class above, because it does not
   depend on predicting which witness a given apply perturbs. Build it as a driver
@@ -571,11 +595,20 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
     real changes**; a gate that noisy stops being read. Classify, list, never drop;
   - **do not auto-restore what it overwrites.** Sweeps write before their own final
     checks, so a differing run leaves plausible files on disk. Reverting them is a
-    deliberate act (`git checkout`), not a side effect that hides the finding.
+    deliberate act (`git checkout`), not a side effect that hides the finding;
+  - **and when you do revert, revert SELECTIVELY.** The driver regenerates every
+    artifact, so running it to *verify a repair* leaves the repaired files sitting
+    next to two dozen incidental restamps — and the blanket `git checkout --` the
+    gate's own message suggests will wipe the round's work along with the noise.
+    Keep the round's files by name, revert the rest.
 
   Run it *today*, not only after the next apply: any sweep whose current output
   differs from its committed artifact is a perturbation that already happened and
-  nobody noticed.
+  nobody noticed. Read the artifact's own `program_version` before predicting what
+  a re-derivation should produce: "it will return to the committed value" is only
+  valid if the committed file was stamped at the *current* version, and a
+  prediction that quietly assumes otherwise fails for reasons that look exactly
+  like damage from the round in progress.
 - **A disambiguator for a witness may NOT consult the quantity that witness corroborates.**
   When two candidates survive, picking the one that matches the already-decided value is
   trivially available and usually right — and it silently converts an independent
