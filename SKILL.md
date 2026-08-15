@@ -185,6 +185,69 @@ it is so often missing. Written before any apply exists, a harvester is correct;
 circular the moment it is re-run after one, with nothing in it having changed. See
 "Harvesting traps" for the measured case and the assertion that catches it.
 
+### The TYPE axis: `DataType` has no `SourceType` at all
+
+The whole trust model above is about *symbols*. **Types have no provenance field
+whatsoever** — no tier to filter on, no `getSource()`, nothing marking a struct you
+grew as yours. So the anti-circularity rule has no mechanism on the type axis, and a
+harvester that reads a type name back is unguarded by construction.
+
+Define it from the program's OWN record instead of from your notes. **A
+version-controlled Ghidra program carries a complete type history**, and it is
+directly readable:
+
+```python
+from java.lang import Object as JavaObject
+df   = currentProgram.getDomainFile()
+hist = df.getVersionHistory()                                  # number, user, comment
+old  = df.getReadOnlyDomainObject(JavaObject(), n, monitor)    # open version n
+...
+old.release(consumer)
+```
+
+Diff the `DataTypeManager`s across each version boundary and you have a ledger of
+every type you ever applied, attributed to the round that applied it — for free, if
+your checkin comments name the rounds. Two mechanics that cost real time:
+
+- **The consumer must be a `java.lang.Object`.** A plain Python `object()` makes
+  JPype report *"No matching overloads found"* against a signature it obviously
+  matches.
+- **Diff per TYPE structurally, never per category or per count.** Measured on one
+  project: the `/Demangler` category went **152 → 153 types across its entire
+  history**, while 15 placeholder structs grew from 1 byte to full class layouts.
+  A count view measures that whole population as `+1`. Fingerprint
+  `(path, length, [(offset, component type name, field name)])`, or a component
+  RETYPE or RENAME at constant size — exactly what a field-type upgrade is — is
+  invisible.
+
+**Your NAME applies create types.** Applying a qualified class name makes Ghidra
+materialise a **1-byte empty placeholder struct** of that name, and the decompiler
+will then happily type a `this` parameter with it. Measured: 30 such structs across
+three rounds that applied only names. They are yours, they are circular to read
+back, and nothing in a name ledger mentions them.
+
+**And "a type we applied" is not one thing.** The tiers decide whether reading one
+back is self-reference at all:
+
+| tier | what it is | circular? |
+|---|---|---|
+| transcribed | you typed in a real vendor header (DirectInput, Win32, an SDK) | **No** — the authority is external. The `IMPORTED` analogue |
+| derived | you derived it from this binary | **Yes** — the `AI` analogue |
+| side effect | Ghidra materialised it because you applied a name | **Yes** |
+
+Collapsing these makes the guard fire on every Win32 callback in the binary and
+reads as a catastrophic exposure. Separating them is the difference between a number
+you can act on and one you will learn to ignore.
+
+**Finally, ask whether the binary already explained the reference.** A demangled
+signature reading `void Dwim(CMessage * this, …)` gets `CMessage *` from
+`?Dwim@CMessage@@UAEX…`, which predates every apply you made — you changed what
+`CMessage` is *defined* as, not the reference to it. Of 1409 rows carrying a ledgered
+type on one project, **750 were explained by the mangled name and were ground truth;
+659 were not, and only those were exposure.** Same shape as the `SourceType` filter:
+the question is never "does our name appear", it is "would it be here if we had done
+nothing".
+
 ### `SourceType` is necessary but not sufficient
 
 **Confirmed live in this project: `SourceType` cannot distinguish two different naming
@@ -486,6 +549,33 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
   one level too coarse was correct only for as long as every one of these functions happened
   to contain a single loop — i.e. it was luck, indistinguishable from design, until an apply
   added a second loop.
+- **A decided-artifact RENAME can disable the witness that corroborated it.** The
+  worst version of "re-validate a witness after an apply", because it looks like
+  bookkeeping rather than evidence. Measured: a value type's component was renamed
+  `w` → `Layer` on the strength of a registration witness that matches *registered
+  suffix names against the type's component names*. The rename broke that match, so
+  the route silently stopped deciding — and the artifact it had produced stayed in
+  the repo, now underivable, for **sixteen program versions**. The apply that
+  invalidated the evidence was the one the evidence had justified. Whenever you
+  rename a component, a field or a type, ask which witnesses match on that spelling
+  and re-run them in the same round.
+- **Run every read-only sweep after every apply and require byte-identical output.**
+  This is the only cheap defence against the whole class above, because it does not
+  depend on predicting which witness a given apply perturbs. Build it as a driver
+  over the sweeps whose artifacts you commit, and:
+  - **print the exclusions with their reasons on every run** — a silent exclusion
+    reads as coverage, and the harness's reach has to be a stated number;
+  - **classify benign churn separately.** Most sweeps stamp rows with the program
+    version they harvested at, so a re-run rewrites that column and nothing else. On
+    one project 14 undifferentiated "CHANGED" files resolved into **19 restamps and 7
+    real changes**; a gate that noisy stops being read. Classify, list, never drop;
+  - **do not auto-restore what it overwrites.** Sweeps write before their own final
+    checks, so a differing run leaves plausible files on disk. Reverting them is a
+    deliberate act (`git checkout`), not a side effect that hides the finding.
+
+  Run it *today*, not only after the next apply: any sweep whose current output
+  differs from its committed artifact is a perturbation that already happened and
+  nobody noticed.
 - **A disambiguator for a witness may NOT consult the quantity that witness corroborates.**
   When two candidates survive, picking the one that matches the already-decided value is
   trivially available and usually right — and it silently converts an independent
@@ -1136,6 +1226,16 @@ through Ghidra, these apply:
   (`dt.getName()`), and treat a helper's return vocabulary as API too — one classifier
   returns `x87_float`/`x87_int` where `float`/`int` were assumed, and the mismatch was
   silent.
+- **`runScript(name, args)` SWALLOWS the called script's exception.** Ghidra prints
+  the traceback and `runScript` returns normally, so a driver that runs sweeps in a
+  loop reports every one of them as passing. Measured: a stability harness reported
+  `raised: 0` while two of its nineteen sweeps had raised calibration failures, with
+  both tracebacks visible in the same log. If you need the failure as a *value*, run
+  the script yourself so exceptions propagate —
+  `exec(compile(open(path).read(), path, "exec"), g)` with `g` seeded from the
+  GhidraScript globals (`currentProgram`, `currentAddress`, `monitor`, `state`) plus
+  a per-script `getScriptArgs`. A driver that cannot see the failure it exists to
+  detect is this document's unfireable-check rule wearing the harness's clothes.
 - **`state` is a reserved `GhidraScript` global** (the `GhidraState`). Assigning a string
   to it raises `ClassCastException` from PyGhidra's property setter, reported at a line
   far from the one that looks wrong. Others in the same namespace: `currentProgram`,
