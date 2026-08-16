@@ -1054,12 +1054,38 @@ Three things to know here; the mechanics are in **`references/cpp-abi.md`**.
 - **Ghidra does not devirtualize automatically** — it cannot prove a vtable pointer is
   constant after assignment (issues #650, #516). But four explicit mechanisms do work,
   escalating: name the slots via a vftable struct, mark the table `CONSTANT` so the
-  decompiler reads *through* it, run **`AddVfunctionCallRefScript`** (shipped in 12.1 — it
-  creates a `CALL` reference from a vftable→function token "if it is possible to identify a
-  single corresponding **applied vftable structure**", so its precondition is exactly the
-  work the struct-apply rounds already did), or override the call site with
+  decompiler reads *through* it, run **`AddVfunctionCallRefScript`** (shipped in 12.1 —
+  see the measured caveats below, they are severe), or override the call site with
   `RefType.CALL_OVERRIDE_UNCONDITIONAL`. The last two **write your inference into the call
   graph** — tag them `SourceType.AI` and never let a harvest read them back as fact.
+- **`AddVfunctionCallRefScript`'s real preconditions, and why batching it is unsound.**
+  An earlier revision of this document said its precondition was "a single corresponding
+  applied vftable structure, so exactly the work the struct-apply rounds already did."
+  **That is wrong, measured against a 12.1.2 install and a project that had done exactly
+  that work.** Read the source before planning a round on it:
+  - `isVftableStructure()` requires **every component to be a `Pointer` to a
+    `FunctionDefinition`**. A struct built the idiomatic way — from
+    `ClassUtils.getVftDefaultEntry(dtm)`, which returns a plain `PointerDataType` — fails
+    this on every component. Measured: **0 of 15** applied vftable structs passed. Naming
+    the *fields* after the methods does not help either; `getOrdinalOfFunction()` matches
+    the decompiler token against the **pointed-to type's** name.
+  - It is **cursor-driven** (`currentLocation instanceof DecompilerLocation`) — one call
+    site per invocation. There is no batch mode to "run and count".
+  - It writes `SourceType.**ANALYSIS**`, not `AI`. On a project that filters harvests by
+    tier, that launders an inference into the trusted tier.
+  - **The soundness is supplied by the human at the cursor, and automation removes it.**
+    Its inference is *"type T is applied at exactly one address A, therefore slot k
+    resolves to `*(A + 4k)`"* — which assumes **static type == dynamic type**. A
+    `Base *` at runtime points at a *derived* class's table. The script never checks for
+    descendants because an analyst looking at one site knows whether the receiver can be
+    derived. Measured on one hierarchy: sound for 6 of 14 classes, and the 8 unsound ones
+    were the interesting ones, carrying **748 of 1066** slots (one base had 16 descendants).
+    A batch version would emit confidently wrong call-graph edges while every report
+    counted them as successes.
+
+  Generalise it: **before batching any shipped interactive aid, ask what the human at the
+  cursor was contributing.** These scripts are written for an analyst who supplies context
+  the code does not check, and the missing check is usually invisible in the output.
 - **"There is no provable devirtualization here" is a claim about your MECHANISM until you
   have tried the dataflow APIs.** A round in this project concluded devirtualization was
   impossible and gave the reason as "real devirtualization needs reaching-definitions
@@ -1265,7 +1291,7 @@ We wrote a vtable sweeper from scratch without checking that the first item exis
 | **Measure what a round actually changed** | `ProgramDiff` + `ProgramDiffFilter` → `AddressSetView`; `ProgramMerge` to restore one category from a checkpoint |
 | Recover C++ classes wholesale | `RecoverClassesFromRTTIScript` + the `classrecovery` package — **gates on RTTI**, so a `/GR-` binary gets nothing, and that is what licenses hand-rolling |
 | C++ classes on 32-bit MSVC with **no** RTTI | Pharos **OOAnalyzer** (`--ignore-rtti`) via **CERT Kaiju**. Candidates only: destructor F1 0.41, member offsets unpublished |
-| Devirtualize a call site | `AddVfunctionCallRefScript` (12.1) — needs an **applied vftable struct** with a single instance |
+| Devirtualize a call site | `AddVfunctionCallRefScript` (12.1) — needs components typed `Pointer`→`FunctionDefinition` (NOT the `ClassUtils` default pointer), is cursor-driven, writes `ANALYSIS`, and its unique-instance inference is unsound for any class with descendants. Read the caveats before planning on it |
 | Dataflow across basic blocks | `DecompilerUtils.getBackwardSliceToPCodeOps` (SSA p-code); `SymbolicPropogator` for `this + K` without the decompiler |
 | Identify the build toolchain | `ghidra.app.util.bin.format.pe.rich` + `PortableExecutableRichPrintScript` — the PE Rich header names the compilers and linkers used |
 | Attack undefined code | `Processors/x86/data/patterns/x86win_patterns.xml` (real MSVC prologue/filler pairs — **extend the XML**, don't write pattern code); `FindUndefinedFunctionsScript`, `MakeFunctionsScript`, `CreateFunctionAfterTerminals`, `DumpFunctionPatternInfoScript` |
