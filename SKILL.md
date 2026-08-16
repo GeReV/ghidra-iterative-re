@@ -355,6 +355,21 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
 - **Defining functions at undefined code.** Feeds analyzers new material, extends
   pointer-table runs truncated by undefined targets, adds call-graph edges. Often the
   highest-leverage single mutation.
+- **Type vftable struct components as `Pointer` → `FunctionDefinition`, not as bare
+  pointers.** The idiomatic build — `ClassUtils.getVftDefaultEntry(dtm)` — returns a plain
+  `PointerDataType`, which names the slots but types nothing, so every virtual call still
+  decompiles as `(*(code *)(*(int *)this + 0x48))()`. Build a `FunctionDefinitionDataType`
+  from each slot TARGET's function instead and the same call renders
+  `(*p->vftable->GetPos)(p)` with typed arguments and a return type that propagates into
+  the caller's locals. Measured on one binary: 1053 of 1068 slots across 15 classes, from
+  363 distinct definitions (slots share targets through inheritance), every one
+  `__thiscall` with a real prototype. Two things make it cheap and safe: take the
+  signatures only from targets carrying a MANGLED symbol, so the evidence tier is the
+  binary's own string; and `Structure.replace(ordinal, ptr, 4, name, comment)` is a
+  1-for-1 swap, so assert the struct's length and component count are unchanged and the
+  blast radius is confined to decompilation. The slots you cannot type are usually the
+  compiler-generated destructor thunks, which have no export by construction — leave them
+  bare rather than inventing a signature.
 - **Struct layouts.** Field accesses become named. Can *change* signatures as a side
   effect: a large struct returned by value switches to the hidden return-storage-pointer
   convention, so `T Func(this)` becomes `T * Func(this, T *__return_storage_ptr__)`.
@@ -702,6 +717,25 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
   the stability driver wrote ten rows of non-history (hundreds accumulated, all identical
   in shape). Snapshot-and-restore the append-only files, and *print* that you did, so the
   restore is visible rather than a silent side effect.
+- **A FALSE POSITIVE on a gate is worse than noise.** Noise gets skimmed; a false positive
+  gets *reasoned about*, and then discounted — which trains the reader to discount exactly
+  the entries the gate exists to raise. Measured: a stability harness classified benign
+  version restamps by splitting CSV rows on `,` instead of parsing them, so any row with a
+  comma inside a quoted field kept its version cell and its file was reported as a
+  perturbed witness. It fired on three artifacts immediately after a large type apply —
+  indistinguishable from the exact damage the harness exists to catch — and all three were
+  pure restamps. **Parse the format; never split it.** A classifier that separates benign
+  churn from real change is load-bearing, so it deserves the same rigor as the check it
+  feeds.
+- **A confinement predicate cannot see an INTERPROCEDURAL dependency, and a stray is not
+  automatically damage.** The usual predicate — signature ∪ local-variable types ∪
+  referenced typed globals — misses a function that merely *calls* something returning a
+  typed pointer and then dispatches through it: the typed locals in its decompilation are
+  decompiler-invented, not committed variables, so no route sees them. Measured: the single
+  control stray after a vftable retype was a real, intended effect arriving exactly that
+  way. Adjudicate a stray by **reading the function**, and record the predicate's blind
+  spot — widening the control group to make the number look better is backwards, and is the
+  temptation this rule exists to name.
 - **A run that RAISED must not have its output promoted.** Scripts commonly write
   their artifacts before the final verification stage, so a failing run can leave
   perfectly plausible files on disk — already regenerated, already looking current,
@@ -1346,6 +1380,15 @@ through Ghidra, these apply:
   of Part 1. Search these with Python if your shell's text tools are proxied or unreliable.
 - Ghidra writes the host filesystem with plain `open()`. Windows-hosted Ghidra driven from
   WSL: script source needs Windows paths (`C:\...`); read the same files at `/mnt/c/...`.
+- **Type-check against Ghidra's INTERFACES, not its implementation classes.** A datatype
+  read back from the `DataTypeManager` is a DB-backed implementation —
+  `dtm.addDataType()` hands you a `FunctionDefinitionDB`, which implements
+  `FunctionDefinition` but is **not** an instance of the concrete
+  `FunctionDefinitionDataType` you constructed. Measured: an end-state check written
+  against the impl class reported **0 of 1053** on a retype that had completely succeeded.
+  Ghidra's own shipped scripts check the interface (`instanceof FunctionDefinition`) —
+  follow them. Same family as the rule below: the object you get back is not the object
+  you put in.
 - **Compare against the API's own returned value, never a hand-written literal.** Ghidra
   names `UnsignedShortDataType` **`ushort`**, not `uint16_t`; a literal in an end-state
   check aborted a *correct* apply after its write had committed, destroying that run's
