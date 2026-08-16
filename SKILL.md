@@ -251,6 +251,47 @@ back is self-reference at all:
 | derived | you derived it from this binary | **Yes** — the `AI` analogue |
 | side effect | Ghidra materialised it because you applied a name | **Yes** |
 
+
+**And `transcribed` needs a second column your notes probably do not have: WHERE FROM,
+and UNDER WHAT LICENCE.** The tier records that a type came from outside; for any project
+whose destination is a reimplementation, the property that actually matters is whether the
+outside source can be carried into your source tree at all.
+
+Measured: a vtable layout for a Microsoft COM interface was transcribed from a public
+copy of the vendor header, and the licence was checked only afterwards — **LGPL-2.1**,
+derived from Wine and MinGW-w64. Copyleft, in a repo aiming at a clean reimplementation.
+
+The resolution generalises, and it is the same discipline as everything else here:
+
+- **Treat the external layout as a HYPOTHESIS and verify it against the binary.** Here the
+  argument count the program passes at each of its own call sites had to equal the
+  parameter count the header declared: 11 of 11 agreed, and the semantics corroborated
+  separately (the `Open` slot taking one flag value to host and another to join; a
+  get-modify-set pair on the session descriptor matching two log strings). Those eleven
+  are established by *measurement*, and the header is not their authority.
+- **Keep only what the binary establishes; replace the rest with numbered placeholders.**
+  The other 42 slots were unverifiable — nothing in the program calls them — so they
+  became `slot_NN`. The compile check still passed identically afterwards, which is the
+  proof the names carried no information: **removing them cost nothing and removed the
+  obligation.** If a name is not verifiable against your binary, it is contributing
+  licence risk in exchange for nothing.
+- **Audit the headers you already have.** The same sweep found one sibling header with its
+  provenance recorded and self-derived (parameter counts taken from `__stdcall` name
+  decoration in the import table — no external source at all), and another with *no
+  provenance statement whatsoever*, silently carrying the same unanswered question.
+
+Two adjacent traps found in the same file, both worth copying:
+
+- **An MSVC-ism makes a header uncompilable off Windows, so nobody ever compiles it.**
+  `__stdcall` is a keyword gcc rejects outright. A header full of offset-critical layout
+  had therefore never been compiled once since it was written — the dormant-defect shape
+  again. Add a portability shim (`__attribute__((stdcall))` on x86, empty elsewhere) so
+  the layout can actually be asserted.
+- **Verify the offsets with a COMPILER, not with your own arithmetic.** Re-deriving struct
+  offsets in Python is the project's arithmetic checking itself; `offsetof` in a compiled
+  translation unit is an independent evaluator. And poison it — move one slot by four and
+  require the compile to fail, per assertion.
+
 Collapsing these makes the guard fire on every Win32 callback in the binary and
 reads as a catastrophic exposure. Separating them is the difference between a number
 you can act on and one you will learn to ignore.
