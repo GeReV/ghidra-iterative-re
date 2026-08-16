@@ -113,6 +113,22 @@ object model rather than from your own arithmetic — which is precisely the ste
 having. Hand-rolling the *type* emitter is the failure this skill warns about; hand-rolling
 the *assertions* is the whole point.
 
+**Decide WHEN to apply an identification by fan-out, not by confidence.** The cost of
+applying a name is fixed — checkpoint, census, invariant bracket. The benefit scales with
+the number of call sites it makes readable. Measured: `fwrite` was recognised early in one
+session and then carried for several rounds as a *script constant*
+(`FWRITE = 0x004c4f2d`) rather than applied — which bought the analysis and threw away the
+decompilation. 224 serialisation bodies were read as `FUN_004c4f2d(...)` when they could
+have read `fwrite(...)`, and a committed signature would have propagated argument types
+into **951** call sites. That is this document's own central claim being ignored in
+practice: the database is an inference engine, and an identification held in a variable
+instead of applied changes nothing about what you see next. A single-call-site helper can
+wait for the batch; a high-fan-out leaf should be applied the moment it is recognised,
+*before* the sweep that depends on it is written. The half that batching gets right and
+is worth keeping: **record the identification durably the moment it is made**, in a
+constant or a note, even when the apply waits — one living only in the analyst's head does
+not survive the session.
+
 **Apply in certainty order, never convenience order.** Ground truth from the binary
 first, then mechanical derivations from it, then inferences. A round that applies a guess
 before an available certainty has corrupted every round after it.
@@ -982,6 +998,34 @@ Caveats that cost real time here, all of which generalize:
 
 - **Both mechanisms share one blind spot**: library code that neither calls a marker
   import nor byte-matches the FID corpus is invisible to both. Every count is a **LOWER
+  BOUND**, never a population estimate. "Unclassified" does not mean "game."
+
+  **The corollary that is easy to miss: library identification is not a phase you
+  complete, it is a continuing byproduct of game-side work.** Measured on one project long
+  after its partition was "done": eight CRT stdio functions — `fopen`, `fclose`, `fwrite`,
+  `fread`, `ftell`, `fseek`, `sprintf`, `_strerror` — all sitting in the CRT address
+  region, one of them *between* two functions FID had already named, and every one still
+  carrying no classification at all. They were found by following a **game-side data
+  format downward into the library**: `fwrite` surfaced because 224 serialisation methods
+  called it, not because anything was scanning for library code. The leaf functions at the
+  bottom of a game-side call chain are exactly what both mechanisms miss — small, calling
+  no imports, and an inlined or variant build will not byte-match a corpus. So when a
+  game-side population is opaque, **look at what all of it CALLS and identify the callee
+  first**: the inverse of the usual top-down direction, and where the residue of the
+  partition lives.
+
+- **Identify by CALL SHAPE and argument constants where byte signatures fail.** A semantic
+  fingerprint is checkable in a way a guess is not, and it is available exactly when FID is
+  not: `fopen` pinned by a literal `"wb"` in argument 2, `fwrite`/`fread` by the
+  `(ptr, size, count, FILE*)` signature with the return compared against `count`,
+  `sprintf` by a format string. Record which constant did the pinning — that is the
+  evidence, and it is what a later reader needs in order to disagree with you.
+
+- **A library identification is still YOUR inference, and the famous name disguises that.**
+  `fwrite` is not a guess about what `fwrite` does; it is a guess about what lives at
+  *this address*. Tag it `SourceType.AI`, ledger it, keep it out of harvests — exactly
+  like any other applied name. The pull to treat it as ground truth is strong precisely
+  because the function is well known. Every count is a **LOWER
   BOUND**, never a population estimate. "Unclassified" does not mean "game."
 - **A missing FID match is silent, but not unexplained.** There is no "almost matched"
   signal to inspect, so absence of a hit is not evidence of absence of library code — but
