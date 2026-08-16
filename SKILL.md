@@ -453,18 +453,64 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   rows changed and was unreadable; the two-step version resolved it into "a post-processing
   step I had forgotten to apply", "578 rows of self-harvested names" (above), and finally
   the **55 rows** the change was actually supposed to make.
-- **A p-code harvester must state its simplification style, and calibrate across two.**
-  `DecompInterface.setSimplificationStyle` takes `decompile` (default), `normalize` (omits
-  type recovery and some final clean-up), `firstpass` (unmodified dataflow from raw p-code),
-  `paramid`, `register`. The default style runs a rule called **`earlyremoval` that deletes
-  stack-write COPY operations consumed by function signatures — whether or not the signature
-  is correct.** For a project whose layout evidence is "which offsets does this constructor
-  write", that is a silent under-count arriving from inside the tool, and possibly caused by
-  a signature *you* applied.
+- **A p-code harvester must state its simplification style, and calibrate across two —
+  but read `buildDefaultGroups()` before choosing which two.**
+  `DecompInterface.setSimplificationStyle` takes `decompile` (default), `normalize`,
+  `firstpass`, `paramid`, `register`. The default style runs a rule called **`earlyremoval`
+  that deletes COPY operations whose output has no descendant — including stack writes
+  rendered dead by a function signature, whether or not that signature is correct.** For a
+  project whose layout evidence is "which offsets does this constructor write", that would
+  be a silent under-count arriving from inside the tool, possibly caused by a signature
+  *you* applied.
 
-  So: run the sweep at `normalize` and at `decompile` and require identical write sets;
-  where they differ, fall back to raw `instruction.getPcode()`. This is the "a witness whose
-  silence is indistinguishable from a measured zero" rule with the decompiler as the cause.
+  **An earlier revision of this document said to compare `normalize` against `decompile` to
+  expose it. That is wrong, measured against a 12.1.2 install**, and it is worth stating
+  loudly because the advice looks obviously right:
+
+  ```
+  coreaction.cc:5563   actdead->addRule( new RuleEarlyRemoval("deadcode") );
+  ```
+
+  and `ActionDatabase::buildDefaultGroups()` lists `"deadcode"` in the member arrays of
+  **both** `decompile` and `normalize`. That comparison holds the named rule constant. The
+  only shipped styles omitting `deadcode` are **`register`** (`base`, `analysis`, `subvar`)
+  and **`firstpass`** (`base` alone) — so `register` is the style that actually tests
+  `earlyremoval`, and `firstpass` is the control that shows what the analysis was buying.
+  What `normalize` really omits is **`typerecovery`**, which is a different and often more
+  interesting question: it is the group that consumes *the types you applied*.
+
+  **Generalise past the specific fact:** `buildDefaultGroups()` is the ground truth for
+  what a style runs. The javadoc's one-line descriptions ("omits type recovery and some of
+  the final clean-up steps") do not say which rules move, and a round planned from them
+  targets the wrong comparison — burning the round's whole budget on a comparison that was
+  never capable of firing.
+
+  Measured on one project, over the 14 array-loop candidates behind its only exact size
+  witness: `decompile`, `normalize` and `register` each decided all **12** strides with
+  **identical values**; `firstpass` decided 1. Zero contradictions, zero cases of a
+  less-processed style deciding where the default declined. A real answer, and cheap — but
+  only because the comparison was picked from the groups rather than from the prose.
+
+- **Measure the decompiler-derived SURFACE before auditing it.** The audit above was queued
+  on the premise that the project's layout witnesses were harvested from decompiler output.
+  One census — *which scripts construct a `DecompInterface`* — refuted it: every write-set
+  witness read raw instructions through `listing.getInstructions()`, and the entire
+  decompiler-derived evidence surface was **one function**. A p-code simplification rule
+  cannot perturb a witness that never asks for p-code. The premise had sat unchallenged in a
+  queued round for a week, and it cost one command to check.
+
+- **Do NOT test whether a witness depends on types you applied by withholding an opcode
+  downstream of type recovery.** Same project, same round: the exact-size witness read
+  multiplier constants from `INT_MULT` inputs and `PTRADD` element sizes, and `PTRADD`'s
+  constant is the size of a pointed-to type — i.e. of a struct the project itself applied.
+  Withholding `PTRADD` lost **9 of 12** strides, which reads as "9 exact sizes rest on our
+  own applied types". **False.** `RulePtrArith` (group `typerecovery`) *consumes* the
+  `INT_MULT` it folds into the `PTRADD`, so withholding the `PTRADD` removes the only
+  surviving copy of a constant that was never type-derived; at `normalize`, with
+  `typerecovery` off, the identical constants return as `INT_MULT` and all 12 decide. Turn
+  the **type recovery** off and re-measure. An opcode-withholding test is invalid wherever
+  the analysis consumes the alternative form — and note which way it failed: it
+  *manufactured* a serious finding rather than hiding one.
 - **Your own markup perturbs similarity witnesses.** Ghidra's BSim tutorial warns that
   applying debug information changes BSim signatures and can degrade matching — so a
   correlation run *after* an apply round is not measuring the same thing as one before it.
