@@ -1014,6 +1014,31 @@ Caveats that cost real time here, all of which generalize:
   first**: the inverse of the usual top-down direction, and where the residue of the
   partition lives.
 
+- **Sweep the BOUNDARY DECLARATIONS before hunting the leaves — they are earlier, freer
+  and more specific.** Exported and imported signatures name the I/O layer by TYPE, with
+  no analysis at all. Measured on one project: its very first symbol export, day one,
+  2640 functions, already contained
+  `void Save(CGobject *this, _iobuf *param_1, int param_2)` and **38 signatures
+  mentioning `_iobuf`** — the C stdio `FILE`. The serialisation boundary was fully
+  declared from the first hour and went unread for **246 commits and eight days**, until
+  it was rediscovered from the other end. One query over the signature column
+  (`FILE`/`_iobuf`, `SOCKET`, `HANDLE`, `HKEY`) is minutes and tells you where the
+  program touches the outside world; only then do you need the leaves, and by then you
+  have call sites to pin them by.
+
+- **Prefer leaves whose ARGUMENTS CARRY STRUCTURAL METADATA — not merely high fan-out.**
+  Three families repay identification far beyond the rest, because their arguments *are*
+  layout facts:
+  - **allocators** — the size argument is an object size (an entire size-recovery
+    machinery can rest on `operator new` call sites; an external tool's recall collapsed
+    on this binary purely because it could not find them);
+  - **block copy** — `memcpy` / `rep movsd` extents are member-array bounds;
+  - **I/O** — sizes *and order*, which is what turns a family of serialisation methods
+    into a field-by-field layout witness.
+
+  `strlen` has enormous fan-out and is trivially identifiable, and tells you nothing
+  structural. Fan-out decides *when* to apply a name; this decides *which* leaves to hunt.
+
 - **Identify by CALL SHAPE and argument constants where byte signatures fail.** A semantic
   fingerprint is checkable in a way a guess is not, and it is available exactly when FID is
   not: `fopen` pinned by a literal `"wb"` in argument 2, `fwrite`/`fread` by the
