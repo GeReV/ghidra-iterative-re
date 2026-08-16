@@ -407,6 +407,19 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   names ledger — 0 from any other source. The committed artifact was found to have already
   captured 8 such names from an earlier round. **Join by address, never by name**, or the
   audit itself inherits the collision problem below.
+- **A pipeline that derives wrong and patches afterwards violates this rule from the
+  inside, and it hides for years.** The version everyone catches is a one-off hand edit.
+  The version nobody catches is a *second script* that corrects the first one's output as
+  a routine pipeline step: the committed artifact is correct, every consumer is happy, and
+  the derivation stays broken. Measured: a vtable sweep labelled each table by its slot-0
+  function's namespace and a separate script overwrote that with honest labels afterwards
+  — so a plain run of the sweep produced a file naming **29746 of 31341 rows after a
+  single base class**, 95% of it wrong, and the stability harness (which runs sweeps, not
+  post-steps) reported ~29700 drifting cells on every pass until someone read them. Test
+  for it directly: **run each producer alone and ask whether its output is the committed
+  artifact.** If a second step is required to make it honest, the artifact is not
+  derivable and the fix belongs in the producer — after which the post-step should be
+  retired to a no-op you assert stays a no-op.
 - **Fix a wrong artifact at its DERIVATION, not by patching the rows.** When a defect in
   committed evidence is proven, the tempting round is to amend the data — it is smaller,
   and the diff is reviewable. But a patched artifact stops being re-derivable, which is the
@@ -667,6 +680,28 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
   including the same raise, which exonerated the round in one step and converted the
   failure into a separate, honestly-recorded open item. The control run is usually
   minutes, and it is the difference between a finding and a guess.
+- **Diff against a state the failure could not have produced.** The regeneration diff is
+  the workhorse verification in this document, and it has a blind spot: if you revert an
+  artifact and then re-run the producer, "unchanged" is *also* what you get when the
+  producer crashes and writes nothing. Pass state and failure state become identical —
+  the unfireable-check shape wearing a workflow's clothes. Measured, and published as a
+  false green before it was caught: a sweep died on a `TypeError` in a newly added gate,
+  wrote nothing, and the byte comparison against the just-restored file reported a perfect
+  match. Two habits close it, and you want both: **read the run's exit status before you
+  read its output** (with an async job runner this is not optional — a task id is not a
+  result), and **assert the write actually happened** — row count, mtime, a line the
+  producer only prints on success — before trusting any comparison.
+- **Never byte-compare a tool-written file against your VCS's stored copy.** Ghidra writes
+  CRLF on Windows and git normalizes to LF on commit, so `git show HEAD:file` versus the
+  working file differs by exactly one byte per line — on every file, regardless of
+  content. It looks like a real diff and it is pure line-ending policy. Compare parsed
+  content, or normalize first; a harness that compares on-disk before/after is immune and
+  is the better design for this reason alone.
+- **A verification pass is not a checkpoint — a harness must not pollute the evidence it
+  grades.** One sweep here appended ten metrics rows every time it ran, so each pass of
+  the stability driver wrote ten rows of non-history (hundreds accumulated, all identical
+  in shape). Snapshot-and-restore the append-only files, and *print* that you did, so the
+  restore is visible rather than a silent side effect.
 - **A run that RAISED must not have its output promoted.** Scripts commonly write
   their artifacts before the final verification stage, so a failing run can leave
   perfectly plausible files on disk — already regenerated, already looking current,
