@@ -548,6 +548,19 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   less-processed style deciding where the default declined. A real answer, and cheap — but
   only because the comparison was picked from the groups rather than from the prose.
 
+- **An instruction-level harvester that accepts only IMMEDIATE operands under-counts exactly
+  where the compiler HOISTS a repeated constant into a register — and the blanks look like a
+  property of the data.** A string-registration parser read `MOV [reg+8], imm` and missed
+  `MOV EDI, "float"` loaded once per body and stored from the register per record: 49 of 83
+  type cells came back blank, every one of them `float`, every `int` captured — a pattern
+  that invites a story about the API ("only ints are typed") rather than about the reader.
+  Before theorising about a blank census, compare ONE body against the decompiler's view of
+  it; then fix it at the derivation, keep the old arm reachable behind an argument, and run
+  every consumer through the old-vs-committed / new-vs-old two-step diff (here: 0 drift, then
+  exactly 4 evidence cells and 0 decided-layout rows). Track register loads with the same
+  invalidation discipline as an alias tracker: any write to the register drops it, a CALL
+  drops the caller-saved set, the callee-saved registers survive — which is precisely why the
+  compiler parks the hoisted strings there.
 - **Measure the decompiler-derived SURFACE before auditing it.** The audit above was queued
   on the premise that the project's layout witnesses were harvested from decompiler output.
   One census — *which scripts construct a `DecompInterface`* — refuted it: every write-set
