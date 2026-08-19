@@ -651,6 +651,20 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
 - **Prefer checks that already fail.** Where binary ground truth contradicts current
   state, those disagreements are free demonstrations that a check fires. Cheaper and
   stronger than constructed poison.
+- **A ranking rule presumes candidates of UNKNOWN mutual order; do not feed it candidates
+  the chain already orders.** A nearest-base ranker scored candidates by shared slots and
+  flagged a small margin as "ambiguous". Folding every export-declared ancestor of a node
+  handed it the parent AND the grandparent, and the grandparent (a strict ancestor of the
+  parent, sharing 4 fewer slots) was graded a competitor — five spurious ambiguity flags,
+  the most valuable edge among them, each of which would have excluded the node from naming.
+  Fold the nearest known ancestor only; the rest is already in the chain.
+- **A selftest that derives its poison victim from the artifact inherits the artifact's
+  population, and a round that legitimately empties that population breaks the test for the
+  right reason.** "Pick any base-less non-anchored node" was a fine derivation until a fold
+  left none (`StopIteration`). Derive victims from a property the round cannot empty, or
+  guard the derivation and say what emptied it. Related: a poison that "fires" with the
+  WRONG exception is not a demonstration — assert the expected message marker, or a
+  `KeyError` from a missing table reads as the check working.
 - **A poison that edits a row by string replacement must ASSERT it changed something, or it
   goes inert the day a producer fixes the very blank it was replacing.** Measured: a test
   flipped a registration record's `type= ` (blank) to `type=int ` to make an int-vs-float
