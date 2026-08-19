@@ -651,6 +651,15 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
 - **Prefer checks that already fail.** Where binary ground truth contradicts current
   state, those disagreements are free demonstrations that a check fires. Cheaper and
   stronger than constructed poison.
+- **A poison that edits a row by string replacement must ASSERT it changed something, or it
+  goes inert the day a producer fixes the very blank it was replacing.** Measured: a test
+  flipped a registration record's `type= ` (blank) to `type=int ` to make an int-vs-float
+  check fire; a later round repaired the parser that had left the cell blank, the cell now
+  read `type=float`, the replace matched nothing, and the check reported "did not raise" —
+  broken by a correct fix in a different round, with no test in that round reading it.
+  Compare the row before and after the poison and raise if equal; and when a producer's
+  output changes, run every READER's selftest (a stability harness that re-runs producers
+  does not exercise the readers).
 - **Poison where `expected` and `actual` might share a source** — the classic dead check
   is two reads of the same variable in the same loop compared to each other.
 - **Never verify against state you produced this round.** The `SourceType.AI` filter
