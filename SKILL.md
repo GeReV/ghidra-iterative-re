@@ -1475,6 +1475,57 @@ Three things to know here; the mechanics are in **`references/cpp-abi.md`**.
 
   A negative result is only as strong as the strongest mechanism you actually ran. Name the
   mechanism in the finding, or the next round inherits a conclusion it cannot audit.
+- **A VPTR-STORE CHAIN NAMES ANCESTORS, NOT PARENTS — the optimizer deletes the links you
+  need most.** The rule above ("get parentage from constructors, not from table similarity")
+  is right about *direction* and silently optimistic about *immediacy*. MSVC writes
+  `*this = &vftable` once per class in each constructor and each destructor — and then
+  **deletes any such store nothing can observe before the next one overwrites it.** An
+  intermediate class contributes a link if and only if something between its store and the
+  next store can see the vptr. Measured on one 1999 MSVC/x86 binary, in both directions
+  within one round:
+  - **Survives:** a factory storing base table `B`, then `CALL <ctor>` with `this` in ECX,
+    then its own table. The call could read the vptr, so `B` stays.
+  - **Elided:** a factory whose intermediate constructor was INLINED, so the sequence is
+    grandparent-store, plain field initialisers, own-table store. The intermediate's write is
+    dead and gone — and the derived class's records name the **grandparent** as its parent,
+    self-consistently and forever. Proof the write existed: the same class also has a
+    standalone out-of-line constructor, never called from that factory, performing the
+    identical field initialisations *and* the store.
+
+  The destructor side is identical: three classes' deleting-dtor thunks all called the same
+  out-of-line destructor, which reset the vptr to a table **two levels up**, because the
+  intermediate classes' destructors were trivial and their stores dead. An agent reading only
+  destructors and an agent reading only constructors produced contradictory parents for the
+  same six classes, each with a clean derivation.
+
+  So: **a vptr chain always yields a true ANCESTOR and never proves an IMMEDIATE base, and a
+  missing link is not evidence of a missing class.** Consequences worth acting on:
+  - Label the column honestly — *nearest observed ancestor* — or a later round will "correct"
+    correct data. Where slot-prefix similarity says a nearer table exists (equal or near-equal
+    slot counts, a large shared-slot margin), that is the signal to look for an elided store,
+    not a contradiction to resolve by picking a winner.
+  - **Recover the elided link from the class's own out-of-line constructor**, which usually
+    exists even when every factory inlines it. Matching *field-initialiser sets* between the
+    inlined and out-of-line forms is what ties them together.
+  - **Two agents disagreeing is a finding about the MECHANISM, not a tie to break.** Both
+    derivations here were sound; the ranking question ("which is closer?") was the wrong
+    question, and asking it would have discarded one correct answer.
+- **Three byte-identical functions that were NOT folded are a cheap measurement that ICF is
+  off.** "Identical-code folding hides overrides" is a real hazard and it is also frequently
+  asserted without being checked. If a build emits per-class deleting-destructor thunks with
+  identical bodies at distinct addresses, `/OPT:ICF` was not in effect, and every "X does not
+  override Y" claim stops needing the ICF caveat. One decompile of two sibling thunks settles
+  it.
+- **"Zero cross-references" is a claim about the DATABASE, not the binary.** A reference from
+  bytes the disassembler never made into a function is invisible to the reference model, so
+  `getReferencesTo` returns an honest, empty, wrong answer — and the natural reading of that
+  zero ("compiled but never instantiated", "dead code") is a strong conclusion built on a
+  tool limitation. Measured: a vtable reported as having zero references of any kind had
+  exactly one, inside an out-of-line constructor Ghidra had not recognised, findable only by
+  byte-searching the image for the address. The blind population is precisely the undefined
+  code that function-discovery rounds exist to convert — i.e. it shrinks as the project
+  progresses, which is why the claim looks safer than it is. Byte-search for the address
+  before recording any reference-count zero; it costs seconds.
 - **Slot-index correspondence gives free names**, under single inheritance: if a base
   table's slot *i* is a named exported virtual and a derived table's slot *i* is `FUN_xxxx`,
   that function *is* the override. ABI mechanics, not inference — but check the
