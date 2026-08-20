@@ -704,6 +704,36 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
   `"x87_float"`) sent all 538 float accesses down the integer branch, and only the
   "you must reproduce the known float cells" arm caught it. Absence of disagreement
   is not agreement.
+- **Prefer a PARTITION to a vote when attributing evidence, and print both buckets.**
+  "Three independent registrations agree" is a count, and a count invites the question of
+  how many would have been enough. The stronger form is a split of the *whole* population
+  with no exceptions on either side: measured, of the 16 fields a base class's descendants
+  registered, 13 sat at or above the base's end (so they are the children's own storage)
+  and exactly 3 sat below it — all three the same field, in the base's only layout gap.
+  Nothing else crossed the line in either direction. Two properties make that far stronger
+  than the vote: it is falsifiable by a single counterexample, and **the boundary doing the
+  separating was measured by an unrelated witness**, so the clean split independently
+  corroborates the size it depends on. A rule that reports only what it matched cannot be
+  audited — emit the other bucket and its count too.
+- **A verification harness that re-runs PRODUCERS is structurally blind to MUTATORS.** The
+  stability harness in this document re-runs every read-only sweep and diffs the artifacts;
+  it cannot run the appliers, because running them would mutate. So a round that legitimately
+  changes an artifact can orphan an applier's approved census — its hardcoded population, its
+  ground-truth poison — and nothing reports it until a human next invokes that applier.
+  Measured: a round took a decided-size artifact from 3 pinned entries to 7; the struct
+  applier hardcoded those 3 names and gated on `apply 3`, so it refused to run at all
+  (correct behaviour, invisible for exactly as long as nobody ran it), and the same change
+  silently falsified the assertion in its selftest that used one of the newly-decided
+  entries as its example of something to refuse. When a round changes an artifact, enumerate
+  **every** consumer and say which tier each sits in; the harness covers the sweeps and
+  nothing covers the appliers but you.
+- **Give a ground-truth selftest arm a NEGATIVE twin that pins what the rule DEPENDS on.**
+  An arm asserting "against the real artifacts this rule recovers exactly X and nothing
+  else" proves the rule's output. It does not prove *why* the rule produced it. Add a twin
+  that re-runs the same call with the one input the rule is supposed to hinge on moved, and
+  require the opposite outcome — here, re-running an ownership fold with the base sized at
+  the disputed cell's own offset had to fold nothing, which is what demonstrates the rule is
+  bounded by the measured size rather than by the registrants it happens to agree with.
 - **A contradiction needs a competing CLAIM, not merely a different string.** An
   opaque block (`uint8_t[N]`) is the *absence* of a claim about its interior, and a
   vector-typed member's components genuinely are floats — so an access disagreeing
