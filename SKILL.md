@@ -590,6 +590,14 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   **Print the zeros**: a census listing only the kinds that fired cannot be told apart
   from one where a kind is dead, so enumerate every expected witness kind with its count
   including `0`, and say which zeros are known limitations of the scanner.
+- **An artifact derived from an EXTERNAL input must name that input beside it, and a
+  regeneration must be checked against the named input — diff MAGNITUDE is the tell.** A
+  comparison against an external oracle was regenerated with the wrong one of two archived
+  oracle outputs; the mistake announced itself as a diff in which the ORACLE-side columns
+  moved — something the change under test structurally could not do — and at ~20× the
+  expected size. Before adjudicating any regeneration diff, ask which columns the change
+  could possibly touch; a diff outside that set is an input-identity failure, not a
+  finding.
 - **Measure a proposed mechanism's REACH before building it.** A cheap probe that counts
   how many targets a route could possibly reach costs minutes and routinely refutes the
   round you were about to spend a day on. Two measured examples from one session: a plan
