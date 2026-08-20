@@ -626,6 +626,34 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
     grown a follow-up ("their registrars are the best lead, look in this code blob") that
     was never needed — the answer was in a different binary the whole time. A stale lead
     reads as an opportunity forever; strike it where a reader will meet it.
+- **A GUARD THAT COMPARES ADDRESSES WHERE IT MEANS VALUES discards whole bodies the moment
+  the compiler duplicates a tail.** The conservative rule "the last relevant write in this
+  function must be one my tracker attributed, or nothing here is trustworthy" is correct.
+  Expressing it as *"last-tracked-write **location** == last-write-of-any-kind
+  **location**"* is not. Measured: a compiler duplicated a factory's epilogue across a branch
+  instead of joining it, emitting two identical writes of the same value; the register-restore
+  instruction between them legitimately kills the tracker, so the second write is seen but
+  unattributed — two locations, one value, and the guard threw the entire function away.
+  Six exact class sizes were absent from every artifact for months, reported honestly as
+  `skipped: no_tracked_construction=6`. The sibling class whose branches merged *before* the
+  write had been decided exactly, and sat in the same file.
+
+  Compare the VALUE: every relevant write from the last attributed one onward must carry the
+  same value. Three things make that a repair rather than a loosening, and all three are
+  cheap:
+  - **Assert the direction.** State whether the new rule is strictly weaker or strictly
+    stronger and make the probe *count the other direction and raise*. Here a
+    `REGRESSIONS (old True → new False)` counter asserted **0**, with an example address in
+    the exception. "12 rows changed" alone cannot tell a repair from a hole.
+  - **Measure reach over the FIRE POPULATION, not the cases in hand.** The guard had five
+    consumers, one of them a mutating applier that the read-only stability harness is blind
+    to by construction, so proving the six known cases proved nothing about the rest. Both
+    rules were run over every function under every seeding the consumers use — 11248
+    body/seeding pairs — and exactly 12 moved.
+  - **Point the probe at the PRODUCTION implementation once the rule lands.** Written with
+    two local copies of the rule it is a one-off; extracting the rule into the library and
+    having the probe call it for both settings turns the same hand-built arms into a standing
+    regression test on the shipped code.
 - **A SKIP COUNTER is a to-do list, not a footnote — and an absent ROW hides better than a
   blank CELL.** This document already says to print the zeros and to suspect the reader
   before theorising about a blank census. The sharper failure is one rung up: a sweep that
