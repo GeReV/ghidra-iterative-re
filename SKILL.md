@@ -704,6 +704,19 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
   `"x87_float"`) sent all 538 float accesses down the integer branch, and only the
   "you must reproduce the known float cells" arm caught it. Absence of disagreement
   is not agreement.
+- **A vacuity guard keyed to `checked == 0` can be satisfied by the WRONG population.**
+  The guard exists to catch a check with nothing to compare, and it is defeated by any
+  non-empty comparison — including one drawn entirely from a *different* class than the one
+  under test. Measured: a base-layout check walked the base's ancestor chain, found no rows
+  for the base itself, matched 13 belonging to its grandparent, and passed. Guard the
+  population you actually mean: if the entity under test is expected to contribute rows,
+  require that IT contributed some, and raise naming both sets when it did not.
+- **When a check re-derives what a mutator wrote, keep the two derivations SEPARATE.**
+  The instinct is to share a helper so the check and the applier cannot disagree. That is
+  backwards — sharing makes them agree by construction and verifies nothing. Two
+  independent derivations from the same evidence, compared with a raise on disagreement, is
+  a cross-check, and the duplication is the feature. Comment it as deliberate, or a later
+  tidy-up will "fix" it into vacuity.
 - **Prefer a PARTITION to a vote when attributing evidence, and print both buckets.**
   "Three independent registrations agree" is a count, and a count invites the question of
   how many would have been enough. The stronger form is a split of the *whole* population
@@ -1681,7 +1694,13 @@ through Ghidra, these apply:
   variables to `rax`/`rcx` — the measure became the target and stopped measuring. Use
   multi-dimensional criteria; never let "verification passed" be the objective.
 - **Coverage theatre.** The same study: 10–15% of functions genuinely analyzed while the
-  run reported completion. State coverage as a number, always.
+  run reported completion. State coverage as a number, always — and state it as a
+  **FRACTION of the population it claims to cover, never as a bare count.** A bare count
+  is the theatre: measured here, a structural check reported "13 rows re-checked" beside a
+  24-component prefix and nobody asked, because 13 is a healthy-looking number; the ten
+  unverified components stayed invisible for a whole round. "23 of 24" exposes the gap
+  without the reader needing to know which classes the underlying artifact happens to
+  contain.
 - **Context rot** across long runs, producing inconsistent naming between functions
   analyzed early and late. Short scoped executions beat one monolithic session.
 - **A reproducible error is not evidence for your theory about its cause.** It is evidence
