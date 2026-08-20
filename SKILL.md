@@ -837,6 +837,19 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
   measurement into a tautology, while every report still describes it as two agreeing
   witnesses. Disambiguate on structure the other witness knows nothing about, or report
   nothing.
+- **An approved census is a RULE plus a number — record the predicate beside the count,
+  or the approval is unreproducible.** The number a human approves is the output of a
+  measuring rule, and the rule is the part a later implementer actually needs: measured,
+  a handoff recorded "44 approved" and the operation to perform, but the census's
+  concept-join bar lived only in a design exploration's chat report — the re-implementation
+  derived the population the way the existing machinery always had and fired **100**. The
+  population-drift gate (raise if the fired count differs from the approved one) turned
+  that into a refused dry run rather than a wrong apply; the bar was then recovered from
+  the archived exploration report. Two halves, both cheap: commit the predicate (or the
+  census artifact itself) in the same change that records the approval, and when a lost
+  rule must be reconstructed, require the reconstruction to reproduce the approved number
+  per stratum, not merely in total — a total can match by coincidence; a ranked
+  decomposition cannot.
 - **An expected COUNT must be derived from the artifact, never written as a literal.**
   A hardcoded population size is correct on the day it is typed and silently wrong
   forever after, and because it usually lives in a *summary line* rather than an
