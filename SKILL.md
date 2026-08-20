@@ -598,6 +598,40 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   expected size. Before adjudicating any regeneration diff, ask which columns the change
   could possibly touch; a diff outside that set is an input-identity failure, not a
   finding.
+- **A SKIP COUNTER is a to-do list, not a footnote — and an absent ROW hides better than a
+  blank CELL.** This document already says to print the zeros and to suspect the reader
+  before theorising about a blank census. The sharper failure is one rung up: a sweep that
+  honestly prints `skipped: no_tracked_construction=6` beside 196 successes, and a decider
+  that honestly reports those 6 as "no upper bound". Nothing is hidden and nothing is
+  wrong — yet the six classes are absent from the artifact *entirely*, so no census of it
+  can see them, and the project's narrative silently became "nothing allocates these"
+  (a story about the DATA) when the truth was one line of reader limitation. Measured: all
+  six were allocated by an ordinary factory whose `PUSH 0x230` sat twelve bytes before the
+  call, and reading ONE of those factories by hand produced six exact class sizes that a
+  purpose-built witness round had failed to reach. **Treat every non-zero skip counter as
+  a queued item with an owner, and read one skipped case by hand before believing any
+  conclusion drawn over the survivors.** A blank cell at least appears in the census; a
+  dropped row does not appear anywhere.
+- **Diminishing returns in one vein is a signal to change AXIS, not to push harder, and the
+  trigger is measurable.** When a round costs a full apply-and-verify cycle to decide four
+  bytes, and the residue is a handful of items each needing its own bespoke witness, that
+  population is exhausted *for that method* — the remaining information is somewhere else.
+  Cheap axis changes that repay: rank functions by CALL-SITE FAN-IN rather than by class
+  membership (measured: the two highest-fan-in unnamed functions in one binary were the
+  game's own allocator and its free, 905 call sites between them, invisible to every
+  class-oriented view and already sitting in a script constant, unapplied); ask what a
+  thing IS rather than how big it is; and look at the populations no route reaches at all.
+  The point is not that breadth beats depth — it is that a stalled depth metric is
+  evidence about your METHOD, not about the binary.
+- **A rule built for one population must be offered to its SIBLING populations.** Measured:
+  a "leaf class allocates exactly its own size" rule decided 57 classes in one population
+  and was never extended to a sibling population with an identical evidence shape (same
+  allocation witness, same constructor witness), leaving five leaf classes open whose sizes
+  its own arithmetic would have decided immediately. This is the "two consumers of one
+  rule" hazard pointed at populations instead of code paths, and it is invisible because
+  each population's artifact looks internally consistent. When a rule lands, enumerate
+  every population carrying the evidence it consumes and record which ones you did not
+  extend it to, and why.
 - **Measure a proposed mechanism's REACH before building it.** A cheap probe that counts
   how many targets a route could possibly reach costs minutes and routinely refutes the
   round you were about to spend a day on. Two measured examples from one session: a plan
