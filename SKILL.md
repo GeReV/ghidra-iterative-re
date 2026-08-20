@@ -598,6 +598,34 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   expected size. Before adjudicating any regeneration diff, ask which columns the change
   could possibly touch; a diff outside that set is an input-identity failure, not a
   finding.
+- **A MAXIMAL PRINTABLE RUN IS NOT A STRING — sweep its SUFFIXES, or a string whose
+  neighbour ends in a printable byte is invisible.** A C string's END is observable (the
+  NUL is what the program itself uses); its START is not — a string simply begins wherever
+  the previous datum stopped. So a string sweep built on `[\x20-\x7e]{n,}` silently prefixes
+  every name whose preceding constant happens to end printable, and no token split on
+  non-alphanumerics recovers it. Measured on one binary: two class names went unrecovered
+  for eleven rounds and were written up as *"no string anywhere in the install hashes to
+  either"* — a **measured zero that was a defect in the reader**, the same family as the
+  immediate-operand under-count above. The donors were ordinary float constants:
+  `255.0f` = `00 00 7f 43` ends in `'C'`, `1024.0f` = `00 00 80 44` ends in `'D'`, so
+  `CRendScaledFont` and `CSimpleAnimation` were swept as `CCRendScaledFont` and
+  `DCSimpleAnimation` — one byte long, hashing to nothing, in four separate DLLs. Yield each
+  run's bounded suffixes as well (a 4-byte datum contributes at most 3 printable bytes
+  before the run breaks, so a skip bound of 4 covers it). Three follow-ups, all cheap:
+  - **The same widening usually feeds a MEASURED ZERO somewhere else, so measure it before
+    landing it.** Here the dictionary also carried a "of 588 unresolved ids, exactly one is
+    the hash of any string in the install" claim, and a single accidental collision would
+    have reopened it. A standalone probe over 6,034,721 runs, run before the edit: the
+    skip-0 arm reproduced the old result exactly and the skip-1..4 arm added **zero** ids —
+    2.49M → 4.67M distinct strings for the identical zero, i.e. the claim got *stronger*.
+    Had the probe come back non-zero, the honest outcome was a recorded cost, not a
+    quietly-unwidened sweep.
+  - **Require the NUL when you match.** Matching a name as a bare substring is exactly what
+    the trap defeats; `name + b"\x00"` is the boundary the distortion cannot fake.
+  - **Retract the old claim IN PLACE, and retire the lead it spawned.** The wrong zero had
+    grown a follow-up ("their registrars are the best lead, look in this code blob") that
+    was never needed — the answer was in a different binary the whole time. A stale lead
+    reads as an opportunity forever; strike it where a reader will meet it.
 - **A SKIP COUNTER is a to-do list, not a footnote — and an absent ROW hides better than a
   blank CELL.** This document already says to print the zeros and to suspect the reader
   before theorising about a blank census. The sharper failure is one rung up: a sweep that
