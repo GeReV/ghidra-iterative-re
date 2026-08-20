@@ -791,6 +791,20 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
     decided exactly the same rows, i.e. bought a broader fire population for no
     measured gain. Robustness belongs in the guard, not in a loosened rule; a
     widened rule is a decided-artifact change wearing a bugfix's clothes.
+- **A structural fold that replaces N evidence-bearing cells with ONE composite orphans
+  every check and row keyed to the old cells — and none of them fails; they go INERT.**
+  Folding a 67-cell block into one embedded-record component silently orphaned two
+  decided per-cell type upgrades, one must-fire pin, two test poisons, and one
+  serialisation cross-check across three consumers. The pattern that caught the tail: a
+  raise IN THE MACHINERY for any orphaned key (an upgrade keyed inside a group), pins
+  re-scoped with the retirement recorded, poisons rebuilt with assert-it-changed guards,
+  and the shared descent extracted on its third consumer. Grep for the old keys before
+  the fold, not after the third silent miss.
+- **The selective-revert rule binds automation too.** A stability harness classifies
+  version restamps against the on-disk working copy; a helper loop that then blanket-
+  reverts every restamped file to VCS state wipes the round's own uncommitted regenerated
+  artifacts — the exact blanket revert the rule forbids, executed by a script instead of
+  a hand. Give the loop an explicit set of the round's own files, by name.
 - **Run every read-only sweep after every apply and require byte-identical output.**
   This is the only cheap defence against the whole class above, because it does not
   depend on predicting which witness a given apply perturbs. Build it as a driver
