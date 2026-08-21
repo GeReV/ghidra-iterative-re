@@ -741,6 +741,48 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   placed.** A harness baseline asserting "15 hubs" went stale the moment a round legitimately
   added a sixteenth — inside a check that *passes*, so nothing announced its expiry. Derive
   it from the population function the code under test already exposes.
+- **Two witnesses that are both LOWER BOUNDS on the same relation must be ANDed, never
+  required to AGREE.** The instinct on acquiring a second route to a fact is to gate on the
+  two agreeing. That is right for witnesses that can err in both directions and **wrong** for
+  the common case where each can only MISS evidence, never invent it — there, a
+  symmetric-agreement gate fires on the perfectly normal case of one route being quieter than
+  the other. Measured: two routes to "does this class have a subclass" — recorded parentage
+  (from constructor vptr stores) and destructor-chain descendancy — were gated on agreement
+  and the gate raised on two classes. **The data was right and the gate was wrong**: both
+  routes depend on a compiler-emitted store that is *deleted where nothing observes it*, and
+  the two get deleted in different functions, so each can wrongly say "no subclass" and
+  neither can wrongly say "has one".
+
+  Split the one question into two and the asymmetry becomes usable:
+  - **SOUNDNESS** — does the new route ever report a relation the established one
+    *contradicts*? This is what licenses it to speak at all, and it is graded only on the
+    sub-population the established route can speak about. (Here: 309 of 309 gradeable pairs
+    confirmed, 0 contradicted; the 35 pairs touching unclassified entities are *counted*, not
+    graded, because there is nothing to grade them against.)
+  - **PAYLOAD** — does it ADD a relation the established one missed? For a negative claim
+    ("no subclass exists") only an addition can overturn it.
+
+  Then take the **AND**: the negative claim holds only where *every* route is silent. And
+  **demonstrate each conjunct separately** — remove a known instance from one route and
+  require the other to hold the line, then reverse it. Without those two arms there is no
+  evidence the second route was load-bearing rather than decorative.
+- **When a rule's CALIBRATION cannot exist in the population you are extending it to, SPLIT
+  it and say which half is which — do not manufacture a substitute.** A rule has a *claim*
+  and a *precondition*, and they can be calibrated in different places. Measured: the claim
+  ("for a subclass-free class, the allocation size is exact") could only be calibrated where
+  classes have a size known independently of allocation; the target population has no such
+  class and structurally never will. The tempting substitute — grading the rule against the
+  members already decided — is **circular**, because those were decided by the very witness
+  under test. State the split, calibrate the precondition where you can (it was measurable
+  there, and more strongly), and **assert the structural zero** so the split retires itself
+  the day the population gains an independent witness.
+- **When a round breaks an existing test arm, repair the arm's PURPOSE — never delete it or
+  relax its expectation.** Measured: a new pin rule overwrote the value an older arm asserted,
+  so the arm stopped testing the route it was written for while still passing a weaker check.
+  The fix is to run the old arm with the new rule *disabled* (which is why the new rule needs
+  a flag anyway, for the two-step diff) and to add a companion arm stating the **precedence**
+  between the two rules explicitly — otherwise the ordering of two `if`s is the only record
+  of a decision.
 - **A rule built for one population must be offered to its SIBLING populations.** Measured:
   a "leaf class allocates exactly its own size" rule decided 57 classes in one population
   and was never extended to a sibling population with an identical evidence shape (same
