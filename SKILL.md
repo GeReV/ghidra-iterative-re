@@ -431,6 +431,21 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   verification, so a failed apply claims names it did not apply — and the ledger is what your
   provenance gates join against, so the damage lands in the guard rail rather than in an
   artifact. Revert the raised run's rows BY NAME before re-running.
+- **BEFORE WRITING INTO A SLOT, ENUMERATE ITS READERS — AND ANSWER WITH A NUMBER, NOT A
+  COMPATIBILITY ARGUMENT.** Comments, tags and bookmarks feel inert, and they are not: measured,
+  a round adding provenance PLATE comments at every project-named address was writing into the
+  exact slot `Ghidra`'s Function ID analyzer uses, which a standing gate read and regex-parsed a
+  `Libraries:` block out of. The tempting move is to reason that a prepended block separated by
+  a blank line cannot disturb a parser looking further down — and that reasoning was *correct*,
+  which is precisely why it is not evidence. What shipped instead: a census counting the overlap
+  (**1** address of 3618), a writer that prepends and preserves rather than replaces, and a
+  before/after equality check on all **56** parses. Any slot with a reader needs the equality
+  check; grep for who reads it before deciding it is inert.
+- **RUN EVERY GATE AT THE NEW VERSION — "this round could not have touched it" is sound
+  reasoning and still an assumption.** Measured: a state line was drafted claiming five gates
+  green after a comment-only round when two had been re-run and two were inferred safe on the
+  grounds that comments cannot move types or vtables. True, and it costs two minutes to find
+  out. The most-read sentence in a project's records should carry measurements, not deductions.
 - **A PRECONDITION MEASURED BEFORE A BATCH OF OPERATIONS CAN BE INVALIDATED BY THOSE
   OPERATIONS — re-check it immediately before the operation it guards.** Measured: an
   applier verified at census time that no type of a given name existed; a *merge step in the
@@ -952,6 +967,18 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
     they predated the tagging discipline — 22 such names across 7 namespaces. Treating "the
     name already exists" as corroboration would have been self-corroboration with years
     between the two halves.
+- **WHEN A RESEMBLANCE ARGUMENT IS ACCUMULATING, FIND THE ARTEFACT THE CANDIDATE WOULD HAVE
+  LEFT BEHIND AND CHECK WHETHER IT IS THERE.** Attributing a recovered design to a known
+  codebase gets easier the more traits you list, and listing traits is not testing. Measured: a
+  game's allocator matched a specific published engine on four behaviours including one unique
+  to that engine's later version, and the case was becoming persuasive. Two structural tests
+  settled it in minutes — *does the bookkeeping live in the struct that engine uses?* (no: four
+  loose globals) and *is the magic value that engine writes past each block actually written?*
+  (no: across 113 instructions the only constants stored were `0` and one address). The second
+  dissolved the strongest coincidence in the case, because the `+4` everyone had read as that
+  engine's fingerprint turned out to compensate the allocator's own round-DOWN two lines
+  earlier. **A single absent artefact outweighs any number of shared behaviours** — and note
+  which way this failed: the resemblance argument was manufacturing a conclusion, not hiding one.
 - **Measure a proposed mechanism's REACH before building it.** A cheap probe that counts
   how many targets a route could possibly reach costs minutes and routinely refutes the
   round you were about to spend a day on. Two measured examples from one session: a plan
@@ -2116,7 +2143,7 @@ We wrote a vtable sweeper from scratch without checking that the first item exis
 | Identify the build toolchain | `ghidra.app.util.bin.format.pe.rich` + `PortableExecutableRichPrintScript` — the PE Rich header names the compilers and linkers used |
 | Attack undefined code | `Processors/x86/data/patterns/x86win_patterns.xml` (real MSVC prologue/filler pairs — **extend the XML**, don't write pattern code); `FindUndefinedFunctionsScript`, `MakeFunctionsScript`, `CreateFunctionAfterTerminals`, `DumpFunctionPatternInfoScript` |
 | Build a FID database from period libs | `ImportMSLibs`, `CreateEmptyFidDatabase`, `CreateMultipleLibraries`, `RepackFid`; procedure in `data/building_fid.txt` |
-| **Carry provenance inside the program** | `FunctionTag` (name + comment, DB-backed, and `CppExporter` can filter on it) — tag every function a round touches with the round id, and the ledger becomes reconstructible *from the program* instead of only from your CSV. `BookmarkType.{NOTE,ANALYSIS,WARNING}` for "recorded unresolved" caveats that travel with the address |
+| **Carry provenance inside the program** | `FunctionTag` (name + comment, DB-backed, and `CppExporter` can filter on it) — tag every function a round touches with the round id, and the ledger becomes reconstructible *from the program* instead of only from your CSV. `BookmarkType.{NOTE,ANALYSIS,WARNING}` for "recorded unresolved" caveats that travel with the address | **Also: a PLATE comment at every address you named, so the GUI reader sees it** — measured, 3618 of them over 1909 functions and 1709 data symbols, with `functions_total` and the AI-symbol count asserted unmoved and a full read-only-sweep harness confirming 0 artifacts perturbed. Make the text rename-proof: say *the name here is ours*, never quote the name, or you have planted one stale copy per address
 | Record the analyzer configuration | `pyghidra.analysis_properties(program)` — results are a function of it, so a metrics row omitting it is not a reproducible snapshot |
 | Machine-readable export for replay debt | `ghidra.app.util.xml.*Mgr`, and the shipped **SARIF** exporter (`Features/Sarif`) — both carry the `SourceType` laundering hazard above |
 
