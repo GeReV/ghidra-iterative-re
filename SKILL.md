@@ -411,6 +411,26 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   against a version picked from the Version History table.
 - **Scope address sets as narrowly as the operation allows.** Broad set + large archive
   is the dangerous combination; the incident did not reproduce narrowly.
+- **`Function.setName(sameName, SourceType.X)` IS A NO-OP FOR THE SOURCE — and a mutation
+  that silently does nothing is indistinguishable from one that worked.** Measured: a round
+  re-tagging 22 project-applied names from `ANALYSIS` to `AI` called `setName` with each
+  function's existing name and the new tier. Ghidra short-circuits when the name is
+  unchanged, so no tier moved. All 22 calls returned cleanly, the census printed, the ledger
+  was written, and the run would have reported success. `Function` has **no source setter at
+  all**; **`Symbol.setSource(...)` is the API** — `dir()` on the live objects shows
+  `getSignatureSource`/`setSignatureSource` on `Function` and `getSource`/`setSource` on
+  `Symbol`. Two things generalise past the specific call:
+  - **Count the population you claim to have changed.** Per-item calls that do not throw are
+    not evidence; only a before/after count of the property itself is. Here
+    `ai_symbols == before + N` was the sole check capable of noticing, and the same shape
+    catches any API that silently declines.
+  - **Ask the object rather than recall the API.** One five-line probe printing the
+    SourceType-related members of `Function` and `Symbol` settled in seconds what reasoning
+    from memory had already got wrong once.
+- **A RAISED RUN LEAVES YOUR LEDGER AHEAD OF THE PROGRAM.** The ledger append precedes the
+  verification, so a failed apply claims names it did not apply — and the ledger is what your
+  provenance gates join against, so the damage lands in the guard rail rather than in an
+  artifact. Revert the raised run's rows BY NAME before re-running.
 - **A PRECONDITION MEASURED BEFORE A BATCH OF OPERATIONS CAN BE INVALIDATED BY THOSE
   OPERATIONS — re-check it immediately before the operation it guards.** Measured: an
   applier verified at census time that no type of a given name existed; a *merge step in the
@@ -1176,6 +1196,29 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
   reverts every restamped file to VCS state wipes the round's own uncommitted regenerated
   artifacts — the exact blanket revert the rule forbids, executed by a script instead of
   a hand. Give the loop an explicit set of the round's own files, by name.
+- **THE ANTI-CIRCULARITY AUDIT MUST BE RUN OVER THE WHOLE LEDGER, NOT PER ROUND.** Discharged
+  against "the names this round applied", it can only ever catch a leak the round happened to
+  disturb — which is why one project found its only such leak in the round that named the
+  highest-fan-in function in the binary, and in no earlier round. Run it once over every
+  applied name against every cell of every committed artifact. Four things decide whether the
+  answer means anything:
+  - **Join on the UNQUALIFIED names too.** Measured: only 677 of 3596 applied addresses
+    carried a namespace, so a qualified-only audit reaches under a fifth of the population —
+    and the one real leak was an unqualified allocator name.
+  - **Excuse by (artifact, COLUMN), never by artifact.** A file that legitimately carries an
+    applied name in one column would otherwise get a blanket pass for its other fifteen.
+  - **A join by name cannot tell YOUR SYMBOL from the BINARY STRING your symbol came from.**
+    Measured: ten flagged cells were all a self-announce literal in `.rdata` — the very
+    evidence the applied name was derived from, so equality is the expected direction. Ask of
+    every match: *would this cell hold this value if we had applied nothing?* A false positive
+    on a provenance gate is worse than noise; it gets explained away once and ignored after.
+  - **Turn each excusal into a MEASUREMENT the producer can fail.** Where the excused column
+    carries an applied name, require the producer's own name column to be SUPPRESSED on the
+    same rows; where the artifact's subject is provenance, require it to LABEL those cells as
+    yours from its own source column. Both were demonstrated failing on poisoned copies.
+  And **print what the audit cannot see, as a number**: a ledger join is blind to a
+  project-derived name applied at a HIGHER tier, as are every other ledger-based gate. That is
+  not a hole in the audit — it is the reason the tier discipline exists.
 - **Run every read-only sweep after every apply and require byte-identical output.**
   This is the only cheap defence against the whole class above, because it does not
   depend on predicting which witness a given apply perturbs. Build it as a driver
