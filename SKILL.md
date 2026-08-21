@@ -792,6 +792,49 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   each population's artifact looks internally consistent. When a rule lands, enumerate
   every population carrying the evidence it consumes and record which ones you did not
   extend it to, and why.
+  - **The way to offer it is to MOVE it to one copy — not to copy it, and not to re-derive
+    it — and to leave its CALIBRATION where it was demonstrated.** Measured on the second
+    occurrence of this hazard in the same project: the sibling tool had grown its own
+    narrower version of a base-selection rule, which could not walk through an
+    intermediate entity carrying no layout, and so *raised* where the shared rule would
+    have walked on. Moving the rule to the shared library cost one insert and two renames;
+    the five calibration arms stayed in the original tool's selftest, pointed at the moved
+    copy, so the rule relocated and its evidence did not have to be rebuilt. A second copy
+    would have doubled the calibration debt and guaranteed the two drift.
+- **A PRECONDITION THAT RAISES takes the whole round down with it — where a script is
+  DECIDING SCOPE, express it as a printed exclusion; keep the raise only where the state
+  already exists.** The mutation-safety rules in this document push everything toward
+  raising, and that is right for *damage*. It is wrong for *scoping*, and the two look
+  identical in code. Measured: a struct applier raised on one entity that had never been
+  named and whose parent had no decided layout — so a bare DRY RUN aborted, one un-nameable
+  entity blocked the three that were ready, and the abort landed **before** the round's
+  before/after payoff measurement, destroying it. Both conditions became exclusions printed
+  with a reason and a count. What makes that a repair rather than a loosening is the
+  distinction it draws: for an entity that has **already been applied**, the same conditions
+  still raise, because its type exists, so a missing namespace or a vanished prefix source is
+  damage. Ask of every precondition: *is this the script choosing what to do, or the program
+  telling me something broke?*
+- **A WALK added beside a single-step rule must inherit the single-step rule's RAISES.**
+  Widening "take the base" into "walk the chain" is the common shape of the fix above, and
+  the quiet failure is that the walk *stops* where the single step *raised*. Measured: the
+  single-step form raised on more than one recorded base (a single-inheritance
+  contradiction); the walk was initially written to stop there and return what it had. That
+  is a loosening the two-step diff **cannot** see, because the diff compares outcomes on
+  data where the contradiction does not occur. Point the existing poison at both functions.
+- **A rule change proven INERT everywhere is indistinguishable from one that does nothing —
+  so pin what it DID change with a negative twin.** The two-step diff coming back
+  byte-identical is what licenses the change, and it is also exactly what a no-op looks
+  like. Add an arm requiring the one case the change was made for to succeed under the new
+  rule and to fail under the old one, and derive it from the program with a guard, so the
+  round that finally fixes that case retires the arm by name instead of leaving it inert.
+- **Running a sibling tool purely as an INERTNESS PROOF is also a CENSUS of that tool, and
+  that is where the next orphaned mutator is found.** The harness in this document drives
+  read-only sweeps and structurally cannot run appliers, so an applier's queue of work grows
+  silently. Measured: a sibling applier was invoked only to show a moved rule had not changed
+  its behaviour, and its dry run reported an entity that had become eligible two rounds
+  earlier under a rule added one round after that — an approved-census round nobody had
+  noticed. Whenever you touch shared machinery, run *every* consumer's dry run and read the
+  population line, not just the pass/fail.
 - **Measure a proposed mechanism's REACH before building it.** A cheap probe that counts
   how many targets a route could possibly reach costs minutes and routinely refutes the
   round you were about to spend a day on. Two measured examples from one session: a plan
