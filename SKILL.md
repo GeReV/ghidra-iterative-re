@@ -479,6 +479,35 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   and, with default options, **disassembles and can create a function** at the address
   (`DemanglerOptions.doDisassembly` defaults to `true`). It is a mutating operation of the
   same class as the ones you bracket, not a naming convenience.
+
+  **But measure the VARIANCE before you commit one, because the Parameter ID analyzer got
+  there first.** "Signatures propagate to call sites" is true and it is not a licence: a
+  committed signature's payoff is that it replaces N *different* per-site guesses with one
+  answer, so the round is worth exactly what N is — and where the Decompiler Parameter ID
+  analyzer has already run, N is often 1. Measured on one binary, on the two highest-fan-in
+  functions in it (a custom arena allocator and its free, 852 call sites): both already
+  carried an analyzer-committed `__cdecl` one-parameter prototype at
+  `SignatureSource=ANALYSIS`, structurally identical to the one the planned round proposed,
+  and decompiling all 428 callers and inspecting every CALL p-code op found **361 of 361**
+  allocator sites already rendering one argument and `int *`, and **475 of 475** free sites
+  already rendering one argument and no result. Zero variance on either axis; the round
+  evaporated on one read-only probe. Count the distinct (arity, return type) pairs across the
+  call sites first — that number *is* the payoff.
+
+  Two traps ride along with it, both measured in that round:
+  - **The more CORRECT type can be the less USEFUL one, and the summary line cannot show
+    it.** `void *` is right for an allocator and `int *` is a decompiler guess — but every
+    one of those 361 sites *consumes* the return, and `int *` renders a dereference directly
+    where `void *` forces a cast at each use. Committing the correct type would have cost
+    legibility at 361 sites for nothing measurable, while the round's own headline ("852 call
+    sites given a committed signature") would have read as success. Grade a type change by
+    what it does at the call sites that exist, not by which type is more nearly true.
+  - **An `AI` signature does NOT outrank an `ANALYSIS` one, so the cascade may take it
+    back.** Verified from the enum on a 12.1.2 install: `ANALYSIS` and `AI` are both priority
+    **2**, `isHigherPriorityThan` false in *both* directions. Laying an AI-tagged signature
+    over an analyzer-committed one is a peer overwrite that `analyzeChanges` is entitled to
+    reverse — so check `getSignatureSource()` on the target *before* planning the apply,
+    not after the cascade eats it.
 - **Defining functions at undefined code.** Feeds analyzers new material, extends
   pointer-table runs truncated by undefined targets, adds call-graph edges. Often the
   highest-leverage single mutation.
