@@ -714,6 +714,33 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   thing IS rather than how big it is; and look at the populations no route reaches at all.
   The point is not that breadth beats depth — it is that a stalled depth metric is
   evidence about your METHOD, not about the binary.
+- **Before extending a rule to a new evidence source, compare what the RULE requires against
+  what the evidence already proved — the extension is often free, and if it is not, that is
+  the moment to stop.** Measured: a containment rule (`sizeof(base) <= sizeof(descendant) <=
+  alloc(descendant)`) needed only ANCESTRY, while the evidence it was being offered — edges
+  from a destructor-chain witness — had already cleared a strictly *higher* bar (immediacy)
+  to be recorded at all. So it qualified *a fortiori*: no new soundness argument, no new
+  calibration design, one row changed and a class went from an open interval to an exact
+  size. The round was short precisely because that comparison was made first instead of the
+  argument being re-derived from scratch. The same question asked the other way is the stop
+  signal: when the new use needs MORE than the evidence proved, do not extend — that is a new
+  witness wearing an old rule's clothes.
+  - **Re-run the rule's calibration over the COMBINED population, and demonstrate it firing
+    THERE.** A calibration that only ever sees the original evidence passes vacuously on the
+    new. Here the poison had to point a *fabricated new-source edge* at a known-size base to
+    prove the check reached the added rows at all.
+  - **Give the ground-truth arm a NEGATIVE TWIN, and assert its diff is exactly the expected
+    size.** A flag that re-runs the decider *without* the new evidence must fail to reach the
+    result, and the two runs must differ in exactly the rows claimed. Otherwise "the value is
+    now pinned" is a fact about the artifact, not evidence that the new source caused it.
+  - **A diff of only provenance cells is the OPPOSITE of churn — say so in the write-up.**
+    Two rows here changed `witnesses` and `note` with no value moving: the classes now cite
+    their real base rather than their own constructor. A skimming reader sees noise; the next
+    reader following the citation sees the difference.
+- **A hardcoded population count in a TEST is the same defect as one in a report, and worse
+  placed.** A harness baseline asserting "15 hubs" went stale the moment a round legitimately
+  added a sixteenth — inside a check that *passes*, so nothing announced its expiry. Derive
+  it from the population function the code under test already exposes.
 - **A rule built for one population must be offered to its SIBLING populations.** Measured:
   a "leaf class allocates exactly its own size" rule decided 57 classes in one population
   and was never extended to a sibling population with an identical evidence shape (same
