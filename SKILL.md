@@ -411,6 +411,31 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   against a version picked from the Version History table.
 - **Scope address sets as narrowly as the operation allows.** Broad set + large archive
   is the dangerous combination; the incident did not reproduce narrowly.
+- **A PRECONDITION MEASURED BEFORE A BATCH OF OPERATIONS CAN BE INVALIDATED BY THOSE
+  OPERATIONS — re-check it immediately before the operation it guards.** Measured: an
+  applier verified at census time that no type of a given name existed; a *merge step in the
+  same run* then created one, because moving a function into a class namespace makes Ghidra
+  materialise a placeholder struct of that name; the next step died on a duplicate-name
+  exception with the round half-applied. A census is for deciding SCOPE. It is not a
+  substitute for the check at the point of use.
+- **WRITE A MULTI-STEP APPLY TO CONVERGE ON THE END STATE, NOT TO ASSUME THE START ONE.**
+  `canUndo()` is `False` for a previous script run's transaction and your snapshot-restore
+  path is probably untested, so a raise part-way through leaves a state you must be able to
+  RE-ENTER. Make every step report "already" and do nothing when its end state holds; then a
+  re-run on a finished program is a no-op that still verifies every intended fact, and
+  forward recovery becomes provable rather than hopeful. Two things make it work:
+  - **Derive the population from a REPO fact, not a PROGRAM fact.** Membership taken from an
+    append-only ledger's last row per address survived the partial apply intact; membership
+    read from "who currently occupies this namespace" would have made the round's scope
+    depend on how far the failed run got.
+  - **Give the applier a dry arm that runs the REAL code path** (`do=False` through the same
+    convergence functions). That is the arm that catches this class of defect; a selftest
+    built only from constructed inputs cannot.
+- **`replaceDataType(placeholder, keeper, True)` MOVES the keeper into the DISCARDED type's
+  category.** Measured: structs folded over demangler-created placeholders ended up under
+  `/Demangler/`, not at the root where they had been, and every consumer looking up
+  `"/" + name` silently reported them ABSENT. When you fold types, enumerate the consumers
+  of the type's PATH, not just of its name.
 - Gate mutating scripts behind an explicit `apply` argument so a bare run is a dry run.
 - **Non-returning functions**: if Ghidra doesn't know a function never returns, it
   disassembles the data after every call to it, which "wreaks havoc." Check Error
@@ -903,6 +928,29 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
 - **A short name is not an identity.** Demangled short names collide across a hierarchy —
   an override shares its base's name, so two different tables can look identical. Join on
   **addresses**, not names.
+  - **And a NAMING ROUND is what proves whether you actually did.** Measured: applying four
+    long-established class identities broke **five** separate checks at once, each of which
+    had memorised a spelling where it meant an entity — an approved-scope constant recording
+    which node a previous round was authorised to add (by its old label), a
+    `startswith("UNKNOWN_")` standing in for "is this an unnamed class" (a *tier* question),
+    two tests, one of them a **poison that silently went inert**, and two diagnostics. All
+    five were repaired by resolving the table ADDRESS through a helper that had already been
+    made rename-proof once, for a different class — the fix existed and had simply never
+    travelled to the sites that needed it. If your project has never renamed anything, treat
+    every name-keyed join as unproven rather than as working.
+  - **The dangerous one is a label a producer emits for an entity it CREATES.** A sweep that
+    folds in a new node looked its label up in a map built *before* the fold, so the one node
+    it adds always fell through to the synthetic `UNKNOWN_0x…` spelling. Harmless while that
+    node had no other name; the moment the class was decided, that artifact disagreed with
+    every other artifact, a downstream rule joined the two **by name**, and a class silently
+    regressed from an exact size to an open interval. Nothing errored.
+- **ADJUDICATE A RELABEL BY ASKING WHETHER THE ARTIFACT IS THE OLD ONE WITH THE NAMES
+  SUBSTITUTED — a positional diff cannot answer that.** Renaming changes SORT ORDER, so a
+  row-by-row comparison reports nearly every row of a re-sorted file as changed and the real
+  change hides in the noise. Normalise both sides, substitute the renamed labels, sort, and
+  compare as MULTISETS. Measured: 10 of 14 changed artifacts were provably pure relabels,
+  two more differed only in the ordering of names inside list-valued cells, and exactly two
+  carried the regression worth finding — which had been one line among fourteen.
 - **Population counts depend on the symbol filter, silently.** In this project
   `getExternalFunctions()` returned 134 imports, not the expected 136, because two of them
   exist only as `SymbolType.Label` and not as `Function` symbols — so that API cannot see
