@@ -1273,6 +1273,17 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
   unanchored tables" that kept saying 289 after 7 of those tables were merged out of
   existence. Compute it (`len(tables) - len(anchors)`), and treat a literal in a
   report as the same defect as a literal in a check.
+  - **The worst place for such a literal is a GATE'S DOCUMENTED EXPECTED OUTPUT, and the
+    round that invalidates it will fix only the clause it came for.** A checklist recording
+    what each gate must print when it passes is prose: nothing executes it, so nothing can
+    fail. Measured: a round moved 22 names into a provenance ledger, which changed **six**
+    numbers in one audit's documented headline — and that round corrected exactly **one**,
+    the number it was *about*, leaving five stale in the same paragraph, among them a
+    closing sentence still asserting the very quantity the round had reduced to zero. They
+    survived until an unrelated round happened to run the gate and read its real output.
+    Wrong code fails loudly; a wrong expected value teaches the next reader a false number
+    and is then believed. **When a round changes what a gate PRINTS, re-derive that gate's
+    entire documented paragraph from a fresh run — not the sentence you noticed.**
 - **When a gate fires during a round, ISOLATE before attributing it to your change.**
   The reflex is to assume the work in progress broke it, and that reflex is expensive
   in both directions: it can send you rewriting something correct, or — worse — get
