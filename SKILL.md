@@ -1622,12 +1622,26 @@ Caveats that cost real time here, all of which generalize:
   the complete list of pools, with an end to it. Measured on one binary: a sibling failure
   string suggested "a second arena, on one witness", and enumerating the worker's call sites
   returned exactly **two** pools behind **four** doors — two of which were already named
-  (`zmalloc`, `rendmalloc`) and which no string search would ever have connected to the same
-  pool. The finding that fell out was about the game, not the naming: the compression
-  library's and the renderer's allocations come out of *the same pool the game uses*.
+  (`zmalloc`, `rendmalloc`, both PE export-table entries) and which no string search would
+  ever have connected to the same pool. The finding that fell out was about the game, not the
+  naming: three separate exported doors all draw on *the pool the game itself uses*.
   Generalise past allocators: **before hunting more instances of a pattern, find the
   chokepoint they all pass through and enumerate ITS inputs** — that converts an open-ended
   search into a census.
+- **A BINARY-SUPPLIED NAME IS GROUND TRUTH; WHAT IT MEANS IS STILL YOUR INFERENCE — AND BOTH
+  ARRIVE IN THE SAME STRING.** The rule above ("a library identification is still YOUR
+  inference, and the famous name disguises that") is usually applied to names *you* attach.
+  It fails harder in the other direction, where nothing prompts a second look: an exported
+  symbol named `zfree` needs no defending as a *name* — the export directory supplied it — so
+  reading the `z` as "zlib" and concluding "this belongs to the compression library, not to
+  the game's arena" felt like description rather than inference, and stood unchallenged
+  through two rounds and into a published write-up. Measured afterwards on the same binary:
+  no `zlib`, `inflate`, `deflate`, `adler32`, `zcalloc` or `z_stream` string or symbol exists
+  anywhere in it, and the only observed importers of `zfree` are the game's own two renderer
+  plug-in DLLs. The prefix's meaning remains unknown. **Record "the binary supplied this
+  string" and "this string means X" as separate claims at different tiers** — and note the
+  tell: the moment a name's *spelling* is doing the work in an argument, an inference has
+  entered wearing ground truth's clothes.
 - **A CLAIM ABOUT AN ALGORITHM CANNOT BE MADE FROM ONE HALF OF THE PAIR THAT IMPLEMENTS IT.**
   In an allocate/release pair essentially all the policy lives in the allocator; release is
   frequently a single flag write. Measured: a release routine's eight instructions were read
