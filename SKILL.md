@@ -1059,6 +1059,15 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
   Compare the row before and after the poison and raise if equal; and when a producer's
   output changes, run every READER's selftest (a stability harness that re-runs producers
   does not exercise the readers).
+- **A DRIFT GUARD THAT NAMES THE VALUE IT EXPECTED CATCHES YOUR OWN BUG; ONE THAT COUNTS
+  DOES NOT.** Measured: a census probe recovered call arguments off the wrong end of the
+  push sequence (cdecl pushes right-to-left, so argument 1 is the push met FIRST walking
+  back from the CALL) and reported every site as carrying a non-constant value — i.e. a
+  clean, confident census of **zero** items. What refused it was a guard asserting that one
+  already-known value was still present, because that guard could state what it wanted and
+  what it found. A guard checking only "did we recover anything" passes the empty answer.
+  **Assert a known value, not the shape of the answer** — and keep the bug in the probe's
+  docstring, because it is the only thing explaining why the guard is written that way.
 - **Poison where `expected` and `actual` might share a source** — the classic dead check
   is two reads of the same variable in the same loop compared to each other.
 - **Never verify against state you produced this round.** The `SourceType.AI` filter
@@ -1604,6 +1613,37 @@ Caveats that cost real time here, all of which generalize:
 
   `strlen` has enormous fan-out and is trivially identifiable, and tells you nothing
   structural. Fan-out decides *when* to apply a name; this decides *which* leaves to hunt.
+
+- **THE ALLOCATOR YOU FOUND IS PROBABLY A WRAPPER, AND THE POPULATION QUESTION BELONGS TO ITS
+  WORKER.** A game with more than one memory pool typically gives each pool a thin per-pool
+  door — a dozen instructions that push a pool descriptor and a size to one shared worker and
+  report a pool-specific message on failure. Name the door and you have one allocator; ask
+  instead for **the set of distinct descriptor arguments reaching the worker** and you have
+  the complete list of pools, with an end to it. Measured on one binary: a sibling failure
+  string suggested "a second arena, on one witness", and enumerating the worker's call sites
+  returned exactly **two** pools behind **four** doors — two of which were already named
+  (`zmalloc`, `rendmalloc`) and which no string search would ever have connected to the same
+  pool. The finding that fell out was about the game, not the naming: the compression
+  library's and the renderer's allocations come out of *the same pool the game uses*.
+  Generalise past allocators: **before hunting more instances of a pattern, find the
+  chokepoint they all pass through and enumerate ITS inputs** — that converts an open-ended
+  search into a census.
+- **A CLAIM ABOUT AN ALGORITHM CANNOT BE MADE FROM ONE HALF OF THE PAIR THAT IMPLEMENTS IT.**
+  In an allocate/release pair essentially all the policy lives in the allocator; release is
+  frequently a single flag write. Measured: a release routine's eight instructions were read
+  as "no size classes, no free list, no coalescing — a high-water mark", and used to justify a
+  cautious name. The allocator walks a **circular free list**, **splits** blocks above a
+  remainder threshold, and **coalesces** adjacent free neighbours while searching — a
+  general-purpose allocator. The characterisation was wrong for eleven rounds and nothing ever
+  contradicted it, **because the decision it justified was correct**. That is the shape worth
+  fearing: a wrong reason sitting underneath a right answer is never disturbed by ordinary
+  work. When you characterise a mechanism, name which bodies you read.
+- **PRINT WHETHER A FUNCTION IS EXPORTED BESIDE EVERY FAN-IN, OR A ZERO READS AS DEAD CODE.**
+  A fan-in of 0 is a claim about the database's view of *one module*. Measured: an allocator
+  door with zero in-module callers was `isExternalEntryPoint` — called by the two renderer
+  plug-in DLLs that import 46 of the 47 symbols the exe offers. Same family as "zero
+  cross-references is a claim about the DATABASE, not the binary", and it bites hardest in
+  exactly the binaries this skill tells you to look for companion DLLs in.
 
 - **Identify by CALL SHAPE and argument constants where byte signatures fail.** A semantic
   fingerprint is checkable in a way a guess is not, and it is available exactly when FID is
