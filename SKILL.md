@@ -201,6 +201,31 @@ it is so often missing. Written before any apply exists, a harvester is correct;
 circular the moment it is re-run after one, with nothing in it having changed. See
 "Harvesting traps" for the measured case and the assertion that catches it.
 
+Four corollaries measured later on the same project, which make this cheap to *exploit*
+rather than merely to fear:
+
+- **Applying the HIGHEST-FAN-IN name in the binary is also an audit of every producer's
+  filter, and it is the cheapest one available.** Measured: naming a custom arena allocator
+  and its free — 852 call sites between them — made exactly one committed artifact change,
+  in exactly one cell, because one sweep recorded the allocator's *name* beside the size it
+  had measured and had no `SourceType.AI` exclusion. A wide net finds the holes; schedule
+  the high-fan-in names EARLY for this reason, not only for the decompilation payoff.
+- **The witness being unaffected is WHY the leak survives, not a reason to leave it.** That
+  size bound came from a pushed immediate and a vftable store; the leaked name was
+  provenance text sitting beside them, so nothing was mismeasured and nobody had cause to
+  look. A committed artifact must not change because of what you chose to name last week,
+  whatever the cell is *for*.
+- **Put the filter's assertion BEFORE the write**, and **keep the ADDRESS beside every
+  emitted name.** The first makes a failing filter produce no artifact at all instead of a
+  plausible one that must be reverted by name afterwards — the "a run that RAISED must not
+  have its output promoted" rule solved at the derivation rather than in the cleanup. The
+  second is required because the ledger join is by address, and a producer must not recover
+  the address from the name it just wrote.
+- **Audit the whole producer, not the cell that moved.** The stability harness can only
+  surface the leak whose target this round happened to name. Of that sweep's five name
+  reads one was the defect and four were already safe — but the four had to be *read* to
+  know it. A one-cell diff is a prompt to audit, not the scope of the repair.
+
 ### The TYPE axis: `DataType` has no `SourceType` at all
 
 The whole trust model above is about *symbols*. **Types have no provenance field
@@ -835,6 +860,24 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   earlier under a rule added one round after that — an approved-census round nobody had
   noticed. Whenever you touch shared machinery, run *every* consumer's dry run and read the
   population line, not just the pass/fail.
+- **PRICE A QUEUED ROUND AGAINST THE PROGRAM BEFORE APPLYING IT — a plan's premises decay,
+  and the decay is invisible from inside the plan.** A round described as ready in three
+  separate notes had four premises refuted by one read-only census script: two call-site
+  counts stale by ~200; one "rename" that was really a MERGE into a namespace an earlier
+  round had already created from the same evidence; one that needed no rename at all (the
+  class was already named — only the *table* lacked a namespace, which turned a blocked
+  struct apply into a one-row artifact edit); and two names colliding with types the
+  binary's own demangler had built from export signatures. Every one is a fact about the
+  program, and none is reachable by re-reading the notes — which is where all three
+  descriptions came from. Two follow-ons:
+  - **A name collision is EVIDENCE, not an obstacle.** It usually means an earlier round
+    reached the same conclusion by another route. Read what is already there before deciding
+    what the round does; the operation is often smaller than planned.
+  - **But census the colliding name's TIER.** Measured on the same pair: the pre-existing
+    names carried the *analyzer* tier and were absent from the agent-name ledger, because
+    they predated the tagging discipline — 22 such names across 7 namespaces. Treating "the
+    name already exists" as corroboration would have been self-corroboration with years
+    between the two halves.
 - **Measure a proposed mechanism's REACH before building it.** A cheap probe that counts
   how many targets a route could possibly reach costs minutes and routinely refutes the
   round you were about to spend a day on. Two measured examples from one session: a plan
