@@ -479,6 +479,41 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   names ledger — 0 from any other source. The committed artifact was found to have already
   captured 8 such names from an earlier round. **Join by address, never by name**, or the
   audit itself inherits the collision problem below.
+- **A producer whose CLASSIFICATION INPUT is derived from its own output is self-harvesting,
+  and there is no `SourceType` tier to filter on.** The self-harvest rule above is about
+  *symbols*; this is the same failure on the **artifact** axis, where the only defence is
+  arithmetic. Shape: sweep S writes artifact A; derivation D folds A into artifact B; S reads
+  B to decide what is new. Measured: a destructor-chain witness classified its claims against
+  a hierarchy file built from its own edges, and on the second run its two contradictions had
+  become agreements *with itself* — agreement counters up by exactly the folded edges
+  (100/209 → 101/210), contradictions **2 → 0**, and every gate green for the wrong reason.
+  Fix it at the derivation, not by loosening the gate:
+  - **Design the artifact so the pre-fold view is RECONSTRUCTIBLE.** Record, per row, what the
+    value used to be (`superseded_base`) and which entities the fold created. A fold you
+    cannot undo on paper is one you cannot audit.
+  - **Subtract your own previous output at load, then classify — and PRINT that you did it.**
+    A silent subtraction is as unauditable as a silent fold.
+  - **The vacuity guard is what catches this, not any value check.** Nothing here was
+    "wrong": no count mismatched, no artifact drifted. The only thing that fired was the
+    selftest arm asserting there was still a contradiction available to poison with. A
+    self-harvesting producer fails by having its findings quietly go to zero while every
+    other number *improves*, so a census selftest without a vacuity arm cannot see it.
+- **Two identical branches of an `if`/`else` are a silent UNDER-REPORT, not dead code.** Where
+  you wrote a branch to express a distinction and both arms do the same thing, the distinction
+  is simply unmeasured — and the output still looks like a working measurement with a small
+  answer. Measured: a probe meant to treat "the class's own store survived" and "it was
+  elided" differently emitted the same pairs in both cases, so an entire claim category went
+  untested and single-element chains produced nothing at all. Repairing it moved that arm from
+  unmeasured to 209 agreements and 1 contradiction. Diff the arms of any `if`/`else` you wrote
+  for a reason.
+- **A calibration gate on a witness that may legitimately STRENGTHEN must be a FLOOR, not an
+  equality.** The failure worth catching is the witness going *quiet*; an equality additionally
+  fails every time the program legitimately grows, which trains the reader to re-baseline it.
+- **Do not MERGE the artifact you are using as an independent cross-check.** A new witness
+  agreeing with an unrelated artifact 30 of 30 is worth more as a standing corroboration than
+  as 29 extra rows — folding them makes the two agree by construction and destroys the
+  measurement that justified the witness in the first place. Independence is a property you
+  spend when you merge.
 - **A pipeline that derives wrong and patches afterwards violates this rule from the
   inside, and it hides for years.** The version everyone catches is a one-off hand edit.
   The version nobody catches is a *second script* that corrects the first one's output as
