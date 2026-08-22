@@ -612,6 +612,23 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
     selftest arm asserting there was still a contradiction available to poison with. A
     self-harvesting producer fails by having its findings quietly go to zero while every
     other number *improves*, so a census selftest without a vacuity arm cannot see it.
+- **N-OF-N AGREEMENT IS WORTH NOTHING WHEN ONE SIDE WAS APPLIED FROM THE OTHER — AND IT IS THE
+  MOST PERSUASIVE-LOOKING NUMBER YOU WILL PRODUCE.** Measured: a probe found **43 of 43** names
+  in a property registrar matching the field names on the recovered structs exactly. Read as an
+  independent witness confirming the layouts, that is a striking corroboration. It is
+  tautological: the applier that built those structs *reads that registry*. This is the
+  self-harvest rule on the ARTIFACT axis, where no `SourceType` tier exists to filter on, so the
+  only defence is provenance and arithmetic — before recording any agreement as evidence, ask
+  **"would this cell hold this value if we had applied nothing?"** and name the producer on each
+  side. A perfect score is the shape to distrust first.
+- **"NO EVIDENCE SOURCE EXISTS FOR THIS" IS A RESULT, AND BELONGS IN THE RECORD AS ONE.** A
+  layout round can recover offsets and widths for thousands of cells and still have no source
+  anywhere that could NAME them. Measured: of every committed artifact carrying both an offset and
+  a name, exactly one had a class column intersecting the recovered population at all — reaching
+  16 of 198 classes, whose names were already applied. So 182 classes and ~3750 fields have no
+  naming source in the project. Left as a task on an open list, "name the fields" reads as
+  available work forever and gets re-derived every few rounds; recorded as a measurement, with the
+  sources checked and what would change the answer, it stops costing anything.
 - **Two identical branches of an `if`/`else` are a silent UNDER-REPORT, not dead code.** Where
   you wrote a branch to express a distinction and both arms do the same thing, the distinction
   is simply unmeasured — and the output still looks like a working measurement with a small
@@ -1607,6 +1624,17 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
   pure restamps. **Parse the format; never split it.** A classifier that separates benign
   churn from real change is load-bearing, so it deserves the same rigor as the check it
   feeds.
+
+  **And the worst false positive of all sits on a DISAGREEMENT report.** Measured: a probe
+  comparing a property registrar's field names against the names already on the recovered
+  structs reported **18 CONFLICTs** — "two sources disagree about this field" — and every one
+  was an agreement seen at the wrong granularity. The registrar names `Pos.X`, `Pos.Y`,
+  `Pos.Z` at three consecutive offsets; the program has ONE 16-byte component called `Pos`
+  covering all three. A string comparison calls that a conflict. **Compare names at the
+  granularity each source actually speaks in** — a dotted name is a sub-field of a record,
+  not a competing claim about the same cell — and note the asymmetry that earns this its own
+  rule: ordinary noise gets skimmed, but a conflict gets *reasoned about* and then explained
+  away, which is how a reader learns to discount the conflicts that are real.
 - **A confinement predicate cannot see an INTERPROCEDURAL dependency, and a stray is not
   automatically damage.** The usual predicate — signature ∪ local-variable types ∪
   referenced typed globals — misses a function that merely *calls* something returning a
