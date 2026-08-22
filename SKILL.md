@@ -1388,6 +1388,27 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
   character as `0xC2 0xA7`, valid UTF-8**, written by the other host. Name the encoding in
   shared writers; until then, keep everything an applier writes to a ledger ASCII. Any project
   driving Windows-hosted Ghidra from WSL or a container has both halves of this.
+- **A LOWER BOUND ON A CLASS SIZE IS INHERITED; A CONSTRUCTOR'S OWN WRITE EXTENT IS ONLY THE
+  ANSWER FOR A ROOT.** Obvious stated plainly, and easy to get wrong in code because the witness
+  is per-body. Measured: a derived class whose constructor writes nothing but the vptr and a
+  class-identity tag has an own `write_max` of **8**, while it cannot be smaller than the base it
+  contains — whose constructor reaches **452**. A producer that took each class's own writes
+  reported `8` and thereby contradicted a finding the project had already written down in prose.
+  Walk the chain (`max(own, base's lower)`), take the UPPER bound from the smallest **transitive**
+  descendant that is actually allocated rather than from direct children only, and assert
+  containment both ways so a single row can falsify it. And the thing that caught it: **when a
+  new artifact replaces prose, diff it against the prose** — the disagreement is the check.
+- **A GUARD WRITTEN AGAINST SELF-HARVEST CAN REFUTE THE EVIDENCE RULE ITSELF, NOT JUST THE
+  PLUMBING — SO READ WHAT IT SAYS BEFORE RELAXING IT.** A producer required every class name it
+  emitted to be attested in the binary's export manglings, on the narrow grounds that a recent
+  naming round had applied those same strings to those same addresses. It refused to run — and
+  the refusal was not about a read-back at all: it showed that the round which first attributed
+  those classes had leaned on *"the factory's NAME declares what it builds"*, while the factory
+  manglings actually name their **input** (`CreateFriendlyUnit` takes a `CBasicUnit *`;
+  `CreateProject` names the *unit* type, not the project type). The attribution had been resting
+  on the English of a member name the whole time. **Emit the NAME and the ATTRIBUTION as separate
+  columns at separate tiers**, cite the mangling that genuinely declares the type, and let the
+  guard check only the half it can verify.
 - **FIXING THE WRITE SIDE OF A ROUND-TRIP WITHOUT THE READ SIDE TURNS AN ACCIDENTAL PASS INTO
   REAL CORRUPTION.** The encoding rule above tells you to name the encoding; this is the trap
   waiting when you do. A bare read and a bare write on the SAME host cancel out — cp1252 decodes
