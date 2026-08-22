@@ -1252,6 +1252,57 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   `CALL`** — linker-retained code the game never runs, appearing in no tick. A round can be
   perfectly feasible and still not worth running; a pricing probe that reports only reach has
   answered half the question. Say which half you measured.
+
+- **TO ASK WHAT A SHIPPED ANALYZER WOULD DO, BORROW ITS MACHINERY — DO NOT REIMPLEMENT ITS
+  RULES.** This is the "check for a built-in before writing your own" rule applied to a *question*
+  rather than to a task, and it is the higher-value form. Measured: the question "can Ghidra's
+  shipped function-start patterns fire anywhere in these undisassembled bytes" would have required
+  hand-rolling ditted-bit matching, pre/post pattern pairing, a fixed-bit budget and four
+  post-match prerequisites — four chances to be subtly wrong, each failing in the direction that
+  MANUFACTURES a finding. What it actually takes:
+  - `ghidra.app.analyzers.Patterns.getPatternDecisionTree()` → `findPatternFiles(program, tree)`
+    — **ask which pattern files apply to this program** rather than assuming; it resolves through
+    `patternconstraints.xml` and a `ProgramDecisionTree`.
+  - `ghidra.util.bytesearch.Pattern.readPatterns(resourceFile, arrayList, patternFactory)` —
+    parses them, and `PatternPairSet.createFinalPatterns` applies the bit budget internally.
+  - `MemoryBytePatternSearcher(name, patternList)` + `setSearchExecutableOnly(true)` +
+    `searchAll(program, monitor)` — the same `BulkPatternSearcher` the analyzer runs.
+
+  **The seam that keeps it read-only is the `MatchAction`, not the search.** The production
+  `PatternFactory` is `FunctionStartAnalyzer` *itself*, and instantiating it is NOT read-only —
+  its `applyActionToSet` calls `func.setNoReturn(true)` and writes an `AddressSetPropertyMap`.
+  Supply your own `PatternFactory` (a plain interface: `getMatchActionByName`,
+  `getPostRuleByName`, so `@JImplements` works from PyGhidra) returning `MatchAction`s whose
+  `apply` records and whose `restoreXml` keeps the XML attributes — those attributes carry the
+  analyzer's extra prerequisites and decide whether a match is unconditional. `DummyMatchAction`
+  is the shipped no-op template.
+- **A PATTERN FILE IS A CROSS PRODUCT FILTERED BY AN INFORMATION BUDGET, NOT A LIST OF BYTE
+  STRINGS.** `PatternPairSet.createFinalPatterns` builds a final pattern from a (prepattern,
+  postpattern) pair only if `postcheck >= postBitsOfCheck` **and**
+  `precheck + postcheck >= totalBitsOfCheck`, both counting FIXED (non-ditted) bits. Measured, and
+  it demolished an apparently perfect counter-example: thirteen NOPs followed by `SUB ESP,0x10`
+  matches the shipped `0x90` prepattern against the shipped `0x83ec 0.....00` postpattern — and
+  `0x90` supplies 8 fixed bits while that postpattern supplies 19, so at `totalbits="32"` **the
+  pair is never built.** Reading the prologue bytes can never reveal this; reading
+  `createFinalPatterns` reveals it in one line.
+- **A SHIPPED PATTERN CAN BE STRUCTURALLY INCAPABLE OF FIRING WHERE YOU ARE LOOKING, AND ITS HIT
+  COUNT STILL READS AS A FINDING.** Post-match attributes are prerequisites, checked in
+  `FunctionStartAnalyzer.checkPreRequisites` long after the bytes match: `validcode="function"`
+  requires an **existing** function at the address; `after="func|inst|data|ptr|def"` runs
+  `checkAfterName`; `validcode="N"` runs `PseudoDisassembler.checkValidSubroutine`. Measured: 628
+  of 640 matches inside undisassembled bytes were the `<data>0xcc</data>` `__break` pattern, which
+  carries `validcode="function"` — impossible in undefined bytes by definition — and all 628 were
+  INT3 filler. Counted naively that is a 640-strong false positive on a census of padding. **Read
+  each pattern's attributes before counting its hits**, and note where a refusal is *structural*
+  rather than incidental: `checkAfterName`'s fallback `pureDataReferencesOnly` opens with
+  `if (!referencesTo.hasNext()) return false;`, so **no references is a refusal, not a pass**.
+- **CALIBRATE A BORROWED ENGINE THE SAME WAY YOU CALIBRATE A WITNESS.** A "0 matches in the region
+  I care about" result is worth nothing until the engine has been shown to fire where it should.
+  The arm: run it over the whole program and require a large share of its matches to land on
+  function starts that already exist (measured: 1,205 of 2,905, **41.5%**). Raise if the file
+  resolution returns nothing, if 0 final patterns are built, if the search returns 0 matches, or
+  if 0 land on a known start — each of those turns the headline zero into a fact about your
+  wiring rather than about the program.
 - **Do not classify a population member by what it is NOT.** "Not a table start, therefore
   interior to a table" is only sound if the tables tile the region — and recovered runs
   almost never tile anything (262 gaps totalling ~37KB here). The wrong label is invisible
