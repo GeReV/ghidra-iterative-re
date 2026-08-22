@@ -1550,16 +1550,38 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
   which reads as complete coverage, and it produced cells for **1 of 12** sampled. The
   precondition is a locatable receiver, and **173 of those 198 recorded sites are not member
   functions at all** — they are the FACTORIES the constructor was inlined into, correctly carrying
-  `__cdecl`, in which ECX is not an input, so there is no mapped symbol for `this`. Effective reach
-  **25**. One calling-convention census over the whole population costs seconds and moved the
-  price by a factor of eight. Ask "does the precondition hold here", never "can I name a target
-  here".
+  `__cdecl`, in which ECX is not an input, so there is no mapped symbol for `this`. One
+  calling-convention census over the whole population costs seconds. Ask "does the precondition
+  hold here", never "can I name a target here".
+- **BUT PRICE THE PRECONDITION OVER EVERY ENTRY POINT, NOT OVER THE ONE YOUR ARTIFACT HAPPENED TO
+  RECORD — THAT IS WHERE THE FACTOR OF TWELVE WAS.** The same round then priced the whole thing at
+  **25 of 198** reachable and **12** independently useful, and both figures were wrong, because it
+  tried exactly ONE function per class: the address its size artifact stored. The mechanism's real
+  requirement is *a member function with a receiver*, and **every non-static member takes `this`**
+  — a method touching many fields is a better witness than a constructor setting four. Widening
+  from "the recorded constructor" to "any member" took reach to **198 of 198** and the independent
+  population from 12 to **151**. Two riders, both measured:
+  - **Enumerate a class's whole function population before pricing any per-class witness.** This
+    document already warns that *a class's vtable is not its population — it is only the virtual
+    half*; here the mirror failed, a witness built from the constructor alone, and the vtable route
+    reached **109 of the 173** by itself. Namespace members reached 64, exported `??0` constructor
+    manglings **0**. Report the union.
+  - **A VTABLE SLOT TARGET IS NOT NECESSARILY THAT CLASS'S METHOD, AND THE CHECK IS FREE.** Slots
+    are shared through inheritance — a derived table repeats its base's entries for every method it
+    does not override — so a target reached from C may be a BASE's method whose `this` is the base,
+    and attributing its field accesses to C is an ownership error. No hierarchy artifact is needed:
+    **a target appearing in more than one attributed table is shared by construction.** Measured
+    **560 of 1322 shared**, and the arm that mattered: **0 classes reachable only through a shared
+    target**. Had that been non-zero, the reach figure would have been an upper bound pending an
+    ownership rule.
 - **CROSS-TAB REACH AGAINST INDEPENDENCE BEFORE PRICING A CORROBORATION ROUND — the number you
   want is the INTERSECTION, and it is smaller than either.** A second-witness round is worth what
   it can reach *and* speak about non-circularly. A decompiler-derived witness inherits the types
   you applied, so a class you have already typed may hand your own layout back; a class with no
-  type cannot. Measured: 25 reachable, 151 untyped, and the cell that decides the round —
-  reachable **and** untyped — is **12**. Scoping on 198, on 151 or on 25 would each have been
+  type cannot. Measured, on the first pass: 25 reachable, 151 untyped, and the cell that decides
+  the round — reachable **and** untyped — was **12**. (The reach half was later corrected to 198,
+  taking the cell to **151** — see the entry-point rule above. The cross-tab was the right frame;
+  one of its inputs was wrong.) Scoping on 198, on 151 or on 25 would each have been
   scoping on a number that does not exist. **And demonstrate the witness on the independent half**:
   the first sample's one working class was typed (persuasive, worth nothing); re-sampling reached
   an untyped class that reproduced **20 of 20** committed field offsets with 0 straddles, and that

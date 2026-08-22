@@ -440,10 +440,16 @@ Three more caveats, all measured:
   `HighVariable` at the receiver's storage. On a `__thiscall`/`__fastcall` body that is ECX; on
   a `__cdecl` one ECX is not an input at all and `computeHighVariable` returns `None`. Measured:
   198 of 198 classes had a recorded constructor site — and 173 of those sites are **factories the
-  constructor was inlined into**, correctly `__cdecl`, so effective reach was **25**. Census
-  `getCallingConventionName()` over the population before pricing anything on it, and check what
-  each site actually IS before calling a convention wrong: an inlined-constructor factory is not
-  a member function and has no receiver to declare. Do **not** reach for `getParameter(0)`'s storage
+  constructor was inlined into**, correctly `__cdecl`, so pointing it at the recorded site reached
+  only **25**. Census `getCallingConventionName()` over the population before pricing anything on
+  it, and check what each site actually IS before calling a convention wrong: an inlined-constructor
+  factory is not a member function and has no receiver to declare.
+
+  **But do not price the reach on one entry point per class.** Any non-static member takes `this`,
+  so a class with no usable constructor is still reachable through a namespace member or a vtable
+  slot target — which took the same population from 25 to **198 of 198**. If you use slot targets,
+  drop the ones shared through inheritance first (a target in more than one attributed table is a
+  base's method); measured 560 of 1322 shared, 0 classes dependent on a shared one. Do **not** reach for `getParameter(0)`'s storage
   instead: that is `this` only under `__thiscall`, and under `__cdecl` it is the first *stack*
   argument, which yields a `HighVariable` every time and produces no cells — a failure that
   reads as a quiet witness rather than a wrong question.
