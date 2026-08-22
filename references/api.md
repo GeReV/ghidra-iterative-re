@@ -20,8 +20,54 @@ A Ghidra install carries a complete, exact-version API surface offline:
 | `docs/CheatSheet.html`, `docs/ChangeHistory.md`, `docs/WhatsNew.md` | UI actions, version deltas |
 | `docs/README_PDB.html` | PDB parser — read this **first** on any Windows target, before assuming symbols are gone |
 | `docs/languages/` | Processor/Sleigh docs |
+| **`Ghidra/*/*/lib/*-src.zip`** | **The Java SOURCE, per module.** Not one archive — one zip beside each jar. This is the only place that answers *"which arm of this call mutates"*, which neither the stubs nor the javadoc state. |
 
 Search these with Python, not shell text tools, if your environment proxies `grep`.
+
+**Read the source, not just the stubs, before depending on a shipped helper.** Measured: three
+questions this reference now answers — which `FillOutStructureHelper` argument mutates, why a
+shipped byte pattern never fires, and what `checkAfterName` accepts — were **unanswerable from the
+javadoc** and took one read each from the source zips. Finding the right zip:
+
+```bash
+find "$GHIDRA" -name '*-src.zip' -print0 | while IFS= read -r -d '' z; do
+  unzip -l "$z" 2>/dev/null | grep -q 'TheClass.java' && echo "$z"
+done
+```
+
+Note the `-print0`/`read -d ''`: under **zsh** an unquoted `$(find ...)` in a `for` loop does
+**not** word-split, so the naive form silently hands every path to one `unzip` and reports
+nothing. An empty search result is a claim about your search until the search is shown to work.
+Useful locations, verified on 12.1.2 — the module a class lives in is rarely the one you guess:
+
+| Class | Module |
+|---|---|
+| `ghidra.util.bytesearch.*` | `Ghidra/Features/Base/lib/Base-src.zip` |
+| `ghidra.app.analyzers.FunctionStartAnalyzer`, `Patterns` | `Ghidra/Features/**BytePatterns**/lib/BytePatterns-src.zip` |
+| `ghidra.app.decompiler.util.FillOutStructureHelper` | `Ghidra/Features/Decompiler/lib/Decompiler-src.zip` |
+| `ghidra.program.model.data.NoisyStructureBuilder` | `Ghidra/Framework/SoftwareModeling/lib/SoftwareModeling-src.zip` |
+
+## The MCP boundary — what needs a script
+
+An MCP server gives you interactive **reads** cheaply and is the wrong instrument for everything
+below. Reach for a script when you need any of these; none is reachable through a read-only tool
+surface, and several are actively unsafe through a mutating one.
+
+| Need | Why MCP cannot | See |
+|---|---|---|
+| Set `SourceType` on anything | Mutating MCP tools hardcode `USER_DEFINED` — audited, 18 occurrences | SKILL.md, "Mutate through scripts" |
+| Any bracketed mutation | The invariant diff has to wrap the operation in one transaction | SKILL.md, "Mutation safety" |
+| Bulk p-code / SSA work | Per-item calls; you want `ParallelDecompiler` or one `DecompInterface` | "Decompiler" below |
+| Drive a shipped analyzer's machinery yourself | No tool exposes `PatternFactory`, `MatchAction`, `PseudoDisassembler` | "Byte pattern search", "Read-only witnesses" |
+| Read raw instruction p-code | `Instruction.getPcode()` is the SLEIGH spec; no MCP equivalent | "Program, listing, functions" |
+| Enumerate undisassembled ranges | `Listing.getUndefinedRanges` over `Memory.getExecuteSet()` | "Program, listing, functions" |
+| Walk the program's version history | `getVersionHistory()` / `getReadOnlyDomainObject` | "Version control and checkpointing" |
+| Anything needing a Java interface implementation | `@JImplements` from PyGhidra | "PyGhidra / JPype interop" |
+
+The converse is worth stating too: **MCP is right for orientation** — `get_binary_info`,
+`analysis_options` (which analyzers ran, and at what settings), `get_strings`, `xrefs`,
+`get_function_statistics`. One `analysis_options` call answered "were the function-start
+analyzers even enabled" in seconds, and that is a fact no script should be written to obtain.
 
 ## Provenance — `ghidra.program.model.symbol.SourceType`
 
@@ -219,6 +265,10 @@ ifc.dispose()          # always
 (`updateDBVariable(...)` commits decompiler-level variables to the database),
 `PcodeOp`, `Varnode`.
 
+For `this`-relative offset recovery over SSA, do not hand-roll a register tracker — see
+`FillOutStructureHelper` under "Read-only witnesses", including which of its arms writes to the
+DataTypeManager and why its reach dies on a `__cdecl` prototype.
+
 ## Demangling
 
 ```python
@@ -260,10 +310,148 @@ effectively reconstructs the original translation units as first-class program d
 `ghidra.util.bytesearch`: `DittedBitSequence` (wildcarded patterns), `Pattern`,
 `PatternPairSet` (pre/post patterns — the function-start-pattern mechanism),
 `MemoryBytePatternSearcher`, `ProgramMemorySearcher`, `BulkPatternSearcher`,
-`GenericMatchAction`, `AlignRule`, `PostRule`, `Match`.
+`GenericMatchAction`, `DummyMatchAction`, `AlignRule`, `PostRule`, `Match`,
+`PatternFactory`, `MatchAction`. Also `ghidra.features.base.memsearch.*` for the
+memory-search API.
 
 Use for custom function-start signatures (attacking undefined-code backlogs) and library
-fingerprinting. Also `ghidra.features.base.memsearch.*` for the memory-search API.
+fingerprinting — **and to ask what the shipped function-start analyzer would do, without
+running it.** The whole pipeline is drivable from a script, which is strictly better than
+reimplementing ditted-bit matching:
+
+```python
+from ghidra.app.analyzers import Patterns              # Features/BytePatterns
+from ghidra.util.bytesearch import Pattern, MemoryBytePatternSearcher
+from java.util import ArrayList
+
+tree  = Patterns.getPatternDecisionTree()               # patternconstraints.xml
+Patterns.hasPatternFiles(program, tree)                 # bool
+files = Patterns.findPatternFiles(program, tree)        # ResourceFile[] — ASK, don't assume
+pats  = ArrayList()
+for f in files:
+    Pattern.readPatterns(f, pats, factory)              # factory: your PatternFactory
+searcher = MemoryBytePatternSearcher("probe", pats)
+searcher.setSearchExecutableOnly(True)
+searcher.searchAll(program, monitor)                    # or .search(program, addressSet, monitor)
+```
+
+Four things the javadoc does not tell you, all read from the source and all load-bearing:
+
+- **A pattern file is a cross product filtered by an information budget, not a list of byte
+  strings.** `PatternPairSet.createFinalPatterns` pairs each prepattern with each postpattern
+  and keeps the concatenation only if `postcheck >= postBitsOfCheck` **and**
+  `precheck + postcheck >= totalBitsOfCheck`, counting **fixed (non-ditted) bits**. With
+  `x86win_patterns.xml`'s `totalbits="32" postbits="16"`, the pair `0x90` (8 fixed bits) with
+  `0x83ec 0.....00` (19) totals 27 and **is never built** — so a prologue that visibly matches
+  can be one the engine never had a pattern for. `Pattern.getMarkOffset()` is the prepattern
+  length, i.e. the match address is the proposed function start.
+- **The seam that makes this read-only is the `MatchAction`, not the search.**
+  `ghidra.app.analyzers.FunctionStartAnalyzer` **is** the production `PatternFactory`, and
+  instantiating it is not read-only: its `applyActionToSet` calls `func.setNoReturn(true)` and
+  writes an `AddressSetPropertyMap`. Both `PatternFactory` (`getMatchActionByName`,
+  `getPostRuleByName`) and `MatchAction` (`apply`, `restoreXml`) are plain interfaces, so
+  `@JImplements` works; return a fresh recording action per tag so each pattern keeps its own
+  attributes, and mirror `DummyMatchAction` by consuming the element in `restoreXml`.
+- **The XML attributes are post-match PREREQUISITES, checked long after the bytes match**, in
+  `FunctionStartAnalyzer.checkPreRequisites`. Count hits without reading them and you will
+  report padding as candidates. `validcode="function"` requires an **existing** function at the
+  address; `validcode="N"` runs `PseudoDisassembler.checkValidSubroutine`; `after=` runs
+  `checkAfterName`, whose branches are `func` / `inst` / `data` / `ptr` / `def`, and whose
+  fallback `pureDataReferencesOnly` **opens by refusing an address with no references at all**.
+  Also `label=`, `noreturn=`, `thunk=`, `contiguous=`, `section=`.
+- **`funcstart` and `possiblefuncstart` are different tiers and both create functions.** The
+  first goes to `funcResult` → `analysisManager.createFunction`; the second to
+  `potentialFuncResult` → a scheduled `PossibleDelayedFunctionCreator`. And
+  `applyActionToSet` silently drops any address failing
+  `addr % language.getInstructionAlignment() != 0` (1 on x86, so never).
+
+**Calibrate a borrowed engine like any other witness**: run it over the whole program and
+require a large share of matches to land on functions that already exist. Measured on one
+binary, 140 final patterns → 2,905 matches, **1,205 (41.5%) on known function starts**. Without
+that arm, "0 matches in the region I care about" is a fact about your wiring.
+
+## Read-only witnesses — analysis without mutation
+
+Three shipped helpers answer questions worth asking without writing to the program. All three
+have an arm that *does* write, and in two cases it is not the arm you would guess, so the rule
+is the same each time: **read the source for which arm mutates, then bracket the run with a
+datatype/function-count diff that raises.** The source read is the hypothesis; the bracket is
+the evidence.
+
+### `PseudoDisassembler` (`ghidra.app.util`)
+
+Genuinely read-only by its own javadoc — *"no references, symbols are created or will be
+saved"*, and it needs no open transaction.
+
+```python
+pd = PseudoDisassembler(program)
+pd.isValidSubroutine(addr)                              # returns, no bad instrs, one entry, no overlap
+pd.isValidSubroutine(addr, allowExistingCode)           # allow flowing into existing instructions
+pd.isValidSubroutine(addr, allowExistingCode, mustTerminate)
+pd.checkValidSubroutine(addr, ctx, allowExisting, mustTerminate, contiguous)
+pd.disassemble(addr)                                    # -> PseudoInstruction (also (addr, bytes[]))
+pd.isValidCode(addr[, ctx]); pd.followSubFlows(entry, maxInstr, processor)
+pd.setMaxInstructions(n); pd.getLastCheckValidInstructionCount()
+```
+
+**Use `allowExistingCode=True` when testing a KNOWN function start** — the default form requires
+not overlapping existing instructions, so it refuses every function you already have and the
+recall arm reads as a broken instrument.
+
+**Measured calibration, and it is the reason to distrust it as a discriminator: 400 of 400
+sampled known function starts accepted (100% recall) and 288 of 400 sampled function INTERIORS
+also accepted — a 72% false-accept rate.** So "N undisassembled ranges decode cleanly" is close
+to information-free. It is a sanity filter, not evidence. Grade it in both directions before
+believing any count it produces.
+
+### `FillOutStructureHelper` (`ghidra.app.decompiler.util`)
+
+The same witness as a hand-rolled `this`-offset tracker, but over decompiler SSA — so it crosses
+basic blocks via `MULTIEQUAL` phis and, given a `DecompInterface`, recurses into CALLs.
+
+```python
+h   = FillOutStructureHelper(program, monitor)
+lib = h.setUpDecompiler(DecompileOptions())             # pins setSimplificationStyle("decompile")
+var = h.computeHighVariable(storageAddr, func, lib)     # HighVariable at that storage, or None
+h.processStructure(var, func, True, False, lib)         # (createNewStructure, createClassIfNeeded)
+h.getStorePcodeOps(); h.getLoadPcodeOps()               # List<OffsetPcodeOpPair>
+h.getComponentMap()                                     # NoisyStructureBuilder
+```
+
+**Which arm mutates — the opposite of the intuitive reading:**
+
+| arguments | effect |
+|---|---|
+| `createNewStructure=True, createClassIfNeeded=False` | **read-only.** `createUniqueStructure` builds a `StructureDataType` and **never adds it to the DTM**; `populateStructure` edits that detached object. Take the op lists, discard the Structure. |
+| `createNewStructure=False` | **rewrites an existing type.** `getStructureForExtending` fetches the struct *out of the DTM* and then `growStructure` / `replaceAtOffset` run on it — i.e. it overwrites the very layout you meant to cross-check. |
+| `createClassIfNeeded=True` on a `this` param | **mutates and launders.** `createUniqueClassNamespaceAndStructure` calls `symbolTable.createClass(..., SourceType.USER_DEFINED)`, moves the function with `RenameLabelCmd(..., USER_DEFINED)`, and `VariableUtilities.findOrCreateClassStruct`. |
+
+Three more caveats, all measured:
+
+- **The returned ops are not confined to the function you passed** — `pushIntoCalls` walks into
+  callees. Ghidra's own caller filters them (`RecoveredClassHelper.removePcodeOpsNotInFunction`).
+  Filter with `func.getBody().contains(op.getPcodeOp().getSeqnum().getTarget())`, and report
+  both counts: the unconfined set is what compares to a construction-chain walk, the confined
+  set to a single body.
+- **It is decompiler-derived, so it inherits every signature and type you applied.** Agreement
+  on a class you have already typed may be a tautology; agreement on an untyped one is a real
+  second witness. Split the population before quoting an agreement count.
+- **Its precondition is a locatable receiver, and that is where reach dies.** It needs a
+  `HighVariable` at the receiver's storage. On a `__thiscall`/`__fastcall` body that is ECX; on
+  a `__cdecl` one ECX is not an input at all and `computeHighVariable` returns `None`. Measured:
+  198 of 198 classes had a constructor to point it at — and 173 carried an analyzer-committed
+  `__cdecl` prototype, so effective reach was **25**. Census `getCallingConventionName()` over
+  the population before pricing anything on it. Do **not** reach for `getParameter(0)`'s storage
+  instead: that is `this` only under `__thiscall`, and under `__cdecl` it is the first *stack*
+  argument, which yields a `HighVariable` every time and produces no cells — a failure that
+  reads as a quiet witness rather than a wrong question.
+
+### `AlignedStructureInspector` (`ghidra.program.model.data`)
+
+`packComponents(structureInternal)` → `StructurePackResult` (`.structureLength`, `.alignment`)
+computes an MSVC-packed size **without touching the DTM**. Turns a candidate layout into a
+hypothesis test: alignment alone narrows a size interval, and a `double` member narrows it
+further. Narrowing, never deciding. *(doc — not executed here.)*
 
 ## Correlation across builds
 
@@ -369,3 +557,60 @@ Two matter for methodology:
 - **`-process`** operates on a program already in a project, so a headless pipeline can
   drive the same database an interactive session uses, with `-preScript`/`-postScript`
   bracketing.
+
+## PyGhidra / JPype interop — the errors that cost time
+
+- **A Java collection parameter needs a Java collection.** `dtm.findDataTypes(name, [])` fails
+  with *"No matching overloads found"* against a signature it obviously matches; pass
+  `java.util.ArrayList`. Same shape as the `java.lang.Object` consumer required by
+  `getReadOnlyDomainObject`.
+- **Implement Ghidra interfaces with `@JImplements` / `@JOverride`** (`from jpype import ...`).
+  Verified on `PatternFactory`, `MatchAction` and `ContextEvaluator` — all plain interfaces.
+  This is what lets you substitute one step of a shipped pipeline while keeping the rest real.
+- **`getBytes(addr, n)` returns a Java `byte[]`; `bytes(ba)` converts it** via the buffer
+  protocol, giving unsigned values directly. Do this once per memory block and use
+  `bytes.find` — a per-byte `mem.getByte()` loop over a megabyte is minutes, this is instant.
+  Assert the returned length equals what you asked for: a partial read silently shifts every
+  offset you compute afterwards.
+- **Type-check against INTERFACES, not implementation classes** — a datatype read back from the
+  DTM is a `FunctionDefinitionDB`, not the `FunctionDefinitionDataType` you constructed.
+- **`state`, `currentProgram`, `currentAddress`, `monitor`, `script` are reserved
+  `GhidraScript` globals.** Assigning to `state` raises `ClassCastException` from a property
+  setter, reported far from the offending line.
+- **Never derive a path from `__file__`** in an installed script; resolve from a constants
+  module.
+
+## Facts about the program you will want and may not think to ask for
+
+```python
+listing.getUndefinedRanges(mem.getExecuteSet(), True, monitor).getAddressRanges()
+```
+Every byte in executable memory the disassembler never touched — an `AddressSet`, so ask it for
+`getAddressRanges()`. **Classify these by CONTENT before quoting the total**: measured, 5,033 of
+5,321 ranges were pure `0xCC`/`0x00`/`0x90` alignment filler, so the honest population was 236
+ranges, not 5,321.
+
+```python
+ins.getFlowType()      # .isTerminal() .isJump() .hasFallthrough() .isCall() .isConditional()
+```
+The authority on whether control leaves an instruction — **ask this, never a mnemonic list**.
+Its use for grading a whole evidence base: if a defined function's last instruction still falls
+through, that body is truncated in the database and every witness that walks function bodies has
+been reading a partial function. Calibrate over the whole corpus first (measured: 5,628 of 5,629
+functions end in a flow terminator) so the answer is a measurement, not a property of the probe.
+
+```python
+func.getCallingConventionName()   # '__cdecl' / '__thiscall' / '__fastcall' / None
+func.getSignatureSource()         # DEFAULT | ANALYSIS | IMPORTED | USER_DEFINED | AI
+dtm.getDataTypeCount(True)        # cheap invariant for a mutation bracket
+```
+Check the SOURCE before planning to overwrite a signature: `AI` and `ANALYSIS` are both priority
+2, so an AI-tagged replacement of an analyzer-committed prototype is a **peer overwrite** the
+next `analyzeChanges` is entitled to reverse.
+
+```python
+refMgr.getReferenceDestinationIterator(addressSetView, True)   # what is referenced in a region
+refMgr.getReferencesTo(addr); refMgr.getReferenceCountTo(addr)
+```
+Remember these are claims about the **database**: a reference from bytes never disassembled does
+not exist here. Byte-search for an address before recording any reference-count zero.

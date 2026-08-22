@@ -23,7 +23,11 @@ Quoted numbers from one binary are examples for calibration, not properties of y
 against a real install, plus the offline doc paths to discover more. Read it before
 writing scripts; it exists because recalling Ghidra's API from memory produces plausible
 names that do not exist, and because several of the most useful classes are absent from
-the public javadoc.
+the public javadoc. It also carries the two things that decide whether a round is
+buildable at all: **the MCP boundary** — what genuinely needs a script rather than a tool
+call — and **read-only witnesses**, i.e. which arm of `PseudoDisassembler`,
+`FillOutStructureHelper` and the byte-pattern engine can be driven without writing to the
+program, each with its measured calibration.
 
 ---
 
@@ -1528,21 +1532,18 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
   failed at the time. It surfaced two rounds later as a gate firing on unrelated work, and
   looked exactly like damage from the round in progress. The exclusion was not defeated by
   new data — it was defeated by the *category* of the data changing underneath it.
-- **`FillOutStructureHelper`'S READ-ONLY ARM IS `(createNewStructure=True,
-  createClassIfNeeded=False)` — AND THE OBVIOUS READING OF THAT IS BACKWARDS.** Measured against
-  the 12.1.2 source, because the javadoc does not say which arm mutates:
-  `createUniqueStructure` builds a `StructureDataType` and **never adds it to the
-  DataTypeManager**, so the returned struct is detached and `populateStructure` edits only that.
-  The two arms that DO mutate are the ones nobody warns about — `createNewStructure=False` calls
-  `getStructureForExtending` to fetch the **existing** struct out of the DTM and then
-  `growStructure`/`replaceAtOffset` on it, i.e. **it silently rewrites the recovered layout you
-  were about to cross-check**; and `createClassIfNeeded=True` on a `this` param calls
-  `symbolTable.createClass(..., SourceType.USER_DEFINED)` plus
-  `RenameLabelCmd(..., SourceType.USER_DEFINED)`, **laundering into the highest provenance tier**
-  from inside a helper that reads as an analysis convenience. Take
-  `getStorePcodeOps()`/`getLoadPcodeOps()` from the detached arm and discard the Structure — and
-  **bracket the run with a datatype/function-count diff that raises**, because reading the source
-  is a hypothesis about your install and the bracket is what makes it evidence.
+- **WHICH ARM OF A SHIPPED HELPER MUTATES IS NOT IN THE JAVADOC, AND AN INHERITED CAVEAT CAN
+  NAME THE WRONG ONE — READ THE SOURCE, THEN BRACKET THE READING.** Measured on
+  `FillOutStructureHelper`: a handoff warned that `createNewStructure=True` mutates the
+  DataTypeManager. It is **backwards** — that arm builds a detached `StructureDataType` and never
+  adds it, while the two arms nobody was warned about are the dangerous ones (one rewrites the
+  existing struct you meant to cross-check; the other calls `createClass` and `RenameLabelCmd` at
+  **`SourceType.USER_DEFINED`**, laundering into the highest tier from inside a helper that reads
+  as an analysis convenience). Per-arm mechanics live in `references/api.md`, "Read-only
+  witnesses"; the generalisation is what belongs here: **the source read is a hypothesis about
+  your install, and a datatype/function-count diff across the run that RAISES is what makes it
+  evidence.** Neither half is optional — reading alone gets the arm wrong when the source is
+  subtle, and bracketing alone tells you nothing until you have already run it.
 - **A REACH FIGURE CAN BE STRUCTURALLY MEANINGLESS AND STILL READ AS TOTAL COVERAGE — price the
   mechanism's PRECONDITION, not the availability of a target.** Measured while pricing that
   helper: all **198 of 198** laid-out classes had a constructor to point it at, which reads as
