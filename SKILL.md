@@ -1690,6 +1690,34 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
   same shape as the apply whose post-write check crashed: the write survives the
   failure, so the failure has to be treated as reaching the *files*, not just the
   exit status.
+- **THE SAME VALUE CAN COME BACK BY A DIFFERENT AND SOUND ROUTE, AND A VALUE-BASED ASSERTION
+  CANNOT TELL.** Measured: an arm asserted that a particular field offset must NOT appear in the
+  harvested evidence, because its earlier appearance had been an artifact of a stack-tracking bug
+  since fixed. The offset returned, and the arm failed for several rounds. Adjudicated, it was
+  **real**: supplied by a function whose own export mangling declares the type of the parameter
+  being read, from the same body that supplies every other offset the check requires to be
+  PRESENT. The arm had conflated *"this value must not appear"* with *"this value must not appear
+  FOR THAT REASON"*, and only the second was ever the point. **Assert the PROVENANCE, not the
+  number** — the repair replaced one value check with three that name the contributing body and
+  instruction, plus a negative twin scoped to the artifact's original route, which still fails if
+  the bug returns while the value is legitimately present. Note also which way this failed: the
+  stale check made a correct harvester look broken, and the tempting "fix" was to go and debug
+  the harvester.
+- **A PATTERN THAT WAS A BUG LAST ROUND IS NOT EVIDENCE OF A BUG THIS ROUND.** The failing
+  instruction above was `TEST byte ptr [EBX],0x8` — reading operand 0, which the immediately
+  preceding round had just proved was being mistaken for a WRITE elsewhere in the same codebase.
+  It is not the same bug: that consumer scans EVERY operand and names its rows `..._access`,
+  which is direction-neutral by construction and correct, because a read of `ptr+K` proves the
+  cell lies inside the pointee exactly as a write does. **The identical instruction shape was a
+  defect in one consumer and correct behaviour in another.** Adjudicate each consumer against
+  what it CLAIMS, not against the shape that burned you last time — pattern-matching a fresh
+  finding onto a recent one is how a correct component gets "repaired".
+- **A PARTING SPECULATION IN A COMMITTED ROUND RECORD IS INHERITED AS A FINDING — TEST IT, THEN
+  STRIKE IT WHERE A READER MEETS IT.** That preceding round closed by predicting the same defect
+  in three more consumers. All three were wrong: two scan every operand, one reads the source
+  operand deliberately, and the affected consumer was the only one. Notes are read as evidence by
+  whoever comes next, so the refutation was written back into the original section rather than
+  left to a later reader to discover — the same discipline as retracting a measured zero in place.
 - **A check that fires may be a defect in the CHECK.** Validating a decided artifact
   with a *stronger* predicate than the calibrated rule that produced it rejects rows
   the producing sweep legitimately attributed. Before loosening a rule or editing
