@@ -817,6 +817,38 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   a queued item with an owner, and read one skipped case by hand before believing any
   conclusion drawn over the survivors.** A blank cell at least appears in the census; a
   dropped row does not appear anywhere.
+- **AND THE SKIP COUNTER CAN BE A FINDING WEARING A FAILURE'S CLOTHES — SPLIT THE PREDICATE
+  BEFORE BELIEVING THE COUNT.** The rule above says to treat a non-zero skip counter as a queued
+  item. The sharper case is where the counter is not a limitation at all. Measured: a layout
+  producer refused 99 classes on `sizeof(base) >= sizeof(class)`, sound reasoning because a base
+  at least as large as its derived class contradicts containment. Every one of the 99 was
+  **equality, and none was strictly larger** — the ordinary behaviour-only subclass, which
+  overrides virtuals and adds no data members. Printed as "99 skipped" that reads as the tool
+  failing; the truth was *99 classes proven to add no fields*, established by two independently
+  derived sizes (each class's own allocation, and the base's own artifact). One `>=` had
+  collapsed a finding and a contradiction into a single bucket, and the finding was the larger
+  half. Whenever a guard's condition is a comparison, ask what each side of the boundary means
+  separately — this is the "absent row hides better than a blank cell" failure moved one level
+  up, into the PREDICATE rather than the reader, where no census of the output can see it.
+- **CALIBRATE A NEW LAYOUT WITNESS ON THE BASE SUBOBJECTS IT ALREADY WALKS THROUGH — IT IS A FREE
+  OUTSIDE ROUTE — AND PARTITION THE RESULT INTO THREE BUCKETS, NOT TWO.** Any construction-chain
+  or member-access witness for a derived class necessarily crosses its base subobjects, so
+  wherever some *other* machinery has already laid out one of those bases you have a graded
+  population for nothing, produced by a route the new witness does not consume. Measured: five
+  such bases covered 51 classes, giving **500 cells inside a committed field, 0 straddling a
+  committed boundary, 2423 in a committed gap**. Three things make it a real calibration:
+  - **The gap bucket must be reported and NOT graded.** A cell landing where the older artifact
+    claims nothing is neither agreement nor contradiction; folding it into either side corrupts
+    the measure, and it is usually the biggest bucket — here 2423 against 500. It is the
+    *payload*: the new witness reaching where the old one did not.
+  - **Require agreement, not merely absence of contradiction.** A zero `inside` count must raise.
+    Otherwise a witness that is systematically misaligned — every cell landing in gaps — passes
+    with a clean sheet.
+  - **Put the arm BEFORE the write and poison it on real data.** Shifting one cell two bytes per
+    gradeable class fires it (`7 cell(s) straddle`), and because the check sits between the
+    harvest and the emit, the poisoned run leaves no artifact to revert. That is the "a run that
+    RAISED must not have its output promoted" rule solved by ORDERING instead of by cleanup, and
+    it is strictly better because it cannot be forgotten.
 - **A REDUCING OPERATION IS WHERE AN EVIDENCE SET GOES TO DIE — READ WHAT YOUR SWEEPS DISCARD,
   NOT ONLY WHAT THEY EMIT.** The skip-counter rule above is about rows a sweep declined to
   produce. This is the case where the sweep *did* the work, on the *whole* population, and
