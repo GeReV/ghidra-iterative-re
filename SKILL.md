@@ -1528,6 +1528,49 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
   failed at the time. It surfaced two rounds later as a gate firing on unrelated work, and
   looked exactly like damage from the round in progress. The exclusion was not defeated by
   new data — it was defeated by the *category* of the data changing underneath it.
+- **`FillOutStructureHelper`'S READ-ONLY ARM IS `(createNewStructure=True,
+  createClassIfNeeded=False)` — AND THE OBVIOUS READING OF THAT IS BACKWARDS.** Measured against
+  the 12.1.2 source, because the javadoc does not say which arm mutates:
+  `createUniqueStructure` builds a `StructureDataType` and **never adds it to the
+  DataTypeManager**, so the returned struct is detached and `populateStructure` edits only that.
+  The two arms that DO mutate are the ones nobody warns about — `createNewStructure=False` calls
+  `getStructureForExtending` to fetch the **existing** struct out of the DTM and then
+  `growStructure`/`replaceAtOffset` on it, i.e. **it silently rewrites the recovered layout you
+  were about to cross-check**; and `createClassIfNeeded=True` on a `this` param calls
+  `symbolTable.createClass(..., SourceType.USER_DEFINED)` plus
+  `RenameLabelCmd(..., SourceType.USER_DEFINED)`, **laundering into the highest provenance tier**
+  from inside a helper that reads as an analysis convenience. Take
+  `getStorePcodeOps()`/`getLoadPcodeOps()` from the detached arm and discard the Structure — and
+  **bracket the run with a datatype/function-count diff that raises**, because reading the source
+  is a hypothesis about your install and the bracket is what makes it evidence.
+- **A REACH FIGURE CAN BE STRUCTURALLY MEANINGLESS AND STILL READ AS TOTAL COVERAGE — price the
+  mechanism's PRECONDITION, not the availability of a target.** Measured while pricing that
+  helper: all **198 of 198** laid-out classes had a constructor to point it at, which reads as
+  complete coverage, and it produced cells for **1 of 12** sampled. The precondition is that the
+  receiver be locatable, and **173 of the 198 constructors carried an analyzer-committed
+  `__cdecl` prototype** in which ECX is not an input at all — so there is no mapped symbol for
+  `this` and the helper returns nothing. Effective reach **25**. One calling-convention census
+  over the whole population costs seconds and moved the price by a factor of eight. Ask "does the
+  precondition hold here", never "can I name a target here".
+- **CROSS-TAB REACH AGAINST INDEPENDENCE BEFORE PRICING A CORROBORATION ROUND — the number you
+  want is the INTERSECTION, and it is smaller than either.** A second-witness round is worth what
+  it can reach *and* speak about non-circularly. A decompiler-derived witness inherits the types
+  you applied, so a class you have already typed may hand your own layout back; a class with no
+  type cannot. Measured: 25 reachable, 151 untyped, and the cell that decides the round —
+  reachable **and** untyped — is **12**. Scoping on 198, on 151 or on 25 would each have been
+  scoping on a number that does not exist. **And demonstrate the witness on the independent half**:
+  the first sample's one working class was typed (persuasive, worth nothing); re-sampling reached
+  an untyped class that reproduced **20 of 20** committed field offsets with 0 straddles, and that
+  single case is the whole proof-of-concept.
+- **A BLOCKER FOUND WHILE PRICING CAN OUTRANK THE ROUND YOU WERE PRICING — and its `SourceType` is
+  part of the finding.** Those 173 wrong prototypes are not a fact about one helper: an MSVC
+  constructor is `__thiscall`, so every decompilation of those bodies renders without a `this`
+  parameter and **every** decompiler-derived witness on them is degraded. All 173 sat at
+  `SignatureSource=**ANALYSIS**` — the Decompiler Parameter ID analyzer, exactly the case Ghidra's
+  own course warns about — so repairing them is an `AI`-over-`ANALYSIS` **peer overwrite** (both
+  priority 2) that the next `analyzeChanges` is entitled to reverse. Measuring the signature
+  SOURCE during the pricing turns that from a surprise discovered inside the repair round into a
+  constraint on its design.
 - **BEFORE HAND-ROLLING AN ALIAS TRACKER, CHECK `FillOutStructureHelper` — IT IS THE SAME
   WITNESS, ON SSA, AND IT RECURSES INTO CALLS.** A linear register tracker over raw instructions
   is the natural way to answer *"which offsets does this body touch through `this`"*, and it is
