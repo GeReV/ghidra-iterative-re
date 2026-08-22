@@ -113,6 +113,38 @@ object model rather than from your own arithmetic — which is precisely the ste
 having. Hand-rolling the *type* emitter is the failure this skill warns about; hand-rolling
 the *assertions* is the whole point.
 
+**AND EMIT FIXED-WIDTH TYPES, BECAUSE THE TARGET'S WORD SIZE IS NOT THE HOST'S — THIS BITES THE
+HEADER, THE RECOMPILE AND THE REIMPLEMENTATION, IN THAT ORDER OF DISCOVERY AND THE REVERSE ORDER
+OF COST.** Nearly every target this document is about is 32-bit and nearly every machine you will
+build on is 64-bit. Under LP64 a pointer is 8 bytes and 8-ALIGNED where the target's is 4, and
+`long` is 8 where the target's is 4. Write `char *` or `long` into a recovered struct and the
+compiler silently relays every field after it and changes `sizeof`.
+
+- **In the HEADER it is loud, and that is the cheap case.** Measured: one field retyped from
+  `uint` to `char *` — correctly, the evidence artifact recorded `ctype "char *"` with **`width
+  4`** — was emitted with its spelling rather than its width. `sizeof` of the containing record
+  went **268 → 280**, five classes embedding it shifted, and the header produced **161 errors**
+  for 90 commits. **When an artifact records both a spelling and a width, the width is the fact.**
+  Emit `uint32_t` for a 32-bit target pointer and name the real type in a comment: the header
+  then compiles anywhere, which is the difference between a check that runs and a check that
+  rots.
+- **In a RECOMPILE-AND-DIFF it is quiet and it invalidates the comparison.** Every displacement
+  in the emitted object code is computed from the host's layout, so a struct whose size the host
+  changed produces instruction-level differences that are artifacts of your build, not of your
+  reimplementation. Build 32-bit for this work (`-m32` and the multilib to go with it, or a
+  cross-toolchain) — and know before you start whether you *have* it: on one machine `-m32` failed
+  at link for `Scrt1.o` and even under `-fsyntax-only` for `bits/libc-header-start.h`.
+- **In the SOURCE-LEVEL REIMPLEMENTATION it is quiet and it is load-bearing**, because the
+  properties such projects are usually graded by are precisely the byte-layout-sensitive ones: a
+  save format, a replay, a network packet, a lockstep sync checksum. A reimplementation built
+  64-bit reproduces the *behaviour* of every struct containing a pointer and none of its
+  *layout* — so it desyncs against the original binary and cannot load its own saves, for a
+  reason that never appears in the logic. If the destination is functional equivalence graded by
+  those oracles, **the pointer width is part of the specification**: model target pointers as
+  explicit 32-bit handles or offsets, or commit to building 32-bit, and write down which. This is
+  the same discipline as the header, one level up — and it is the level where discovering it late
+  is expensive.
+
 **Decide WHEN to apply an identification by fan-out, not by confidence.** The cost of
 applying a name is fixed — checkpoint, census, invariant bracket. The benefit scales with
 the number of call sites it makes readable. Measured: `fwrite` was recognised early in one
