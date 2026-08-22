@@ -2220,6 +2220,29 @@ equivalence graded by those oracles, the pointer width is part of the specificat
 target pointers as explicit 32-bit handles or offsets, or commit to building 32-bit — and write
 down which, because the decision is invisible in the source once made.
 
+**A WIDER SCALAR SMUGGLES IN AN ALIGNMENT THE SAME WAY A POINTER SMUGGLES IN A SIZE.** The
+pointer case above is the famous half; this is the one that will bite you when you emit *gaps*.
+Measured, on the very first run of a generator written with the pointer lesson already in hand:
+the obvious width→type map `{1: uint8_t, 2: uint16_t, 4: uint32_t, 8: uint64_t}` put a `uint64_t`
+on an 8-byte **gap** at offset `0x1dc`. That offset is 4-aligned and not 8-aligned, so the
+compiler padded to `0x1e0` and relayed every later field in the class. **An 8-byte gap is not a
+64-bit integer — it is eight bytes nothing observes**, and the recovered evidence claimed a width,
+never an alignment. Emit gaps and any width you did not independently establish as a scalar as
+`uint8_t[N]`, which aligns to 1 and can therefore sit at whatever offset the evidence records.
+The general form: **every type name is a claim, and a layout emitter must only make the claims its
+evidence actually supports.**
+
+Two things worth taking from how that surfaced:
+
+- **The external evaluator grades your PIPELINE, not only your data.** That round had honestly
+  priced itself as "assurance, not a findings engine" — 3753 of 3796 fields were naturally
+  placeable and no class had non-abutting regions, so nothing was expected to fire. The first
+  compile rejected the *emitter*. Build the oracle even when you expect the data to be clean.
+- **Ask the compiler WHERE it diverged; do not read the declarations and reason.** The failing
+  assertions named offsets from `0x1f4` onward and the declarations there looked perfectly
+  consecutive and 4-aligned. A probe that walks the members in order and reports the FIRST
+  mismatch named the real culprit 24 bytes earlier, immediately.
+
 **The general rule, and it is not only about pointers:** a recovered layout is a statement about
 the TARGET's ABI. Anything whose size or alignment differs between target and host — pointers,
 `long`, `size_t`, `ptrdiff_t`, enum width, `double` alignment, bitfield packing order, struct tail
