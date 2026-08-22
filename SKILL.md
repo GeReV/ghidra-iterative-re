@@ -1193,6 +1193,65 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   it; scoping the round from its 7 findings would have been scoping from a filtered view.
   The whole-population probe happened to confirm exactly 7 and 0 new, which is the outcome
   that makes the check look unnecessary and is precisely why it has to be run.
+
+- **A BYTE PATTERN'S FALSE-POSITIVE RATE IS DIRECTLY COUNTABLE AGAINST THE FUNCTIONS YOU
+  ALREADY HAVE — count it before mining anything.** Mining function-start patterns from a
+  program's own corpus (`Ghidra/Features/BytePatterns`,
+  `ClosedPatternRowObject.mineClosedPatterns`) is the obvious way to attack undefined code, and
+  the obvious way to price it — how many candidates would it produce — is the wrong axis.
+  **A wrong function start ABSORBS the true function after it**, so the mechanism damages the
+  population it is meant to grow, and the function count rises either way. Precision decides the
+  round, and your existing functions *are* the graded set: every occurrence of a candidate
+  prologue inside a defined body but **not at its entry** is a place the pattern would fire
+  wrongly. Measured on one 1999 MSVC/x86 binary with 5,629 known starts: `c3909090`
+  (`RET; NOP NOP NOP`) is **54 starts against 3,230 interiors — 1.6% precision**; `c2040090`
+  is 29 against 972; only **5 of the top 25** reach 95%. And the vocabulary itself refused the
+  round before precision even mattered: **1,950 distinct 4-byte prologues over 5,629 starts,
+  top 25 covering 34.1%**. Derive the count two independent ways (per-entry reads, and a bulk
+  image scan classified against the same start set) and **raise if they disagree** — that is the
+  only thing that catches a misaligned bulk read, which would silently invalidate every number.
+- **PRICE THE UNDEFINED-CODE SEARCH SPACE BY CONTENT, NOT BY RANGE COUNT — the filler
+  dominates, and the headline number is a span.** `Listing.getUndefinedRanges` over
+  `Memory.getExecuteSet()` is the right enumeration and its total is not the population.
+  Measured: "5,321 ranges / 87,713 bytes", carried across several rounds, resolved into
+  **5,033 ranges / 44,440 bytes of pure `0xCC`/`0x00`/`0x90` alignment padding**, 52 ranges under
+  8 bytes, and a candidate-bearing residue of **236 ranges / 43,139 bytes**. 95% of the ranges
+  could never hold a function. Classify each range by content before scoping anything on it.
+- **`PseudoDisassembler.isValidSubroutine` IS NOT A DISCRIMINATOR — 100% RECALL, 72%
+  FALSE-ACCEPT — AND ONLY THE NEGATIVE TWIN SAYS SO.** `ghidra.app.util.PseudoDisassembler` is
+  genuinely read-only (its own javadoc: creates no references or symbols, needs no transaction),
+  which makes it the right instrument to reach for and the easy one to over-trust. Graded both
+  ways on one binary: **400 of 400** sampled known function starts accepted
+  (`isValidSubroutine(addr, allowExistingCode=True)`), and **288 of 400** sampled known function
+  *interiors* accepted too. So "N undisassembled ranges decode cleanly" is close to
+  information-free — a recall-only calibration would have published 224 such ranges as a finding.
+  This is the skill's "calibrate by positive agreement, not only absence of contradiction" rule
+  pointed at its mirror image: here the recall arm passes trivially and the *precision* arm is
+  the one that refuses the instrument.
+- **A GAP BOUNDED BY TWO DEFINED FUNCTIONS IS A SAFER PLACE TO CREATE A FUNCTION THAN OPEN
+  BYTES — measure the bounding before accepting a stated hazard.** "A false positive absorbs the
+  true following function" is the correct objection to pattern-driven function creation in open
+  bytes, and it is **void** where the following function already exists in the database.
+  Measured: of 236 candidate ranges, **221 were preceded by a defined function ending in a flow
+  terminator and 210 were followed immediately by a defined function START** — whole functions
+  sitting in bounded gaps of an otherwise contiguous `.text`. The bounding is a safety property
+  no byte pattern supplies, and it is one cheap census away.
+- **ASK WHETHER AN UNDISASSEMBLED BOUNDARY TRUNCATES A DEFINED FUNCTION — it is cheap and it
+  grades your whole evidence base at once.** If a defined body stops at such a boundary while its
+  last instruction still **falls through**, that function is cut short in the database, and every
+  witness computed by walking function bodies — write sets, construction extents, read/write
+  cells, and every layout resting on them — has been reading a partial body and reporting a
+  complete answer. Nothing warns. Ask each instruction's own `FlowType` (`isTerminal()`,
+  `isJump()`, `hasFallthrough()`), never a mnemonic list, and **calibrate both ways over the
+  whole corpus first** — measured, 5,628 of 5,629 defined functions end in a flow terminator and
+  1 falls through, which is what makes the answer (**0 of 236 truncated**) a measurement rather
+  than a property of the probe. On this binary it was the most valuable thing the round produced,
+  and it was a reassurance, not a defect.
+- **SEPARATE FEASIBILITY FROM VALUE, AND MEASURE BOTH.** The same population was recoverable
+  *and* worthless: **11 references reach all 43,139 residue bytes, every one `DATA`, none a
+  `CALL`** — linker-retained code the game never runs, appearing in no tick. A round can be
+  perfectly feasible and still not worth running; a pricing probe that reports only reach has
+  answered half the question. Say which half you measured.
 - **Do not classify a population member by what it is NOT.** "Not a table start, therefore
   interior to a table" is only sound if the tables tile the region — and recovered runs
   almost never tile anything (262 gaps totalling ~37KB here). The wrong label is invisible
@@ -2662,6 +2721,7 @@ We wrote a vtable sweeper from scratch without checking that the first item exis
 | Devirtualize a call site | `AddVfunctionCallRefScript` (12.1) — needs components typed `Pointer`→`FunctionDefinition` (NOT the `ClassUtils` default pointer), is cursor-driven, writes `ANALYSIS`, and its unique-instance inference is unsound for any class with descendants. Read the caveats before planning on it |
 | Dataflow across basic blocks | `DecompilerUtils.getBackwardSliceToPCodeOps` (SSA p-code); `SymbolicPropogator` for `this + K` without the decompiler |
 | Identify the build toolchain | `ghidra.app.util.bin.format.pe.rich` + `PortableExecutableRichPrintScript` — the PE Rich header names the compilers and linkers used |
+| **Test if a subroutine starts here, WITHOUT mutating** | `PseudoDisassembler` (`ghidra.app.util`) — `isValidSubroutine(addr[, allowExistingCode[, mustTerminate]])`, `isValidCode`, `disassemble(addr)` → `PseudoInstruction`, `followSubFlows`. Creates no references or symbols and needs no transaction. **Calibrate it: measured 100% recall on known starts and a 72% FALSE-ACCEPT rate on known function interiors** — it is a sanity filter, not a discriminator |
 | Attack undefined code | `Processors/x86/data/patterns/x86win_patterns.xml` (real MSVC prologue/filler pairs — **extend the XML**, don't write pattern code); `FindUndefinedFunctionsScript`, `MakeFunctionsScript`, `CreateFunctionAfterTerminals`, `DumpFunctionPatternInfoScript` |
 | Build a FID database from period libs | `ImportMSLibs`, `CreateEmptyFidDatabase`, `CreateMultipleLibraries`, `RepackFid`; procedure in `data/building_fid.txt` |
 | **Carry provenance inside the program** | `FunctionTag` (name + comment, DB-backed, and `CppExporter` can filter on it) — tag every function a round touches with the round id, and the ledger becomes reconstructible *from the program* instead of only from your CSV. `BookmarkType.{NOTE,ANALYSIS,WARNING}` for "recorded unresolved" caveats that travel with the address | **Also: a PLATE comment at every address you named, so the GUI reader sees it** — measured, 3618 of them over 1909 functions and 1709 data symbols, with `functions_total` and the AI-symbol count asserted unmoved and a full read-only-sweep harness confirming 0 artifacts perturbed. Make the text rename-proof: say *the name here is ours*, never quote the name, or you have planted one stale copy per address
