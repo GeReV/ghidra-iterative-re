@@ -735,6 +735,44 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   cannot perturb a witness that never asks for p-code. The premise had sat unchallenged in a
   queued round for a week, and it cost one command to check.
 
+  **QUALIFIED, and the qualification is the more useful half: "not the decompiler" is not the
+  same as "not p-code", and there are THREE levels here, not two.** Reading raw instructions
+  does insulate a witness from simplification rules — and if it reads
+  `getDefaultOperandRepresentation()`, it buys that insulation by throwing away the
+  instruction's SEMANTICS, which is a worse trade than it looks:
+
+  | level | what it is | carries direction? | simplification rules? |
+  |---|---|---|---|
+  | rendered operand text | `getDefaultOperandRepresentation()` + a regex | **no** | no |
+  | **raw instruction p-code** | **`Instruction.getPcode()` — the SLEIGH spec itself** | **yes** | **no** |
+  | decompiler p-code | `HighFunction` / `DecompInterface` | yes | yes |
+
+  The middle row is the one projects skip, and it is strictly better than the first: same
+  insulation, plus the processor specification's own account of what the instruction does.
+  Measured: a write-set witness parsed operand 0 with a regex and recorded it as a WRITE,
+  because operand 0 is the destination for `MOV`. It is a **source** for `CMP`, `TEST`, `FLD`,
+  `FMUL` and every x87 memory form — so **1552 of 21249 committed `ctor_write` rows (7.3%),
+  across 151 of 198 classes, were reads**. Nothing failed; the offsets were real, the sizes
+  they bounded were right (a read of `this+K` proves K is inside the object exactly as a store
+  does), and only the LABEL was false. `getPcode()` containing a `STORE` op answers the
+  direction question authoritatively, because it *is* the processor's definition.
+
+  Two riders, both measured on that repair:
+
+  - **Do not hand-write the mnemonic list.** The first attempt at the fix was a
+    `READ_OP0 = {CMP, TEST, PUSH, FLD, ...}` set typed from memory. Graded against the SLEIGH
+    answer on the same instructions it **disagreed on 70 of 2221**. This is the skill's own
+    "discover the API from the install, not from memory" rule pointed at instruction semantics,
+    where it is easier to fall for because the mnemonics feel like common knowledge.
+  - **A relabel moves evidence in BOTH directions — measure both before predicting the net.**
+    The repair was expected to *reduce* corroboration, since some cells were corroborated by a
+    write that turned out to be a read: 8 such rows were counted, and a drop was predicted.
+    The actual result was a **rise, 317 → 347**, because the mislabel had been *collapsing two
+    independent witness kinds under one name* and hiding corroboration at far more cells than
+    it invented it at — **570 cells gained** a distinct kind against **41** that lost one. The
+    prediction was wrong because only the loss direction had been counted, which is exactly the
+    half-measurement this document demands a counter for when a rule changes.
+
 - **Do NOT test whether a witness depends on types you applied by withholding an opcode
   downstream of type recovery.** Same project, same round: the exact-size witness read
   multiplier constants from `INT_MULT` inputs and `PTRADD` element sizes, and `PTRADD`'s
