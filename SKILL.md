@@ -833,8 +833,8 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   - **Recovering it is ADDITIVE and must be proven so, not argued so.** Append the cells at the
     exact site that already computes the reduced value, so no existing key's value can move —
     then run the stability harness anyway, because "this cannot have changed anything" is the
-    reasoning this document refuses everywhere else. Here: 47 producers, 0 raised, 96/96
-    artifacts byte-identical.
+    reasoning this document refuses everywhere else. Here: 47 producers, 0 raised, 0 CHANGED and 55
+    version-only restamps across 96 artifacts.
 - **PRICE A PROPOSED WITNESS IN COVERAGE, NEVER IN SPAN — AND A ONE-EXAMPLE CAVEAT IS NOT A
   MEASUREMENT.** "Measure a proposed mechanism's REACH before building it" has a unit, and
   picking the wrong one flatters the round. Measured on the same population: the committed
