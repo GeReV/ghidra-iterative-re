@@ -1940,6 +1940,56 @@ Three things to know here; the mechanics are in **`references/cpp-abi.md`**.
   - **Two agents disagreeing is a finding about the MECHANISM, not a tie to break.** Both
     derivations here were sound; the ranking question ("which is closer?") was the wrong
     question, and asking it would have discarded one correct answer.
+- **A LEAFNESS RULE THAT READS VPTR STORES ALONE CANNOT SEE THE ORDINARY SUBCLASS.** "Does any
+  body store this class's table and then a different one?" is the natural way to ask whether a
+  class has a subclass, and it is only half the question. MSVC emits a derived constructor as
+  `call base_ctor; mov [this], own_vftable`, so the base's vptr store lives in the **base's**
+  body and never appears in the derived one — a store-only rule therefore sees only a subclass
+  whose base constructor was **inlined**, and returns `LEAF` for every class whose children were
+  compiled the normal way. Measured on one binary: it returned `LEAF` for the class with **four**
+  subclasses while giving the right answer for the three classes that really are leaves, which
+  is exactly why nothing looked wrong. **Classify a body by its vtable stores AND its calls to
+  the class's constructor**, and take the demonstration from ground truth rather than a
+  constructed poison: a class the binary itself declares subclasses for is a must-fire arm that
+  costs nothing and cannot go inert.
+- **"IS THERE A FUNCTION AT THIS ADDRESS" IS A CLAIM ABOUT THE DATABASE, AND IT DOES NOT BELONG
+  IN A STRUCTURAL TEST.** This document already says a cross-reference count is a fact about the
+  database rather than the binary. The same mistake hides one rung down, inside predicates that
+  feel like observations: a "is this immediate a vtable?" test written as *every slot is a
+  defined function entry point* refused **three genuine tables** on one binary, whose slot
+  targets were real code in bytes Ghidra had never disassembled. Test what the binary
+  guarantees — *the slots point into executable memory, at distinct addresses* — and **print
+  each slot's kind** (`function` / `code` / `undisassembled` / `not-executable`), so the missing
+  definitions stay visible as findings instead of being swallowed by the relaxation that admits
+  them. Those slots are usually a real population worth a round of their own.
+- **A DIFFERENT HIERARCHY CAN USE DIFFERENT SLOT NUMBERS, AND A SLOT-KEYED SWEEP REPORTS A CLEAN
+  ZERO ON IT.** A slot index is a per-hierarchy convention, not a program-wide one. Measured: a
+  binary's main object tree put `Save`/`Load` at slots **45/46**, a second, unrelated family put
+  them at **0/1**, and every sweep keyed to the first numbering passed silently over the second
+  — which was then written up across three rounds as "these classes are non-polymorphic, which
+  is why every vtable-driven route is blind to them". The classes had vtables the whole time.
+  **Before concluding a population has no vtable, ask which slot you were looking in.**
+- **CLOSE A BLINDNESS GUARD ON EVERY ROUTE THE CLAIM RESTS ON, NOT JUST THE SEARCHABLE ONE.**
+  Byte-searching for a vtable's address finds vptr stores hidden in undisassembled code; it can
+  **never** find a hidden `E8 rel32` call, because the encoding is position-dependent. A guard
+  covering only the searchable half reads as complete and is not. The other half is cheap and
+  exact: enumerate the undisassembled ranges inside executable blocks (`Listing.getUndefinedRanges`
+  over `Memory.getExecuteSet()` — it returns an `AddressSet`, so iterate `getAddressRanges()`)
+  and decode every relative call in them. Measured on one binary: **5,317 ranges / 88,842 bytes**,
+  and both halves paid — the store search found two real undisassembled destructors, and the call
+  decode returned a *measured* zero instead of an assumed one.
+- **A PREMISE RECORDED IN A NOTES FILE IS AN UNTESTED CLAIM, AND EVERY ROUND BUILT ON IT INHERITS
+  IT WITHOUT RE-READING IT.** The self-harvest rules here are about evidence; this is the same
+  failure on the *scoping* axis, and it is cheaper to fall into because nothing is ever written
+  down twice. Measured: one round's parenthetical — "almost certainly non-polymorphic, which is
+  precisely why every vtable-driven route here is blind to them" — scoped the next three rounds,
+  one of which declined a rule that would have decided two open sizes *because* of it. It was
+  refuted by a decompilation printed in one of those very rounds. The tell was not subtle and it
+  was not missed for lack of evidence; it was missed because the premise had stopped being a
+  question. **When three rounds in a row inherit the same negative premise, re-derive it from the
+  program before the fourth** — and prefer premises stated as a probe that can be re-run over
+  premises stated as a sentence.
+
 - **Three byte-identical functions that were NOT folded are a cheap measurement that ICF is
   off.** "Identical-code folding hides overrides" is a real hazard and it is also frequently
   asserted without being checked. If a build emits per-class deleting-destructor thunks with
