@@ -817,6 +817,34 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   a queued item with an owner, and read one skipped case by hand before believing any
   conclusion drawn over the survivors.** A blank cell at least appears in the census; a
   dropped row does not appear anywhere.
+- **A CALL TO A BASE CONSTRUCTOR IS NOT AN ALLOCATION OF THE BASE — AND THE MISLABEL PRINTS A
+  PLAUSIBLE, PRECISE, WRONG SIZE.** Asking *"is class X ever allocated on its own?"* as *"is there
+  an allocation whose object is handed to X's constructor?"* is the natural phrasing and it is
+  wrong under single inheritance: a descendant's factory allocates the DESCENDANT and calls the
+  base constructor on the same pointer. Measured, on a class bounded [452, 496]: the probe
+  answered **2 direct allocations, of 676 and 496 bytes** — which are exactly the two descendants'
+  sizes — and printed *"DIRECT ALLOCATIONS of AIUnit -> 676 bytes"*, a confident wrong size for
+  the very class the round existed to size. **Classify each allocation against the known
+  descendant sizes before attributing it to the base.** Note the direction of the failure: it
+  MANUFACTURES a finding rather than hiding one, which is the direction that gets believed.
+- **A CLASS'S VTABLE IS NOT ITS POPULATION — IT IS ONLY THE VIRTUAL HALF.** A per-class witness
+  built from vtable slot targets silently omits the constructor and every non-virtual member,
+  which are compiled as the class and are exactly as good a witness. Measured: a size probe
+  scanned 4 slot targets, found nothing above offset 88, and was one step from recording a
+  measured zero over a population that **excluded the constructor which had produced the class's
+  existing lower bound of 452**. Widening to slots + constructor + namespace members + bodies
+  taking a `Class *` this-parameter moved the highest observed access from **88 to 452** — and
+  that jump is the check that the widening reached the right code rather than merely more of it.
+  Before believing any per-class census, ask whether its population is the CLASS or just its
+  vtable.
+- **MEASURE A NEGATIVE FROM BOTH DIRECTIONS, THEN RETIRE THE LEAD EXPLICITLY.** "This class's own
+  bodies never reach past K" is half an answer; the other half is whether its DESCENDANTS write
+  below their own start, which would move the boundary the other way. Both came back zero, which
+  turned an earlier round's prose claim — *"nothing observes those 44 bytes"* — into a
+  measurement. Then **say the lead is exhausted, name the routes that were run, and name the
+  evidence that would still settle it** (here a runtime observation at the descendant's factory,
+  recorded at its own provenance tier since it is a fact about one execution). A stale "unknown"
+  reads as an opportunity forever, and the next round will otherwise re-derive the same negative.
 - **PRICING THE NEXT ROUND IS A REVIEW OF THE LAST ONE — AND IT CATCHES WHAT THE GATES
   STRUCTURALLY CANNOT.** This document already says to price a queued round against the program
   because a plan's premises decay. The other half is that the pricing probe is the first thing to
