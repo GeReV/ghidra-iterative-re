@@ -439,9 +439,11 @@ Three more caveats, all measured:
 - **Its precondition is a locatable receiver, and that is where reach dies.** It needs a
   `HighVariable` at the receiver's storage. On a `__thiscall`/`__fastcall` body that is ECX; on
   a `__cdecl` one ECX is not an input at all and `computeHighVariable` returns `None`. Measured:
-  198 of 198 classes had a constructor to point it at — and 173 carried an analyzer-committed
-  `__cdecl` prototype, so effective reach was **25**. Census `getCallingConventionName()` over
-  the population before pricing anything on it. Do **not** reach for `getParameter(0)`'s storage
+  198 of 198 classes had a recorded constructor site — and 173 of those sites are **factories the
+  constructor was inlined into**, correctly `__cdecl`, so effective reach was **25**. Census
+  `getCallingConventionName()` over the population before pricing anything on it, and check what
+  each site actually IS before calling a convention wrong: an inlined-constructor factory is not
+  a member function and has no receiver to declare. Do **not** reach for `getParameter(0)`'s storage
   instead: that is `this` only under `__thiscall`, and under `__cdecl` it is the first *stack*
   argument, which yields a `HighVariable` every time and produces no cells — a failure that
   reads as a quiet witness rather than a wrong question.

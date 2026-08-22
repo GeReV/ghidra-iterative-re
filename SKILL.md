@@ -1546,13 +1546,14 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
   subtle, and bracketing alone tells you nothing until you have already run it.
 - **A REACH FIGURE CAN BE STRUCTURALLY MEANINGLESS AND STILL READ AS TOTAL COVERAGE — price the
   mechanism's PRECONDITION, not the availability of a target.** Measured while pricing that
-  helper: all **198 of 198** laid-out classes had a constructor to point it at, which reads as
-  complete coverage, and it produced cells for **1 of 12** sampled. The precondition is that the
-  receiver be locatable, and **173 of the 198 constructors carried an analyzer-committed
-  `__cdecl` prototype** in which ECX is not an input at all — so there is no mapped symbol for
-  `this` and the helper returns nothing. Effective reach **25**. One calling-convention census
-  over the whole population costs seconds and moved the price by a factor of eight. Ask "does the
-  precondition hold here", never "can I name a target here".
+  helper: all **198 of 198** laid-out classes had a recorded constructor site to point it at,
+  which reads as complete coverage, and it produced cells for **1 of 12** sampled. The
+  precondition is a locatable receiver, and **173 of those 198 recorded sites are not member
+  functions at all** — they are the FACTORIES the constructor was inlined into, correctly carrying
+  `__cdecl`, in which ECX is not an input, so there is no mapped symbol for `this`. Effective reach
+  **25**. One calling-convention census over the whole population costs seconds and moved the
+  price by a factor of eight. Ask "does the precondition hold here", never "can I name a target
+  here".
 - **CROSS-TAB REACH AGAINST INDEPENDENCE BEFORE PRICING A CORROBORATION ROUND — the number you
   want is the INTERSECTION, and it is smaller than either.** A second-witness round is worth what
   it can reach *and* speak about non-circularly. A decompiler-derived witness inherits the types
@@ -1563,15 +1564,29 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
   the first sample's one working class was typed (persuasive, worth nothing); re-sampling reached
   an untyped class that reproduced **20 of 20** committed field offsets with 0 straddles, and that
   single case is the whole proof-of-concept.
-- **A BLOCKER FOUND WHILE PRICING CAN OUTRANK THE ROUND YOU WERE PRICING — and its `SourceType` is
-  part of the finding.** Those 173 wrong prototypes are not a fact about one helper: an MSVC
-  constructor is `__thiscall`, so every decompilation of those bodies renders without a `this`
-  parameter and **every** decompiler-derived witness on them is degraded. All 173 sat at
-  `SignatureSource=**ANALYSIS**` — the Decompiler Parameter ID analyzer, exactly the case Ghidra's
-  own course warns about — so repairing them is an `AI`-over-`ANALYSIS` **peer overwrite** (both
-  priority 2) that the next `analyzeChanges` is entitled to reverse. Measuring the signature
-  SOURCE during the pricing turns that from a surprise discovered inside the repair round into a
-  constraint on its design.
+- **A COUNT MATCH BETWEEN TWO PARTITIONS IS A PROMPT TO JOIN THEM, AND THE APPROVAL CENSUS IS THE
+  LAST CHANCE TO REFUTE THE ROUND — SO WRITE IT TO BE CAPABLE OF SAYING NO.** Measured, on the very
+  next round: those 173 `__cdecl` bodies were written up as *wrong prototypes an analyzer had
+  committed*, and a mutating repair round was recommended and approved. The census that was
+  supposed to produce its population instead refuted it. The size artifact carried a `route=`
+  column — in the same cell the earlier round had parsed the address out of — splitting the same
+  198 classes **173 / 25**, identically to the convention split. Joined **per class by address**
+  rather than by total: **0 off-diagonal**. They are the same partition. `factory_inline` means
+  the constructor was inlined into a factory, so the recorded site is a factory — not a member
+  function, no receiver, and **`__cdecl` is correct for it**. Four things generalise:
+  - **An identical total on two partitions is evidence of nothing until you join by address.** A
+    total can match by coincidence; a ranked decomposition cannot.
+  - **Read every column of the row you generalised from.** The refuting evidence was not missing;
+    it sat beside the value already being read, and the defect was an unstated assumption (*every
+    `ctor_write_max` site is a constructor*) the artifact itself contradicts.
+  - **"Not an X" needs positive evidence, not the absence of X's marker.** The confirming arms —
+    **173 of 173 return a pointer, 0 of 173 read ECX before writing it**, from raw instruction
+    p-code — with the control that makes the zero a measurement: **25 of 25** genuine member
+    functions in the same population *do* read ECX first.
+  - **A round whose damage no existing gate can see must be refuted BEFORE the apply.** Setting a
+    calling convention moves no function count and creates no symbol, so the function-count
+    invariant and the AI ledger would both have stayed green while 173 correct functions acquired
+    a wrong `AI`-tier prototype under a headline reading *"173 prototypes repaired"*.
 - **BEFORE HAND-ROLLING AN ALIAS TRACKER, CHECK `FillOutStructureHelper` — IT IS THE SAME
   WITNESS, ON SSA, AND IT RECURSES INTO CALLS.** A linear register tracker over raw instructions
   is the natural way to answer *"which offsets does this body touch through `this`"*, and it is
