@@ -1263,6 +1263,19 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
   entries as its example of something to refuse. When a round changes an artifact, enumerate
   **every** consumer and say which tier each sits in; the harness covers the sweeps and
   nothing covers the appliers but you.
+
+  **And the harness is blind a second way: to the producers it EXCUSES.** A stability harness
+  earns its keep by re-running producers, so anything it merely *hashes* — for cost, for a
+  cross-host dependency, for an append-only ledger — is reported `unchanged` every pass,
+  truthfully, because it was never regenerated. Measured: the artifact recording **which types the
+  project had applied**, derived by walking the program's own version history, was hashed-only
+  because that walk is slow. Nothing re-ran it and no round did so by hand, so it covered
+  boundaries up to **v55** while the program stood at **v83** — 23 boundaries missing, including
+  the previous round's own type apply, in the very ledger a later round would consult to ask what
+  had been applied. **Every excusal transfers ownership from the harness to a human, so it must
+  carry a NAMED trigger saying when that human runs it** ("in any round that applies a type, and
+  check its last recorded version against the program's"). An excusal with a reason but no trigger
+  is how an artifact acquires no owner at all.
 - **Give a ground-truth selftest arm a NEGATIVE twin that pins what the rule DEPENDS on.**
   An arm asserting "against the real artifacts this rule recovers exactly X and nothing
   else" proves the rule's output. It does not prove *why* the rule produced it. Add a twin
