@@ -817,6 +817,53 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   a queued item with an owner, and read one skipped case by hand before believing any
   conclusion drawn over the survivors.** A blank cell at least appears in the census; a
   dropped row does not appear anywhere.
+- **A REDUCING OPERATION IS WHERE AN EVIDENCE SET GOES TO DIE — READ WHAT YOUR SWEEPS DISCARD,
+  NOT ONLY WHAT THEY EMIT.** The skip-counter rule above is about rows a sweep declined to
+  produce. This is the case where the sweep *did* the work, on the *whole* population, and
+  threw the result away one line later. Measured: a body scanner tracked every store through a
+  register its alias tracker resolved to the object, computed `offset + width` for each, and
+  kept only the **maximum**, committed as a scalar `ctor_write_max`. 125 of the 133 classes in
+  the project's next open lead carried that row — so 125 complete per-offset write sets had been
+  measured and discarded, round after round, while a new sweep was being designed to obtain
+  exactly them. Two things make this worth a standing check rather than an anecdote:
+  - **The reducer's own artifact proves the traversal already reaches the population.** A
+    committed `max`, `count` or `any` column is a receipt saying *"this code visited every one of
+    these and looked at the quantity you now want"*. Grep your producers for `max(`, `+= 1` and
+    early `break` before scoping any round that proposes to go and measure something.
+  - **Recovering it is ADDITIVE and must be proven so, not argued so.** Append the cells at the
+    exact site that already computes the reduced value, so no existing key's value can move —
+    then run the stability harness anyway, because "this cannot have changed anything" is the
+    reasoning this document refuses everywhere else. Here: 47 producers, 0 raised, 96/96
+    artifacts byte-identical.
+- **PRICE A PROPOSED WITNESS IN COVERAGE, NEVER IN SPAN — AND A ONE-EXAMPLE CAVEAT IS NOT A
+  MEASUREMENT.** "Measure a proposed mechanism's REACH before building it" has a unit, and
+  picking the wrong one flatters the round. Measured on the same population: the committed
+  high-water marks reach a median **31.9%** of each class's size, which reads like a workable
+  layout; the bytes those same writes actually **cover** are **2.3%**, because one store far out
+  produces a large maximum and a tiny footprint. Span is an upper bound on coverage and the gap
+  between them is the entire question. The sibling witness failed the same way in the other
+  direction: a previous round had called its tiling "sparse" on the strength of one example, and
+  over the whole population it covers **2.7%** of bytes with 106 of 133 classes under 5% — the
+  difference between "supplement it" and "it cannot carry the round".
+- **A CONSTRUCTION WRITE SET IS A PROPERTY OF THE CHAIN, NOT OF THE BODY — AND THE QUIET RESULT
+  IS THE TELL.** This document already says a vptr-store chain names ancestors because MSVC
+  deletes unobservable stores. The layout consequence is the same mechanism read forward: MSVC
+  emits a derived constructor as `call base_ctor; mov [this], own_vftable`, so essentially all
+  field initialisation lives in the **base's** body. A flat per-body write set therefore reports
+  **one** tracked cell on a 936-byte class, which reads as a broken tracker and is not. Follow
+  the calls whose receiver the scan resolved to the object — delta-0 by construction, so sound
+  under single inheritance — depth-capped and cycle-guarded: coverage went **5.0% → 69.8%**,
+  median **77.6%** per class, 78 of 125 classes above 75%. Two riders:
+  - **Another artifact usually already records WHY the witness was quiet.** The size artifact's
+    witness column read `ancestor:ctor_write_max` for most of this population: the size was known
+    to be inherited, therefore so were the fields. Nobody had put the two side by side. When a
+    witness comes back surprisingly quiet, search your own artifacts for the explanation before
+    theorising about the tracker or the data.
+  - **Say what the coverage number is NOT.** It is bytes touched by an observed construction-time
+    access — offsets and widths — not fields identified, typed or named; and the chain admits
+    non-constructor callees on purpose, because a write through `this` proves the cell is in the
+    object whoever emitted it. Splitting those bytes between a class and its bases is a separate
+    step with its own rule.
 - **Diminishing returns in one vein is a signal to change AXIS, not to push harder, and the
   trigger is measurable.** When a round costs a full apply-and-verify cycle to decide four
   bytes, and the residue is a handful of items each needing its own bespoke witness, that
