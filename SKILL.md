@@ -817,6 +817,37 @@ gone, bytes reverted to undefined — with **no error, no exception, no log line
   a queued item with an owner, and read one skipped case by hand before believing any
   conclusion drawn over the survivors.** A blank cell at least appears in the census; a
   dropped row does not appear anywhere.
+- **PRICING THE NEXT ROUND IS A REVIEW OF THE LAST ONE — AND IT CATCHES WHAT THE GATES
+  STRUCTURALLY CANNOT.** This document already says to price a queued round against the program
+  because a plan's premises decay. The other half is that the pricing probe is the first thing to
+  look at last round's ARTIFACT with a different question, which makes it the cheapest review you
+  will ever get. Measured: a layout round shipped with its tiling guard passing on every class,
+  its re-derivation calibration at 198/198 and an outside-route calibration at 500/500 — all
+  green, all correct, and all blind. The next round's apply census then printed a stratum named
+  *"fields start at 0"* whose members had a recorded base, and **a class with a base cannot own
+  byte 0; that is its base's vptr.** The guards were checking internal consistency; only the
+  census asked what the rows MEANT. Two things generalise:
+  - **A FALLBACK THAT DEGRADES SILENTLY TO ZERO WILL BE READ AS A MEASUREMENT.** The boundary
+    computation fell back to "how far did our own walk of the base reach", which is legitimately 0
+    for a base outside the walked population — so one value meant both *"this class genuinely
+    starts at 0"* and *"we have no idea where its base ends"*. 33 of 99 classes, **79% of the
+    field rows**, took the second path while being reported as the first. Make a fallback chain
+    record WHICH RUNG it landed on, as a value in the row: here `base_sizeof` /
+    `base_ctor_write_max` / `base_observed_extent` / `base_unmeasured`. Same family as
+    "distinguish measured-zero from structural-zero", one level down — inside a derivation rather
+    than in a census.
+  - **WHEN THE ROWS ARE RIGHT AND THE LABEL IS WRONG, ADD THE LABEL; DO NOT DELETE THE ROWS.**
+    Excluding the affected classes or blanking their fields would have discarded 2839 correct
+    observations — every cell was a real access to a real byte of the object. What was false was
+    the claim that they were the class's OWN storage. A `scope` column repaired it, and the
+    reclassified rows turned out to be the MOST useful for the apply that follows, because they
+    already cover `[0, sizeof)`.
+- **A SUMMARY LINE THAT AVERAGES TWO POPULATIONS IS WRONG EVEN WHEN EVERY ROW IN IT IS RIGHT.**
+  The same round reported "27603 of 50468 own bytes = 54.7%", arithmetic over a mixture of
+  own-storage and whole-object rows. Split, the two real figures are **35.8%** and **58.9%** —
+  and the headline sat between them, resembling both and describing neither. Before reporting a
+  ratio, ask whether its denominator means ONE thing; this is the reporting analogue of the
+  vacuity guard, and it fails in the direction that looks most like success.
 - **AND THE SKIP COUNTER CAN BE A FINDING WEARING A FAILURE'S CLOTHES — SPLIT THE PREDICATE
   BEFORE BELIEVING THE COUNT.** The rule above says to treat a non-zero skip counter as a queued
   item. The sharper case is where the counter is not a limitation at all. Measured: a layout
