@@ -113,37 +113,10 @@ object model rather than from your own arithmetic — which is precisely the ste
 having. Hand-rolling the *type* emitter is the failure this skill warns about; hand-rolling
 the *assertions* is the whole point.
 
-**AND EMIT FIXED-WIDTH TYPES, BECAUSE THE TARGET'S WORD SIZE IS NOT THE HOST'S — THIS BITES THE
-HEADER, THE RECOMPILE AND THE REIMPLEMENTATION, IN THAT ORDER OF DISCOVERY AND THE REVERSE ORDER
-OF COST.** Nearly every target this document is about is 32-bit and nearly every machine you will
-build on is 64-bit. Under LP64 a pointer is 8 bytes and 8-ALIGNED where the target's is 4, and
-`long` is 8 where the target's is 4. Write `char *` or `long` into a recovered struct and the
-compiler silently relays every field after it and changes `sizeof`.
-
-- **In the HEADER it is loud, and that is the cheap case.** Measured: one field retyped from
-  `uint` to `char *` — correctly, the evidence artifact recorded `ctype "char *"` with **`width
-  4`** — was emitted with its spelling rather than its width. `sizeof` of the containing record
-  went **268 → 280**, five classes embedding it shifted, and the header produced **161 errors**
-  for 90 commits. **When an artifact records both a spelling and a width, the width is the fact.**
-  Emit `uint32_t` for a 32-bit target pointer and name the real type in a comment: the header
-  then compiles anywhere, which is the difference between a check that runs and a check that
-  rots.
-- **In a RECOMPILE-AND-DIFF it is quiet and it invalidates the comparison.** Every displacement
-  in the emitted object code is computed from the host's layout, so a struct whose size the host
-  changed produces instruction-level differences that are artifacts of your build, not of your
-  reimplementation. Build 32-bit for this work (`-m32` and the multilib to go with it, or a
-  cross-toolchain) — and know before you start whether you *have* it: on one machine `-m32` failed
-  at link for `Scrt1.o` and even under `-fsyntax-only` for `bits/libc-header-start.h`.
-- **In the SOURCE-LEVEL REIMPLEMENTATION it is quiet and it is load-bearing**, because the
-  properties such projects are usually graded by are precisely the byte-layout-sensitive ones: a
-  save format, a replay, a network packet, a lockstep sync checksum. A reimplementation built
-  64-bit reproduces the *behaviour* of every struct containing a pointer and none of its
-  *layout* — so it desyncs against the original binary and cannot load its own saves, for a
-  reason that never appears in the logic. If the destination is functional equivalence graded by
-  those oracles, **the pointer width is part of the specification**: model target pointers as
-  explicit 32-bit handles or offsets, or commit to building 32-bit, and write down which. This is
-  the same discipline as the header, one level up — and it is the level where discovering it late
-  is expensive.
+**And emit FIXED-WIDTH types, not `char *` or `long`.** The target's word size is not the
+host's, and getting this wrong silently relays every field after the offender. It breaks the
+header, the recompile and the reimplementation — in that order of discovery and the reverse
+order of cost. See **Target ABI vs host ABI** in Part 2.
 
 **Decide WHEN to apply an identification by fan-out, not by confidence.** The cost of
 applying a name is fixed — checkpoint, census, invariant bracket. The benefit scales with
@@ -2209,6 +2182,55 @@ on its own:
 own guesses should want, more than anything, one check it cannot influence. If none of these
 is reachable, say so explicitly in the round's record — "no external oracle available" is a
 finding about the project's confidence ceiling, not an absence worth passing over in silence.
+
+## Target ABI vs host ABI — the width that breaks three things
+
+Nearly every target this document is about is 32-bit, and nearly every machine you will build on
+is 64-bit. Under LP64 a pointer is **8 bytes and 8-ALIGNED** where the target's is 4, and `long`
+is 8 where the target's is 4. Write `char *` or `long` into a recovered struct and the compiler
+silently relays every field after it and changes `sizeof`.
+
+The same mistake surfaces in three places, in increasing order of cost and decreasing order of
+noise — which is exactly the wrong order for finding it.
+
+**1. In the HEADER it is loud, and that is the cheap case.** Measured: one field retyped from
+`uint` to `char *` — correctly; the evidence artifact recorded `ctype "char *"` with **`width
+4`** — was emitted with its *spelling* rather than its *width*. `sizeof` of the containing record
+went **268 → 280**, the five classes embedding it all shifted, and the header produced **161
+errors for 90 commits** because nothing was wired to run the compile. **When an artifact records
+both a spelling and a width, the width is the fact.** Emit `uint32_t` for a 32-bit target pointer
+and name the real type in a comment. The header then compiles anywhere, which is the difference
+between a check that runs and a check that rots.
+
+**2. In a RECOMPILE-AND-DIFF it is quiet, and it invalidates the comparison.** Every displacement
+in the emitted object code is computed from the host's layout, so a struct the host resized
+produces instruction-level differences that are artifacts of your build rather than of your
+reimplementation — and you will chase them as if they were findings. Build 32-bit for this work
+(`-m32` plus the multilib, or a cross-toolchain), and establish that you *can* before planning
+around it: on one machine `-m32` failed at link for `Scrt1.o` and even under `-fsyntax-only` for
+`bits/libc-header-start.h`.
+
+**3. In a SOURCE-LEVEL REIMPLEMENTATION it is quiet and load-bearing**, because the properties
+such projects are graded by are precisely the byte-layout-sensitive ones: a save format, a replay,
+a network packet, a **lockstep sync checksum**. A reimplementation built 64-bit reproduces the
+*behaviour* of every struct containing a pointer and none of its *layout* — so it desyncs against
+the original binary and cannot load its own saves, for a reason that never appears anywhere in the
+logic and survives every unit test you would think to write. **If the destination is functional
+equivalence graded by those oracles, the pointer width is part of the specification.** Model
+target pointers as explicit 32-bit handles or offsets, or commit to building 32-bit — and write
+down which, because the decision is invisible in the source once made.
+
+**The general rule, and it is not only about pointers:** a recovered layout is a statement about
+the TARGET's ABI. Anything whose size or alignment differs between target and host — pointers,
+`long`, `size_t`, `ptrdiff_t`, enum width, `double` alignment, bitfield packing order, struct tail
+padding — must be pinned explicitly rather than inherited from whatever compiler happens to build
+your source. Ghidra will tell you what the target thinks: the `data_organization` block in the
+compiler spec (`x86win.cspec` for 32-bit MSVC) records `pointer_size`, `long_long_size`,
+`double_size`, the size→alignment map and `bitfield_packing use_MS_convention`. That is the
+authority; your build host is not.
+
+Endianness and fixed-point are the same family of problem on non-x86 targets and are covered in
+`references/platforms-eras.md`.
 
 ## Dispatch recovery — virtual calls are one case of several
 
