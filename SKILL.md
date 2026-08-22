@@ -1376,6 +1376,30 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
   content. It looks like a real diff and it is pure line-ending policy. Compare parsed
   content, or normalize first; a harness that compares on-disk before/after is immune and
   is the better design for this reason alone.
+- **A WRITER THAT DOES NOT NAME ITS ENCODING PRODUCES DIFFERENT BYTES DEPENDING ON WHICH HOST
+  RAN IT — AND THE FAILURE LANDS IN YOUR GUARD RAIL, NOT IN AN ARTIFACT.** The CRLF rule above
+  is the famous half of this; the encoding half is quieter and worse. Measured: a shared
+  `append_csv` helper opened its file with no `encoding=`, so it wrote **cp1252 when called from
+  Windows-hosted Ghidra and UTF-8 when called from a Linux-side script**. A `§` in one round's
+  provenance strings became a bare `0xA7`, and a standing Linux-side audit died with
+  `UnicodeDecodeError` **reading the very ledger it exists to check** — so the symptom was "the
+  gate is broken", not "the data is wrong", which is the reading that wastes an hour. What
+  proved it was the helper rather than the round: **four artifacts already carried the same
+  character as `0xC2 0xA7`, valid UTF-8**, written by the other host. Name the encoding in
+  shared writers; until then, keep everything an applier writes to a ledger ASCII. Any project
+  driving Windows-hosted Ghidra from WSL or a container has both halves of this.
+- **APPLYING NAMES TO A POPULATION A HARVESTER READS IS THE CHEAPEST AUDIT OF THAT HARVESTER'S
+  FILTER — AND THE PASSING DIRECTION IS THE ONE WORTH CITING.** This document already says a
+  wide naming round finds filter holes, because that is how the only leak on one project was
+  found. The mirror is worth stating separately, because it looks like churn and gets reverted:
+  measured, naming 16 vtable slot targets made the project's OLDEST sweep — the one that had
+  once folded 578 agent-applied names back into committed evidence — move 12 `primary_name`
+  cells from the default `FUN_…` spelling to **blank**. It met sixteen freshly applied names and
+  emitted none of them. **That artifact diff is the anti-circularity filter demonstrating itself
+  on live data; keep it and cite it rather than reverting it as noise**, because otherwise the
+  filter goes unwatched from the round that installed it onward. It also tells you the two
+  producers disagree about how to render "no non-agent name" (one blanks, one falls back to the
+  default spelling) — harmless, and worth knowing before you join on that column.
 - **A verification pass is not a checkpoint — a harness must not pollute the evidence it
   grades.** One sweep here appended ten metrics rows every time it ran, so each pass of
   the stability driver wrote ten rows of non-history (hundreds accumulated, all identical
