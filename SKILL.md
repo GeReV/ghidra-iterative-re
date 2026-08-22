@@ -1413,6 +1413,30 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
   failed at the time. It surfaced two rounds later as a gate firing on unrelated work, and
   looked exactly like damage from the round in progress. The exclusion was not defeated by
   new data — it was defeated by the *category* of the data changing underneath it.
+- **BEFORE HAND-ROLLING AN ALIAS TRACKER, CHECK `FillOutStructureHelper` — IT IS THE SAME
+  WITNESS, ON SSA, AND IT RECURSES INTO CALLS.** A linear register tracker over raw instructions
+  is the natural way to answer *"which offsets does this body touch through `this`"*, and it is
+  what projects write: it can only LOSE registers, it stops at basic-block joins, and it stops
+  dead at a `CALL`. Ghidra ships the same question answered over decompiler SSA —
+  `ghidra.app.decompiler.util.FillOutStructureHelper.processStructure(highVar, func, ...)`, then
+  **`getStorePcodeOps()` / `getLoadPcodeOps()`**, each a list of `OffsetPcodeOpPair`
+  (`getOffset()` / `getPcodeOp()`), plus `getComponentMap()` → `NoisyStructureBuilder`. Because
+  `HighFunction` p-code is SSA with `MULTIEQUAL` phis it crosses basic blocks by construction,
+  and with a non-null `decomplib` it follows CALLs. Measured on one project: its hand-rolled
+  scanner reached a median of 4 construction bodies per class only because the ROUND explicitly
+  walked the call chain itself, and its own docstring conceded the tracker "can only lose
+  registers".
+
+  Three cautions, and they are why this is a check rather than a recommendation:
+  - **It is decompiler-derived**, so it inherits every signature you have applied — the exact
+    circularity this document's trust model exists to prevent. It is a second witness, not a
+    replacement for an instruction-level one, and the two disagreeing is a finding.
+  - **`createNewStructure=True` MUTATES the DataTypeManager.** Use it as an evidence producer:
+    take `getStorePcodeOps()` and discard the returned `Structure`.
+  - **The returned ops are not confined to the function you passed.** Ghidra's own caller filters
+    them (`RecoveredClassHelper.runFillOutStructureHelper` calls
+    `removePcodeOpsNotInFunction(function, stores)`), and a harvester that skips that step
+    attributes another function's accesses to this one.
 - **Scope a candidate pool to the smallest structure the rule is actually about.** That
   same extractor pooled candidates across the whole FUNCTION when the ABI contract it
   encodes (an array walk with its count at `[ptr-4]`) is a property of a **loop**. Pooling
@@ -2012,12 +2036,35 @@ Caveats that cost real time here, all of which generalize:
 - **A missing FID match is silent, but not unexplained.** There is no "almost matched"
   signal to inspect, so absence of a hit is not evidence of absence of library code — but
   before recording a structural zero, read `Ghidra/Features/FunctionID/data/building_fid.txt`.
-  The shipped databases cover further back than people assume (`vsOlder_{x86,x64}.fidbf`
-  is built from a corpus that **includes Visual Studio 1998**), and the file documents four
-  explicit suppression modes that account for most zeros: **auto-fail** ("a full-hash match
-  will not be returned under any circumstances"), **force-relation** (only matches if a
-  parent or child also matches), **force-specific**, and an instruction-count threshold that
-  drops tiny functions.
+  It documents four explicit suppression modes that account for most zeros: **auto-fail**
+  ("a full-hash match will not be returned under any circumstances"), **force-relation** (only
+  matches if a parent or child also matches), **force-specific**, and an instruction-count
+  threshold that drops tiny functions.
+
+  **BUT DO NOT TRUST THAT FILE ABOUT WHAT THE SHIPPED DATABASES CONTAIN — MEASURE THE ARTIFACT.**
+  An earlier revision of this document read `building_fid.txt`'s library list and concluded the
+  shipped corpus "covers further back than people assume, *including Visual Studio 1998*". That
+  is **wrong on a 12.1.2 install**, and it is wrong for exactly the targets this document is
+  aimed at. The file does list VS1998 Debug/Release — but read what the list is FOR: those
+  libraries were used to generate `common_symbols_win32.txt`, the common-symbols file, not
+  necessarily the shipped databases. Measured with `strings` over `vsOlder_x86.fidbf` (41 MB):
+
+  | token | occurrences |
+  |---|---|
+  | `VC98` | **0** |
+  | `VC42` | **6102** |
+  | `Visual Studio 10.0` | 3751 |
+  | `Visual Studio .NET 2003` | 3336 |
+
+  `vsOlder_x64.fidbf` has **0** of both. The oldest 32-bit coverage shipped is **VC 4.2**; there
+  is no VC5/VC6 content at all. For a late-1990s MSVC binary that reframes a poor FID yield:
+  measured on one such target, 106 CRT identifications and **zero** third-party may be the
+  CORRECT answer for a VC6 image matched against a VC4.2/2003+ corpus — a near-miss, not a
+  misconfiguration, and not something a score-threshold tweak will rescue. **Check which
+  compilers your install's databases actually contain before explaining a zero, and before
+  budgeting a round on tuning.** The generalisation is one this document already makes about
+  artifacts versus prose: a shipped doc describing a build PROCESS is not a manifest of that
+  build's OUTPUT.
 - **You can BUILD a FID database from period libraries**, which converts FID from a lower
   bound into near-complete identification of whatever you fed it. Shipped machinery:
   `ImportMSLibs.java` ("Massive recursive import for a MS Visual Studio installation
@@ -2203,9 +2250,22 @@ Three things to know here; the mechanics are in **`references/cpp-abi.md`**.
   - `SymbolicPropogator` (+ `ConstantPropagationContextEvaluator`) runs over raw
     instructions with no decompiler and no signature dependency, and its `Value` exposes
     **`isRegisterRelativeValue()` / `getRelativeRegister()`** — it models `this + K`
-    natively, making it structurally independent of any decompiler-based witness. Two
-    gotchas: it needs **both** `recordStartEndState=true` and `saveContext=true` or
-    `getRegisterValue` silently returns nothing, and its recording default changed in 12.0.
+    natively, making it structurally independent of any decompiler-based witness.
+    **IT IS NOT READ-ONLY, AND IT LAUNDERS INTO THE `ANALYSIS` TIER.** Verified on a 12.1.2
+    install: `SymbolicPropogator.java:2725-2730` creates every recovered reference with
+    `instruction.addMnemonicReference(target, refType, SourceType.ANALYSIS)` /
+    `addOperandReference(...)`, and the only veto is a `ContextEvaluator` — `evaluateReference`
+    at :2735-2740 opens with `if (evaluator == null) { return target; }`, a non-null return, so
+    **running it with no evaluator writes references at the analyzer tier**. That is the same
+    laundering shape this document refuses in `AddVfunctionCallRefScript`, in a tool it otherwise
+    recommends. To use it as a pure witness, pass a `ContextEvaluator` whose `evaluateConstant`
+    and `evaluateReference` return `null`; `ContextEvaluator` is a plain interface, so
+    `@JImplements` works from PyGhidra. Other gotchas: it needs `recordStartEndState=true`
+    (docstring-confirmed) — *the claim that `saveContext=true` is ALSO required for
+    `getRegisterValue` is **UNVERIFIED**, and reading :186-219 with :344-359 suggests it may not
+    be; measure it before repeating it* — and its recording default changed in **11.4.1**
+    (`docs/ChangeHistory.md:678`, GP-5804), **not** 12.0 as an earlier revision of this document
+    said.
   - Interprocedural templates ship as scripts: `ShowConstantUse.java` ("walk backward
     through function calls to find any constants that find their way directly into the
     variable") and `WindowsResourceReference.java`.
@@ -2478,7 +2538,8 @@ We wrote a vtable sweeper from scratch without checking that the first item exis
 | Find function-pointer / vtable tables | `Search → For Address Tables` |
 | Model a C++ class with vtables | `ClassUtils` / `ClassID` (`ghidra.program.model.gclass`) — a whole convention, don't hand-roll |
 | MSVC RTTI structures | `RTTI0DataType`…`RTTI4DataType`, `MSDataTypeUtils` (`ghidra.app.util.datatype.microsoft`) |
-| Infer struct fields from access patterns | Auto Create / Auto Fill in Structure; **Auto Fill in Class Structure** for a known `this` |
+| Infer struct fields from access patterns | GUI: Auto Create / Auto Fill in Structure, **Auto Fill in Class Structure** for a known `this`. **Programmatic: `FillOutStructureHelper`** (`ghidra.app.decompiler.util`) — `processStructure(highVar, func, createNewStructure, createClassIfNeeded, decomplib)`, then **`getStorePcodeOps()` / `getLoadPcodeOps()`** for `(offset, PcodeOp)` pairs and `getComponentMap()` for a `NoisyStructureBuilder` |
+| Compute an MSVC-packed size WITHOUT mutating the DTM | `AlignedStructureInspector.packComponents(structureInternal)` → `StructurePackResult` (`.structureLength`, `.alignment`) — hypothesis-testing for a candidate layout |
 | Set data constant / volatile | `MutabilitySettingsDefinition`: `NORMAL`/`CONSTANT`/`VOLATILE`/`WRITABLE` |
 | Parse C headers into the program | `CParserUtils.parseHeaderFiles(...)` (C only, not C++) |
 | Open a `.gdt` type archive with no tool | `FileDataTypeManager.openFileArchive(file, false)` |
@@ -2670,6 +2731,7 @@ sources below are cited at the tier the review gave them):
 **Version-sensitivity.** API claims here were checked against **12.1.2** and several are
 version-bound: source-map APIs are 11.3+, `SourceType.AI` is recent, PyGhidra became the
 default in 12.0 (with 3.0 deprecations), `SymbolicPropogator`'s recording default changed in
-12.0, and `AddVfunctionCallRefScript` is 12.1. **Re-verify against your install before
+**11.4.1** (`docs/ChangeHistory.md:678` — this document said 12.0 for several revisions), and
+`AddVfunctionCallRefScript` is 12.1. **Re-verify against your install before
 relying on any of them** — the same discipline as stamping evidence rows with a program
 version, applied to the tool.
