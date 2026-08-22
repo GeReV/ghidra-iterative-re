@@ -1388,6 +1388,26 @@ not rigor, it is ceremony — and it trains you to skip the apparatus where it m
   character as `0xC2 0xA7`, valid UTF-8**, written by the other host. Name the encoding in
   shared writers; until then, keep everything an applier writes to a ledger ASCII. Any project
   driving Windows-hosted Ghidra from WSL or a container has both halves of this.
+- **FIXING THE WRITE SIDE OF A ROUND-TRIP WITHOUT THE READ SIDE TURNS AN ACCIDENTAL PASS INTO
+  REAL CORRUPTION.** The encoding rule above tells you to name the encoding; this is the trap
+  waiting when you do. A bare read and a bare write on the SAME host cancel out — cp1252 decodes
+  `0xC2 0xA7` to `Â§` and re-encodes it back — so a file round-trips byte-identically **by
+  accident**, and nothing has ever looked wrong. Name the encoding on the WRITE only, and that
+  `Â§` is emitted as `0xC3 0x82 0xC2 0xA7`: a file that was correct is now double-encoded, *by
+  the change made to fix encoding*. Measured on the first producer run after a writer-only fix
+  (non-ASCII `[167,194]` → `[130,167,194,195]`), caught because the check counted the specific
+  bytes rather than diffing. **Trace the whole path a value travels — which reader put it in
+  memory, which writer puts it back — and change every hop or none.** And note where the
+  evidence came from: a byte census, because the naive `git show HEAD:file` diff was drowned in
+  CRLF-vs-LF noise, exactly as this document warns two rules up.
+- **WRITE THE ENVIRONMENT PROBE TO RUN UNDER BOTH INTERPRETERS, AND RUN IT IN BOTH PLACES
+  BEFORE BUILDING ON A ONE-SAMPLE INFERENCE.** A cross-host project has two Pythons with
+  different defaults, and a single observed byte is enough to *deduce* which — but not enough to
+  find the other direction. Measured: the deduction "Ghidra writes cp1252" was correct, and the
+  probe that confirmed it also found the half nobody had looked for, that the reverse direction
+  is **silent** rather than raising. Make the probe touch no host-specific API so the comparison
+  is one command in each place; it costs minutes and it is the difference between fixing a
+  one-directional bug and a two-directional one.
 - **APPLYING NAMES TO A POPULATION A HARVESTER READS IS THE CHEAPEST AUDIT OF THAT HARVESTER'S
   FILTER — AND THE PASSING DIRECTION IS THE ONE WORTH CITING.** This document already says a
   wide naming round finds filter holes, because that is how the only leak on one project was
