@@ -2150,6 +2150,29 @@ does.
 Mutation safety. Not an external *source*, but it is the program's own record of what you
 did rather than your memory of it.
 
+**AND IF YOU HAVE ONE, WIRE IT TO SOMETHING THAT RUNS IT — AN UNWIRED ORACLE ROTS SILENTLY AND
+NOTHING ELSE CAN NOTICE.** Measured, and it is the worst-placed instance of this document's "a
+harness is blind to what it does not run" rule: a project that emits its recovered layouts as C
+with `offsetof` assertions and compiles them — the recommendation above — had that header
+**failing to compile for 90 commits** and three program versions, 161 errors. It was found only
+because an unrelated side project ran the generator for a baseline. The cause is worth carrying
+on its own:
+
+- **A TARGET POINTER IS 4 BYTES AND THE HOST'S IS NOT.** A round correctly retyped a field to
+  `char *`, and the evidence artifact recorded it correctly — `ctype "char *"`, **`width 4`**,
+  right for a 32-bit target. The generator emitted the *spelling* verbatim and ignored the
+  *width*, so on any x86-64 host the member became 8 bytes and 8-ALIGNED, the containing struct
+  went 268 → 280, and all five classes embedding it shifted. **When an artifact records both a
+  spelling and a width, the width is the fact.** Emit fixed-width types (`uint32_t` for a 32-bit
+  target pointer, real type in a comment) and the header stays host-independent.
+- **HOST-INDEPENDENCE IS WHAT MAKES THE CHECK RUNNABLE, NOT A STYLE PREFERENCE.** The obvious
+  alternative — `-m32` — failed twice on that machine: at link (`Scrt1.o` absent) and even under
+  `-fsyntax-only` (`bits/libc-header-start.h`), for want of multilib. **A check that needs a
+  toolchain you do not have is a check that will not be run**, which is how it came to rot.
+- **The sibling generator had already made the right decision and documented it.** Two emitters,
+  one convention, one follower — the copy-instead-of-move divergence this document warns about,
+  between two files nobody thought of as sharing a rule.
+
 **Why this is a standing instruction:** a methodology built around never corroborating your
 own guesses should want, more than anything, one check it cannot influence. If none of these
 is reachable, say so explicitly in the round's record — "no external oracle available" is a
