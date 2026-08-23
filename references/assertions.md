@@ -70,6 +70,31 @@ just fired and you are deciding what it means.
   evidence, so a lone pointer-shaped access among 131 decided the cell was a pointer
   "on 90 witnesses". It was an id. Eighteen of twenty applied type upgrades failed
   the corrected bar. Whenever a bar says "N of X", write down what X is.
+
+- **A CONTROL ARM CAN BE A SPECIFIC GROUND-TRUTH FACT INSTEAD OF A HEALTHY-LOOKING
+  COUNT — and when it can, it should be.** "The matcher found 1,435 references in a
+  region known to be busy" grades only *liveness*: it proves the instrument finds
+  something, not that it finds the thing the probe is actually for. Prefer a control
+  the probe must **reproduce exactly**, taken from a source the probe cannot
+  influence. Measured: a probe whose job was to attribute a memory access to a
+  *pointer* was gated on reproducing one instruction read out of the disassembly by
+  hand — `MOV dword ptr [ECX + 0x1ec], 0x12`, with `ECX` reloaded from a known
+  out-parameter slot four instructions earlier — as an access attributed to that
+  pointer. That grades attribution, which is the claim; a reference count does not.
+  Give it a poison that removes the control's subject from the population, so the
+  gate is demonstrated firing.
+
+- **AN IMPOSSIBLE RESULT IS A DEFECT, NOT A DATUM — ASSERT ON IT, DO NOT PRINT IT.**
+  Where two structurally independent bounds exist, check the interval closes the
+  right way and **raise** when it does not: a lower bound above an upper bound is
+  not a measurement of anything, and printing it invites the reader to split the
+  difference or to quote whichever end suits. Measured: a reach probe returned a
+  lower bound of 624 for a base class whose derived class allocates 496 in total.
+  That single check turned a plausible-looking number into a diagnosis of the
+  probe's own contamination. **The best demonstrated-failing poison for such a check
+  is the real defect it caught** — disable the correction and the assertion fires on
+  live data, which is stronger evidence than any constructed input.
+
 ### Calibration and vacuity guards
 
 - **Calibrate a witness by POSITIVE AGREEMENT, not only by absence of contradiction.**

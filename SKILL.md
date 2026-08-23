@@ -390,6 +390,28 @@ scripting rules: `references/api.md`.**
   unverified components stayed invisible for a whole round. "23 of 24" exposes the gap
   without the reader needing to know which classes the underlying artifact happens to
   contain.
+- **Fixing the instance and calling it a lesson.** When a round finds that something was
+  missed *because of a pattern* — a tool's blind spot, a wrong idiom, a class of defect —
+  **the round is not finished until the pattern has been swept.** Repairing the one case
+  that surfaced it and writing the lesson down feels like closure and is not: the other
+  occurrences are still producing confident numbers, and they will be believed precisely
+  because nothing about them looks wrong. Measured: a round found two such patterns, fixed
+  each for one class, wrote both up, and stopped; the sweep afterwards cost **one grep and
+  two artifact-side censuses** and returned three closed answers — eight more call sites
+  (two of them poisoning a *control group*), a measured zero, and a six-item list of what
+  remained. That ratio is why this is a rule and not a judgement call.
+
+  Three things make the sweep cheap and worth doing every time:
+  **(a) ask what each occurrence FEEDS before asking how wrong it is** — an under-counting
+  predicate that selects a *control* is worse than one that selects a population, because
+  the same defect shrinks the treatment group *and* poisons the baseline, and both errors
+  push the result toward "no effect";
+  **(b) sweep the committed ARTIFACTS, not only the scripts** — a wrong artifact poisons
+  every later round while a wrong script only wastes the next one, and the check is usually
+  a pure join against sizes or bounds you already have;
+  **(c) bound the remaining surface as a LIST WITH A DENOMINATOR, not as a worry** —
+  "6 open intervals out of 261 classes, here they are" is a backlog item somebody can
+  finish; "other classes might be affected" is not.
 - **Context rot** across long runs, producing inconsistent naming between functions
   analyzed early and late. Short scoped executions beat one monolithic session.
 - **A reproducible error is not evidence for your theory about its cause.** It is evidence

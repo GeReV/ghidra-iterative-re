@@ -454,6 +454,44 @@ Three more caveats, all measured:
   argument, which yields a `HighVariable` every time and produces no cells — a failure that
   reads as a quiet witness rather than a wrong question.
 
+- **It follows the pointer's VALUE through `COPY` and `MULTIEQUAL`, so on a class hierarchy it
+  will attribute a DERIVED class's fields to a BASE pointer — and the confinement filter does not
+  help, because the contaminating accesses are in the same body.** Measured on a 1999 MSVC binary:
+  driven from a base-class pointer whose type comes from the binary's own export mangling, it
+  reached offset **624** — past the *entire* 496-byte allocation of a class deriving from that
+  base, i.e. an impossible lower bound for the base. The mechanism is ordinary C++: the base
+  pointer is copied into a list-walk iterator, the iterator is narrowed by a type-tag test, and
+  only then are the derived fields touched. The helper sees one dataflow.
+
+  **Two things follow.** First, **assert on the inverted interval**: a lower bound above a
+  structurally independent upper bound is a defect, not a measurement, and printing it invites the
+  reader to split the difference. Second, **find the mechanism that causes the narrowing and make
+  that the discriminator** — here, *does this pointer's flow READ the type tag*. Partitioning on
+  that separated the population completely and with no tuning (6 tag-reading variables reaching
+  624, 18 non-tag-reading ones reaching 496, and the narrowed group landing inside the derived
+  class's own size). **A threshold you have to tune to separate a population is a fitted
+  parameter; one that separates it exactly is a mechanism.** Assert both the discriminator's
+  identity and the coherence bound rather than assuming them.
+
+- **`Function.getLocalVariables()` returns the COMMITTED (database) variables, not what the
+  decompiler sees, and on a stripped binary those differ by an order of magnitude.** A population
+  built from `getParameters()` + `getLocalVariables()` is a population of *what someone has
+  already written down*. Measured: a probe built that way found 19 functions holding a pointer to
+  the class of interest; the idiom that actually carries it is a decompiler-only local —
+  `T *local_14; while (SearchT(this, &local_14, &end)) { ... }` — so every iterator site was
+  structurally outside the population, including the one function that settled the question.
+  **The omission produces no error, no warning and no skip counter**: the probe simply reports a
+  smaller world, and its number reads as a fact about the program.
+
+  To enumerate what the **decompiler** believes, go through
+  `HighFunction.getLocalSymbolMap().getSymbols()` and take `sym.getHighVariable()` /
+  `sym.getStorage()`. To enumerate what a **human** has recorded, use `getLocalVariables()` (or
+  `getAllVariables()`, which adds the parameters). They are different questions and the second one
+  is almost never the one you meant. **Audit what such a predicate FEEDS before asking how wrong
+  it is**: one that selects a *control group* is worse than one that selects a population, because
+  the same defect then shrinks the treatment group and poisons the baseline, and both errors push
+  a measured payoff toward "no effect".
+
 ### `AlignedStructureInspector` (`ghidra.program.model.data`)
 
 `packComponents(structureInternal)` → `StructurePackResult` (`.structureLength`, `.alignment`)
