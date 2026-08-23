@@ -36,15 +36,27 @@ why the specific numbers in it are not thresholds.
 
 ## What's in it
 
+`SKILL.md` is the loop and the rules that bind every round. Everything that is a
+*catalogue* lives in `references/`, keyed by what you are about to do.
+
 | File | Contents |
 |---|---|
-| `SKILL.md` | The methodology. Part 1 is the loop (any binary), Part 2 is what to point it at in a game, Part 3 is the tool surface. |
-| `references/api.md` | Ghidra API surface verified against a real 12.1.2 install, plus the offline doc paths to discover more. |
-| `references/cpp-abi.md` | MSVC/Itanium name mangling, vtable and vbtable symbols, modelling classes via `ClassUtils`, devirtualization. |
+| `SKILL.md` | The methodology: the round loop, the `SourceType` trust model, invariant bracketing, ceremony-vs-blast-radius, the free-names checklist, and a routing table to everything below. |
+| `references/harvesting-traps.md` | 62 measured traps in reading evidence back out: self-harvest, blank censuses, skip counters, reach pricing, the byte-pattern engine. |
+| `references/assertions.md` | 53 on assertion discipline under iteration: checks that cannot fire, cannot pass, or go inert as the program moves underneath them. |
+| `references/trust-and-circularity.md` | The deep end of the trust model: laundering paths, the TYPE axis (types have no `SourceType` at all), and why a tier cannot tell two sources apart that share it. |
+| `references/applying-changes.md` | What is worth applying, emitting a C header with compiled offset assertions, and the rest of the mutation-safety bracket. |
+| `references/game-recon.md` | Free names, separating library code from game code, data shapes, modern engines, platform breadth, runtime observation. |
+| `references/oracles-and-abi.md` | The external oracle — the only check that is not the program grading itself — and target-vs-host pointer width. |
+| `references/api.md` | Ghidra API surface verified against a real 12.1.2 install, the MCP boundary, read-only witnesses, cascade triggers, and the PyGhidra scripting rules. |
+| `references/cpp-abi.md` | MSVC/Itanium name mangling, vtable and vbtable symbols, modelling classes via `ClassUtils`, dispatch recovery and devirtualization. |
 | `references/platforms-eras.md` | Non-PC and pre-modern targets: register context, bank switching, overlays, volatile hardware registers. |
+| `references/sources.md` | Citations, the external-oracle reading list, and which claims are bound to a particular Ghidra version. |
 
 Only `SKILL.md` is loaded when the skill is invoked; the references are read on demand
-when one of the triggers in `SKILL.md` fires.
+when one of the triggers in `SKILL.md` fires. It used to be 3,029 lines and carry all of
+the above; the split happened when the rules that bind *every* round stopped being
+findable among the ones that bind a particular kind of round.
 
 Some of the load-bearing ideas:
 

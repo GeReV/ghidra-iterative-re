@@ -373,3 +373,243 @@ Here, re-deriving raised the slot-correspondence sample count 89 → 107 while a
 stayed at 100%: the new samples came from the newly-corrected edges, so wrong parentage
 would have shown up as disagreement. Consistency proves little on its own; a rival
 measurement improving is worth much more.
+
+---
+
+## Dispatch recovery — virtual calls are one case of several
+
+*Moved here from `SKILL.md` in the 2026-08-23 restructure; the mechanics it points
+at were already in this file.*
+
+Do not force an OOP reading onto a program that isn't OOP. Era matters: pre-C++ and
+early-C++ game code dispatches through plain function-pointer tables far more often than
+through vtables, and the recovery mechanics are the same while the *semantics* are not.
+
+**Establish the inheritance model before relying on slot positions.** A derived class's
+vtable shares a prefix with its base only under single inheritance, so any naming or
+ownership scheme built on slot index depends on it. For MSVC this is three cheap string
+searches, not an assumption:
+
+| Search | Meaning if found |
+|---|---|
+| `??_8` | **vbtable** — virtual inheritance is present; slot prefixes are not reliable |
+| `??_9` | **vcall thunk** — multiple-inheritance dispatch adjustment |
+| `??_7Derived@@6BBase@@@` (qualified form) | a **secondary** vftable, i.e. multiple inheritance |
+
+Only the unqualified `??_7Class@@6B@` form appearing, with no `??_8` and no `??_9`,
+is positive evidence of a plain single-inheritance chain. (Measured on one 1999 MSVC game
+binary: 14 unqualified vftables, zero `??_8`, zero `??_9` — single inheritance confirmed
+for every class carrying an exported vftable symbol, which is a floor for the rest.)
+Itanium-ABI equivalents: `_ZTV` vtables, `_ZTT` VTT for virtual inheritance, `_ZThn`/`_ZTv`
+thunks.
+
+Shapes to expect, all of which look alike in `.rodata`:
+
+- **C++ vtables** — one per class, slot order = declaration order, derived tables share a
+  prefix with their base. Only these carry inheritance meaning.
+- **State-machine / message-handler tables** — indexed by state or message enum. The
+  index is a *grammar*, not a class.
+- **Opcode / bytecode interpreter dispatch** — a table indexed by opcode. Recovering it
+  recovers the scripting language; each handler names one instruction.
+- **Callback registration structs** — `{name, fnptr, arity}` triples. Often self-naming.
+- **Jump tables from switch statements** — Ghidra may fail to bound the switch variable;
+  `FindUnrecoveredSwitchesScript.java` locates these and `SwitchOverride.java` fixes them.
+
+A run-of-code-pointers heuristic cannot tell these apart. **Discriminate by how the table
+is used**, not by its shape: a C++ vtable's address gets stored into offset 0 of an object
+by a constructor; a dispatch table is indexed by a variable at a call site. Verify against
+any authoritative naming (vftable symbols, RTTI) before believing an interpretation.
+
+### If it *is* C++
+
+Three things to know here; the mechanics are in **`references/cpp-abi.md`**.
+
+- **`ClassUtils` exists** (`ghidra.program.model.gclass`) — Ghidra has a *convention* for
+  modelling C++ classes with vtables, including virtual base tables. Follow it and your
+  results interoperate with Ghidra's PDB/RTTI machinery; hand-roll and they sit parallel to
+  it, unusable by it. **Check it before building any vftable struct by hand.**
+- **Ghidra does not devirtualize automatically** — it cannot prove a vtable pointer is
+  constant after assignment (issues #650, #516). But four explicit mechanisms do work,
+  escalating: name the slots via a vftable struct, mark the table `CONSTANT` so the
+  decompiler reads *through* it, run **`AddVfunctionCallRefScript`** (shipped in 12.1 —
+  see the measured caveats below, they are severe), or override the call site with
+  `RefType.CALL_OVERRIDE_UNCONDITIONAL`. The last two **write your inference into the call
+  graph** — tag them `SourceType.AI` and never let a harvest read them back as fact.
+- **`AddVfunctionCallRefScript`'s real preconditions, and why batching it is unsound.**
+  An earlier revision of this document said its precondition was "a single corresponding
+  applied vftable structure, so exactly the work the struct-apply rounds already did."
+  **That is wrong, measured against a 12.1.2 install and a project that had done exactly
+  that work.** Read the source before planning a round on it:
+  - `isVftableStructure()` requires **every component to be a `Pointer` to a
+    `FunctionDefinition`**. A struct built the idiomatic way — from
+    `ClassUtils.getVftDefaultEntry(dtm)`, which returns a plain `PointerDataType` — fails
+    this on every component. Measured: **0 of 15** applied vftable structs passed. Naming
+    the *fields* after the methods does not help either; `getOrdinalOfFunction()` matches
+    the decompiler token against the **pointed-to type's** name.
+  - It is **cursor-driven** (`currentLocation instanceof DecompilerLocation`) — one call
+    site per invocation. There is no batch mode to "run and count".
+  - It writes `SourceType.**ANALYSIS**`, not `AI`. On a project that filters harvests by
+    tier, that launders an inference into the trusted tier.
+  - **The soundness is supplied by the human at the cursor, and automation removes it.**
+    Its inference is *"type T is applied at exactly one address A, therefore slot k
+    resolves to `*(A + 4k)`"* — which assumes **static type == dynamic type**. A
+    `Base *` at runtime points at a *derived* class's table. The script never checks for
+    descendants because an analyst looking at one site knows whether the receiver can be
+    derived. Measured on one hierarchy: sound for 6 of 14 classes, and the 8 unsound ones
+    were the interesting ones, carrying **748 of 1066** slots (one base had 16 descendants).
+    A batch version would emit confidently wrong call-graph edges while every report
+    counted them as successes.
+
+  Generalise it: **before batching any shipped interactive aid, ask what the human at the
+  cursor was contributing.** These scripts are written for an analyst who supplies context
+  the code does not check, and the missing check is usually invisible in the output.
+- **"There is no provable devirtualization here" is a claim about your MECHANISM until you
+  have tried the dataflow APIs.** A round in this project concluded devirtualization was
+  impossible and gave the reason as "real devirtualization needs reaching-definitions
+  dataflow to track `this` across basic blocks". Ghidra ships that:
+  - `DecompilerUtils.getBackwardSlice` / `getBackwardSliceToPCodeOps` /
+    `getForwardSlice(ToPCodeOps)` / `getDataTypeTraceForward|Backward`. `HighFunction` p-code
+    is **SSA with `MULTIEQUAL` phis**, so a slice crosses basic blocks by construction;
+    `Varnode.getDef()` / `getDescendants()` / `getLoneDescend()` are the raw def-use edges.
+  - `SymbolicPropogator` (+ `ConstantPropagationContextEvaluator`) runs over raw
+    instructions with no decompiler and no signature dependency, and its `Value` exposes
+    **`isRegisterRelativeValue()` / `getRelativeRegister()`** — it models `this + K`
+    natively, making it structurally independent of any decompiler-based witness.
+    **IT IS NOT READ-ONLY, AND IT LAUNDERS INTO THE `ANALYSIS` TIER.** Verified on a 12.1.2
+    install: `SymbolicPropogator.java:2725-2730` creates every recovered reference with
+    `instruction.addMnemonicReference(target, refType, SourceType.ANALYSIS)` /
+    `addOperandReference(...)`, and the only veto is a `ContextEvaluator` — `evaluateReference`
+    at :2735-2740 opens with `if (evaluator == null) { return target; }`, a non-null return, so
+    **running it with no evaluator writes references at the analyzer tier**. That is the same
+    laundering shape this document refuses in `AddVfunctionCallRefScript`, in a tool it otherwise
+    recommends. To use it as a pure witness, pass a `ContextEvaluator` whose `evaluateConstant`
+    and `evaluateReference` return `null`; `ContextEvaluator` is a plain interface, so
+    `@JImplements` works from PyGhidra. Other gotchas: it needs `recordStartEndState=true`
+    (docstring-confirmed) — *the claim that `saveContext=true` is ALSO required for
+    `getRegisterValue` is **UNVERIFIED**, and reading :186-219 with :344-359 suggests it may not
+    be; measure it before repeating it* — and its recording default changed in **11.4.1**
+    (`docs/ChangeHistory.md:678`, GP-5804), **not** 12.0 as an earlier revision of this document
+    said.
+  - Interprocedural templates ship as scripts: `ShowConstantUse.java` ("walk backward
+    through function calls to find any constants that find their way directly into the
+    variable") and `WindowsResourceReference.java`.
+  - Heavier, also shipped: the `TaintAnalysis` module, the `SymbolicSummaryZ3` extension,
+    `ExportPCodeForCTADL.java`, and a **LiSA** abstract-interpretation extension with a
+    runnable launch script.
+
+  A negative result is only as strong as the strongest mechanism you actually ran. Name the
+  mechanism in the finding, or the next round inherits a conclusion it cannot audit.
+- **A VPTR-STORE CHAIN NAMES ANCESTORS, NOT PARENTS — the optimizer deletes the links you
+  need most.** The rule above ("get parentage from constructors, not from table similarity")
+  is right about *direction* and silently optimistic about *immediacy*. MSVC writes
+  `*this = &vftable` once per class in each constructor and each destructor — and then
+  **deletes any such store nothing can observe before the next one overwrites it.** An
+  intermediate class contributes a link if and only if something between its store and the
+  next store can see the vptr. Measured on one 1999 MSVC/x86 binary, in both directions
+  within one round:
+  - **Survives:** a factory storing base table `B`, then `CALL <ctor>` with `this` in ECX,
+    then its own table. The call could read the vptr, so `B` stays.
+  - **Elided:** a factory whose intermediate constructor was INLINED, so the sequence is
+    grandparent-store, plain field initialisers, own-table store. The intermediate's write is
+    dead and gone — and the derived class's records name the **grandparent** as its parent,
+    self-consistently and forever. Proof the write existed: the same class also has a
+    standalone out-of-line constructor, never called from that factory, performing the
+    identical field initialisations *and* the store.
+
+  The destructor side is identical: three classes' deleting-dtor thunks all called the same
+  out-of-line destructor, which reset the vptr to a table **two levels up**, because the
+  intermediate classes' destructors were trivial and their stores dead. An agent reading only
+  destructors and an agent reading only constructors produced contradictory parents for the
+  same six classes, each with a clean derivation.
+
+  So: **a vptr chain always yields a true ANCESTOR and never proves an IMMEDIATE base, and a
+  missing link is not evidence of a missing class.** Consequences worth acting on:
+  - Label the column honestly — *nearest observed ancestor* — or a later round will "correct"
+    correct data. Where slot-prefix similarity says a nearer table exists (equal or near-equal
+    slot counts, a large shared-slot margin), that is the signal to look for an elided store,
+    not a contradiction to resolve by picking a winner.
+  - **Recover the elided link from the class's own out-of-line constructor**, which usually
+    exists even when every factory inlines it. Matching *field-initialiser sets* between the
+    inlined and out-of-line forms is what ties them together.
+  - **Two agents disagreeing is a finding about the MECHANISM, not a tie to break.** Both
+    derivations here were sound; the ranking question ("which is closer?") was the wrong
+    question, and asking it would have discarded one correct answer.
+- **A LEAFNESS RULE THAT READS VPTR STORES ALONE CANNOT SEE THE ORDINARY SUBCLASS.** "Does any
+  body store this class's table and then a different one?" is the natural way to ask whether a
+  class has a subclass, and it is only half the question. MSVC emits a derived constructor as
+  `call base_ctor; mov [this], own_vftable`, so the base's vptr store lives in the **base's**
+  body and never appears in the derived one — a store-only rule therefore sees only a subclass
+  whose base constructor was **inlined**, and returns `LEAF` for every class whose children were
+  compiled the normal way. Measured on one binary: it returned `LEAF` for the class with **four**
+  subclasses while giving the right answer for the three classes that really are leaves, which
+  is exactly why nothing looked wrong. **Classify a body by its vtable stores AND its calls to
+  the class's constructor**, and take the demonstration from ground truth rather than a
+  constructed poison: a class the binary itself declares subclasses for is a must-fire arm that
+  costs nothing and cannot go inert.
+- **"IS THERE A FUNCTION AT THIS ADDRESS" IS A CLAIM ABOUT THE DATABASE, AND IT DOES NOT BELONG
+  IN A STRUCTURAL TEST.** This document already says a cross-reference count is a fact about the
+  database rather than the binary. The same mistake hides one rung down, inside predicates that
+  feel like observations: a "is this immediate a vtable?" test written as *every slot is a
+  defined function entry point* refused **three genuine tables** on one binary, whose slot
+  targets were real code in bytes Ghidra had never disassembled. Test what the binary
+  guarantees — *the slots point into executable memory, at distinct addresses* — and **print
+  each slot's kind** (`function` / `code` / `undisassembled` / `not-executable`), so the missing
+  definitions stay visible as findings instead of being swallowed by the relaxation that admits
+  them. Those slots are usually a real population worth a round of their own.
+- **A DIFFERENT HIERARCHY CAN USE DIFFERENT SLOT NUMBERS, AND A SLOT-KEYED SWEEP REPORTS A CLEAN
+  ZERO ON IT.** A slot index is a per-hierarchy convention, not a program-wide one. Measured: a
+  binary's main object tree put `Save`/`Load` at slots **45/46**, a second, unrelated family put
+  them at **0/1**, and every sweep keyed to the first numbering passed silently over the second
+  — which was then written up across three rounds as "these classes are non-polymorphic, which
+  is why every vtable-driven route is blind to them". The classes had vtables the whole time.
+  **Before concluding a population has no vtable, ask which slot you were looking in.**
+- **CLOSE A BLINDNESS GUARD ON EVERY ROUTE THE CLAIM RESTS ON, NOT JUST THE SEARCHABLE ONE.**
+  Byte-searching for a vtable's address finds vptr stores hidden in undisassembled code; it can
+  **never** find a hidden `E8 rel32` call, because the encoding is position-dependent. A guard
+  covering only the searchable half reads as complete and is not. The other half is cheap and
+  exact: enumerate the undisassembled ranges inside executable blocks (`Listing.getUndefinedRanges`
+  over `Memory.getExecuteSet()` — it returns an `AddressSet`, so iterate `getAddressRanges()`)
+  and decode every relative call in them. Measured on one binary: **5,317 ranges / 88,842 bytes**,
+  and both halves paid — the store search found two real undisassembled destructors, and the call
+  decode returned a *measured* zero instead of an assumed one.
+- **A PREMISE RECORDED IN A NOTES FILE IS AN UNTESTED CLAIM, AND EVERY ROUND BUILT ON IT INHERITS
+  IT WITHOUT RE-READING IT.** The self-harvest rules here are about evidence; this is the same
+  failure on the *scoping* axis, and it is cheaper to fall into because nothing is ever written
+  down twice. Measured: one round's parenthetical — "almost certainly non-polymorphic, which is
+  precisely why every vtable-driven route here is blind to them" — scoped the next three rounds,
+  one of which declined a rule that would have decided two open sizes *because* of it. It was
+  refuted by a decompilation printed in one of those very rounds. The tell was not subtle and it
+  was not missed for lack of evidence; it was missed because the premise had stopped being a
+  question. **When three rounds in a row inherit the same negative premise, re-derive it from the
+  program before the fourth** — and prefer premises stated as a probe that can be re-run over
+  premises stated as a sentence.
+
+- **Three byte-identical functions that were NOT folded are a cheap measurement that ICF is
+  off.** "Identical-code folding hides overrides" is a real hazard and it is also frequently
+  asserted without being checked. If a build emits per-class deleting-destructor thunks with
+  identical bodies at distinct addresses, `/OPT:ICF` was not in effect, and every "X does not
+  override Y" claim stops needing the ICF caveat. One decompile of two sibling thunks settles
+  it.
+- **"Zero cross-references" is a claim about the DATABASE, not the binary.** A reference from
+  bytes the disassembler never made into a function is invisible to the reference model, so
+  `getReferencesTo` returns an honest, empty, wrong answer — and the natural reading of that
+  zero ("compiled but never instantiated", "dead code") is a strong conclusion built on a
+  tool limitation. Measured: a vtable reported as having zero references of any kind had
+  exactly one, inside an out-of-line constructor Ghidra had not recognised, findable only by
+  byte-searching the image for the address. The blind population is precisely the undefined
+  code that function-discovery rounds exist to convert — i.e. it shrinks as the project
+  progresses, which is why the claim looks safer than it is. Byte-search for the address
+  before recording any reference-count zero; it costs seconds.
+- **Slot-index correspondence gives free names**, under single inheritance: if a base
+  table's slot *i* is a named exported virtual and a derived table's slot *i* is `FUN_xxxx`,
+  that function *is* the override. ABI mechanics, not inference — but check the
+  preconditions in the reference, and expect virtual destructors to sit in slots as
+  compiler-generated deleting-destructor thunks rather than as `~Class`.
+- **Get parentage from constructors, not from table similarity.** Similarity is symmetric
+  and inheritance is not, so ranking candidate bases by shared slots needs *something* to
+  supply direction — and using depth for it is a trap: a derived class that adds no new
+  virtuals has exactly its base's slot count, so a "parent must be strictly shallower" rule
+  makes the real parent ineligible and silently returns the **grandparent**, self-consistently.
+  A constructor stores each base's vftable into offset 0 in turn, which *is* directional.
+  Mechanics and the measured failure: `references/cpp-abi.md`, "Recovering *which* class
+  derives from which".

@@ -622,3 +622,151 @@ refMgr.getReferencesTo(addr); refMgr.getReferenceCountTo(addr)
 ```
 Remember these are claims about the **database**: a reference from bytes never disassembled does
 not exist here. Byte-search for an address before recording any reference-count zero.
+
+---
+
+*The four sections below moved here from `SKILL.md` in the 2026-08-23
+restructure: cascade triggers, the built-in-before-you-hand-roll table, driving
+Ghidra in library mode, and the PyGhidra scripting rules.*
+
+## Cascade triggers, scoped
+
+Auto-analysis is `ENABLED` by default during scripts ("Auto-Analysis responding to
+changes"), so mutations can trigger analysis *while your loop runs* and you may read
+half-analyzed state. Mutate first, analyze deliberately.
+
+- `analyzeChanges(program)` — "Starts auto-analysis if not started and waits for pending
+  analysis to complete." **The sanctioned trigger.**
+- `analyzeAll(program)` — full re-analysis. Reckless on a curated program; can undo
+  curation. Avoid.
+- Surgical: `AutoAnalysisManager.getAnalysisManager(program)` exposes
+  `codeDefined(addr|set)`, `functionDefined(addr|set)`,
+  `functionSignatureChanged(addr|set)`, `dataDefined(set)`,
+  `createFunction(target, findFunctionStart)`, `getAnalyzer(name)`,
+  `cancelQueuedTasks()`. Tell it what changed, then `analyzeChanges`. Not in the public
+  javadoc — reachable but unsupported.
+- `GhidraScript.AnalysisMode`: `ENABLED` (live), `SUSPENDED` (queued until the script
+  ends), `DISABLED` (change events ignored).
+
+## Check for a built-in before writing your own
+
+We wrote a vtable sweeper from scratch without checking that the first item existed.
+
+| Need | Built-in |
+|---|---|
+| Find function-pointer / vtable tables | `Search → For Address Tables` |
+| Model a C++ class with vtables | `ClassUtils` / `ClassID` (`ghidra.program.model.gclass`) — a whole convention, don't hand-roll |
+| MSVC RTTI structures | `RTTI0DataType`…`RTTI4DataType`, `MSDataTypeUtils` (`ghidra.app.util.datatype.microsoft`) |
+| Infer struct fields from access patterns | GUI: Auto Create / Auto Fill in Structure, **Auto Fill in Class Structure** for a known `this`. **Programmatic: `FillOutStructureHelper`** (`ghidra.app.decompiler.util`) — `processStructure(highVar, func, createNewStructure, createClassIfNeeded, decomplib)`, then **`getStorePcodeOps()` / `getLoadPcodeOps()`** for `(offset, PcodeOp)` pairs and `getComponentMap()` for a `NoisyStructureBuilder` |
+| Compute an MSVC-packed size WITHOUT mutating the DTM | `AlignedStructureInspector.packComponents(structureInternal)` → `StructurePackResult` (`.structureLength`, `.alignment`) — hypothesis-testing for a candidate layout |
+| Set data constant / volatile | `MutabilitySettingsDefinition`: `NORMAL`/`CONSTANT`/`VOLATILE`/`WRITABLE` |
+| Parse C headers into the program | `CParserUtils.parseHeaderFiles(...)` (C only, not C++) |
+| Open a `.gdt` type archive with no tool | `FileDataTypeManager.openFileArchive(file, false)` |
+| **Decompile many functions** | `ParallelDecompiler.decompileFunctions(...)` — never loop `DecompInterface` serially over a whole program |
+| **Record `__FILE__` / source-path evidence** | `program.getSourceFileManager().addSourceMapEntry(file, line, range)` — queryable both ways, not a comment |
+| Custom function-start signatures, library fingerprints | `ghidra.util.bytesearch`: `DittedBitSequence`, `PatternPairSet`, `MemoryBytePatternSearcher` |
+| Find more functions in undefined bytes | `RandomForestFunctionFinderPlugin` (MachineLearning extension) — trains on functions already found |
+| Identify library code | Function ID (FID); **BSim** for similarity search across corpora |
+| Compare two builds / match stripped against symbolled | Version Tracking, BSim, `ghidra.program.model.correlate` (`HashedFunctionAddressCorrelation`, `MnemonicHashCalculator`) |
+| Unrecovered switch / jumptable | `FindUnrecoveredSwitchesScript.java`, `SwitchOverride.java` |
+| Non-returning-function damage | `FixupNoReturnFunctionsScript.java` |
+| Run a routine without the game | **`PcodeEmulator`** (`ghidra.pcode.emu`; `PcodeMachine.inject(addr, sleigh)` stubs unemulatable imports). `EmulatorHelper` is **deprecated** as of 12.1 — keep it only for `enableMemoryWriteTracking()`/`getTrackedMemoryWriteSet()`. Examples in `Features/SystemEmulation/ghidra_scripts/` |
+| Discard changes after a headless pass | `analyzeHeadless -readOnly` — it guarantees nothing is **persisted**; it does *not* prevent mutation within the run, so a later `-postScript` can still read this run's own applies. Containment, not anti-circularity |
+| Batch/pipeline runs | `analyzeHeadless -process -preScript -postScript -noanalysis` |
+| Preview bytes without committing | Disassembled View window |
+| **Emit recovered types as C** | `DataTypeWriter(dtm, writer)` — public and supported. Not `CppExporter.CPPResult`, a private record whose exporter decompiles the whole program |
+| **Measure what a round actually changed** | `ProgramDiff` + `ProgramDiffFilter` → `AddressSetView`; `ProgramMerge` to restore one category from a checkpoint |
+| Recover C++ classes wholesale | `RecoverClassesFromRTTIScript` + the `classrecovery` package — **gates on RTTI**, so a `/GR-` binary gets nothing, and that is what licenses hand-rolling |
+| C++ classes on 32-bit MSVC with **no** RTTI | Pharos **OOAnalyzer** (`--ignore-rtti`) via **CERT Kaiju**. Candidates only: destructor F1 0.41, member offsets unpublished |
+| Devirtualize a call site | `AddVfunctionCallRefScript` (12.1) — needs components typed `Pointer`→`FunctionDefinition` (NOT the `ClassUtils` default pointer), is cursor-driven, writes `ANALYSIS`, and its unique-instance inference is unsound for any class with descendants. Read the caveats before planning on it |
+| Dataflow across basic blocks | `DecompilerUtils.getBackwardSliceToPCodeOps` (SSA p-code); `SymbolicPropogator` for `this + K` without the decompiler |
+| Identify the build toolchain | `ghidra.app.util.bin.format.pe.rich` + `PortableExecutableRichPrintScript` — the PE Rich header names the compilers and linkers used |
+| **Test if a subroutine starts here, WITHOUT mutating** | `PseudoDisassembler` (`ghidra.app.util`) — `isValidSubroutine(addr[, allowExistingCode[, mustTerminate]])`, `isValidCode`, `disassemble(addr)` → `PseudoInstruction`, `followSubFlows`. Creates no references or symbols and needs no transaction. **Calibrate it: measured 100% recall on known starts and a 72% FALSE-ACCEPT rate on known function interiors** — it is a sanity filter, not a discriminator |
+| Attack undefined code | `Processors/x86/data/patterns/x86win_patterns.xml` (real MSVC prologue/filler pairs — **extend the XML**, don't write pattern code); `FindUndefinedFunctionsScript`, `MakeFunctionsScript`, `CreateFunctionAfterTerminals`, `DumpFunctionPatternInfoScript` |
+| Build a FID database from period libs | `ImportMSLibs`, `CreateEmptyFidDatabase`, `CreateMultipleLibraries`, `RepackFid`; procedure in `data/building_fid.txt` |
+| **Carry provenance inside the program** | `FunctionTag` (name + comment, DB-backed, and `CppExporter` can filter on it) — tag every function a round touches with the round id, and the ledger becomes reconstructible *from the program* instead of only from your CSV. `BookmarkType.{NOTE,ANALYSIS,WARNING}` for "recorded unresolved" caveats that travel with the address | **Also: a PLATE comment at every address you named, so the GUI reader sees it** — measured, 3618 of them over 1909 functions and 1709 data symbols, with `functions_total` and the AI-symbol count asserted unmoved and a full read-only-sweep harness confirming 0 artifacts perturbed. Make the text rename-proof: say *the name here is ours*, never quote the name, or you have planted one stale copy per address
+| Record the analyzer configuration | `pyghidra.analysis_properties(program)` — results are a function of it, so a metrics row omitting it is not a reproducible snapshot |
+| Machine-readable export for replay debt | `ghidra.app.util.xml.*Mgr`, and the shipped **SARIF** exporter (`Features/Sarif`) — both carry the `SourceType` laundering hazard above |
+
+## How to drive Ghidra — prefer library mode
+
+**Default to PyGhidra as a library, from plain CPython.** `pyghidra.start()` →
+`open_project()` → `program_context()` → `with pyghidra.transaction(program, "round 5
+apply"):` → `analyze()`. Also there: `consume_program()`, `analysis_properties()`,
+`ghidra_script()`, `walk_programs()`. (PyGhidra 3.0, shipped with 12.0, deprecates the older
+`open_program()`/`run_script()` in favour of these.)
+
+This is not a style preference. **Library mode structurally eliminates three of the four
+hazards below**: no install step means no stale-copy shadowing, no async task means no
+unread result, and your own repo is on `sys.path` so paths resolve where you wrote them.
+You also get real tracebacks. The one constraint: headless cannot open a project that is
+already open in the GUI, so pick one at a time.
+
+Reserve **MCP for interactive reads** against a live GUI session. When you *do* run scripts
+through Ghidra, these apply:
+
+- **Editing a script in your repo does nothing.** Re-install into Ghidra's user script
+  directory before every run (`action="create"`, `overwrite=true`) — **library modules
+  included**: Ghidra's script dir sits earlier on `sys.path` than an appended repo path,
+  so a stale installed copy shadows your edit silently and you debug logic that is not
+  running.
+- **`action="run"` is asynchronous.** It returns a task id; nothing is verified until you
+  read `get_task_status`. Never report a result you have not read.
+- A `create` response may misreport the provider (`<unsupported>`, `Jython`). Cosmetic —
+  the `run` result reports the real one.
+- Prefer one script run over hundreds of per-item MCP calls; and only a script can set
+  `SourceType`.
+
+## Scripting rules (PyGhidra)
+
+- **CPython 3 via PyGhidra**, not Jython — `except X as e`, f-strings, real imports. As
+  of Ghidra 12.1 Jython is an opt-in extension, so a `# @runtime Jython` tag fails before
+  the first line unless installed. Ghidra 12.1 needs JDK 21+.
+- Wrap DB modification in a transaction; `GhidraScript` opens one and `end(True)` closes
+  it (required before save/checkin).
+- Dispose decompilers and close files explicitly; pass `monitor` to long operations.
+- **Discover API from the local install, not memory or the web.** A Ghidra install ships
+  `docs/ghidra_stubs/pypredef/` (hundreds of greppable, exact-version stub files covering
+  classes the public javadoc omits, e.g. `AutoAnalysisManager`),
+  `docs/GhidraAPI_javadoc.zip`, `docs/CheatSheet.html`, `docs/ChangeHistory.md`, and
+  `docs/GhidraClass/` course material — of which
+  `Advanced/improvingDisassemblyAndDecompilation.pdf` is the authoritative guide to most
+  of Part 1. Search these with Python if your shell's text tools are proxied or unreliable.
+- Ghidra writes the host filesystem with plain `open()`. Windows-hosted Ghidra driven from
+  WSL: script source needs Windows paths (`C:\...`); read the same files at `/mnt/c/...`.
+- **Type-check against Ghidra's INTERFACES, not its implementation classes.** A datatype
+  read back from the `DataTypeManager` is a DB-backed implementation —
+  `dtm.addDataType()` hands you a `FunctionDefinitionDB`, which implements
+  `FunctionDefinition` but is **not** an instance of the concrete
+  `FunctionDefinitionDataType` you constructed. Measured: an end-state check written
+  against the impl class reported **0 of 1053** on a retype that had completely succeeded.
+  Ghidra's own shipped scripts check the interface (`instanceof FunctionDefinition`) —
+  follow them. Same family as the rule below: the object you get back is not the object
+  you put in.
+- **Compare against the API's own returned value, never a hand-written literal.** Ghidra
+  names `UnsignedShortDataType` **`ushort`**, not `uint16_t`; a literal in an end-state
+  check aborted a *correct* apply after its write had committed, destroying that run's
+  before/after measurement. Derive the expected string from the same object you write
+  (`dt.getName()`), and treat a helper's return vocabulary as API too — one classifier
+  returns `x87_float`/`x87_int` where `float`/`int` were assumed, and the mismatch was
+  silent.
+- **`runScript(name, args)` SWALLOWS the called script's exception.** Ghidra prints
+  the traceback and `runScript` returns normally, so a driver that runs sweeps in a
+  loop reports every one of them as passing. Measured: a stability harness reported
+  `raised: 0` while two of its nineteen sweeps had raised calibration failures, with
+  both tracebacks visible in the same log. If you need the failure as a *value*, run
+  the script yourself so exceptions propagate —
+  `exec(compile(open(path).read(), path, "exec"), g)` with `g` seeded from the
+  GhidraScript globals (`currentProgram`, `currentAddress`, `monitor`, `state`) plus
+  a per-script `getScriptArgs`. A driver that cannot see the failure it exists to
+  detect is this document's unfireable-check rule wearing the harness's clothes.
+- **`state` is a reserved `GhidraScript` global** (the `GhidraState`). Assigning a string
+  to it raises `ClassCastException` from PyGhidra's property setter, reported at a line
+  far from the one that looks wrong. Others in the same namespace: `currentProgram`,
+  `currentAddress`, `monitor`, `script`.
+- **Never derive a path from `__file__` in a script you install.** The installed copy
+  lives in Ghidra's user script directory, where `dirname(__file__)/..` resolves outside
+  your repo entirely — measured: a header generator read `C:\Users\<you>\symbols`, so
+  its compile check (the only step recomputing offsets from a C compiler rather than from
+  the project's own arithmetic) had *never once run*. Resolve paths from a shared
+  constants module.
