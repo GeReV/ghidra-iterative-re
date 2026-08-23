@@ -143,8 +143,9 @@ just fired and you are deciding what it means.
   "no claim here" fires on correct data and trains you to widen it.
 ### Checks that cannot pass, and checks that cannot fire
 
-- **A check can be UNPASSABLE as easily as unfireable — and it spends the whole time
-  looking like a real failure.** The unfireable check is the famous one; its mirror is a
+- **A check can be UNPASSABLE as easily as unfireable — ask whether the population a
+  failing gate grades can even CONTAIN the evidence that would satisfy it, because a
+  check that cannot pass spends the whole time looking like a real failure.** The unfireable check is the famous one; its mirror is a
   check no run could ever satisfy, which reports a working witness as broken and sends
   you to debug the witness. Measured: a calibration required a pointer-detecting route to
   fire on a cell some *other* route had independently proved is a pointer. In the tool's
@@ -296,17 +297,16 @@ just fired and you are deciding what it means.
   added a second loop.
 ### What an apply invalidates
 
-- **A decided-artifact RENAME can disable the witness that corroborated it.** The
-  worst version of "re-validate a witness after an apply", because it looks like
-  bookkeeping rather than evidence. Measured: a value type's component was renamed
+- **A decided-artifact RENAME can disable the witness that corroborated it — whenever
+  you rename a component, a field or a type, ask which witnesses match on that spelling
+  and re-run them in the same round.** The worst version of "re-validate a witness after
+  an apply", because it looks like bookkeeping rather than evidence. Measured: a value type's component was renamed
   `w` → `Layer` on the strength of a registration witness that matches *registered
   suffix names against the type's component names*. The rename broke that match, so
   the route silently stopped deciding — and the artifact it had produced stayed in
   the repo, now underivable, for **sixteen program versions**. The apply that
-  invalidated the evidence was the one the evidence had justified. Whenever you
-  rename a component, a field or a type, ask which witnesses match on that spelling
-  and re-run them in the same round. Two follow-ups measured when that one was
-  repaired, both of which outlive the rename:
+  invalidated the evidence was the one the evidence had justified. Two follow-ups
+  measured when that one was repaired, both of which outlive the rename:
   - **The rename was not what hid it — the SILENCE was.** A witness that abstains
     per-item needs a guard separating a *legitimate* abstention from a broken
     route, or the two print the same line forever. Here a genuinely partial

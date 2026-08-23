@@ -61,14 +61,15 @@ reach estimate it produced.
   captured 8 such names from an earlier round. **Join by address, never by name**, or the
   audit itself inherits the collision problem below.
 - **A producer whose CLASSIFICATION INPUT is derived from its own output is self-harvesting,
-  and there is no `SourceType` tier to filter on.** The self-harvest rule above is about
+  there is no `SourceType` tier to filter on, and you fix it at the DERIVATION rather than by
+  loosening the gate.** The self-harvest rule above is about
   *symbols*; this is the same failure on the **artifact** axis, where the only defence is
   arithmetic. Shape: sweep S writes artifact A; derivation D folds A into artifact B; S reads
   B to decide what is new. Measured: a destructor-chain witness classified its claims against
   a hierarchy file built from its own edges, and on the second run its two contradictions had
   become agreements *with itself* — agreement counters up by exactly the folded edges
   (100/209 → 101/210), contradictions **2 → 0**, and every gate green for the wrong reason.
-  Fix it at the derivation, not by loosening the gate:
+  Three things do it, and the third is the one that actually catches it:
   - **Design the artifact so the pre-fold view is RECONSTRUCTIBLE.** Record, per row, what the
     value used to be (`superseded_base`) and which entities the fold created. A fold you
     cannot undo on paper is one you cannot audit.
@@ -373,8 +374,9 @@ reach estimate it produced.
   evidence that would still settle it** (here a runtime observation at the descendant's factory,
   recorded at its own provenance tier since it is a fact about one execution). A stale "unknown"
   reads as an opportunity forever, and the next round will otherwise re-derive the same negative.
-- **PRICING THE NEXT ROUND IS A REVIEW OF THE LAST ONE — AND IT CATCHES WHAT THE GATES
-  STRUCTURALLY CANNOT.** This document already says to price a queued round against the program
+- **PRICING THE NEXT ROUND IS A REVIEW OF THE LAST ONE — POINT THE PRICING PROBE AT LAST
+  ROUND'S ARTIFACT WITH A DIFFERENT QUESTION, BECAUSE IT CATCHES WHAT THE GATES STRUCTURALLY
+  CANNOT.** This document already says to price a queued round against the program
   because a plan's premises decay. The other half is that the pricing probe is the first thing to
   look at last round's ARTIFACT with a different question, which makes it the cheapest review you
   will ever get. Measured: a layout round shipped with its tiling guard passing on every class,
@@ -466,8 +468,9 @@ reach estimate it produced.
   direction: a previous round had called its tiling "sparse" on the strength of one example, and
   over the whole population it covers **2.7%** of bytes with 106 of 133 classes under 5% — the
   difference between "supplement it" and "it cannot carry the round".
-- **A CONSTRUCTION WRITE SET IS A PROPERTY OF THE CHAIN, NOT OF THE BODY — AND THE QUIET RESULT
-  IS THE TELL.** `references/cpp-abi.md` says a vptr-store chain names ancestors because MSVC
+- **A CONSTRUCTION WRITE SET IS A PROPERTY OF THE CHAIN, NOT OF THE BODY — FOLLOW THE CALLS
+  WHOSE RECEIVER THE SCAN RESOLVED TO THE OBJECT, AND READ THE QUIET RESULT AS THE TELL RATHER
+  THAN AS A BROKEN TRACKER.** `references/cpp-abi.md` says a vptr-store chain names ancestors because MSVC
   deletes unobservable stores. The layout consequence is the same mechanism read forward: MSVC
   emits a derived constructor as `call base_ctor; mov [this], own_vftable`, so essentially all
   field initialisation lives in the **base's** body. A flat per-body write set therefore reports
@@ -783,9 +786,9 @@ reach estimate it produced.
   because it is usually right. Compute the actual extents and emit the third bucket
   (`start` / `interior` / `gap`); the gap cases are where the surprises live, since an
   address in a gap may sit inside something the noise filter discarded entirely.
-- **A short name is not an identity.** Demangled short names collide across a hierarchy —
-  an override shares its base's name, so two different tables can look identical. Join on
-  **addresses**, not names.
+- **A short name is not an identity — join on ADDRESSES, not names.** Demangled short names
+  collide across a hierarchy: an override shares its base's name, so two different tables can
+  look identical.
   - **And a NAMING ROUND is what proves whether you actually did.** Measured: applying four
     long-established class identities broke **five** separate checks at once, each of which
     had memorised a spelling where it meant an entity — an approved-scope constant recording
