@@ -487,10 +487,21 @@ Three more caveats, all measured:
   `HighFunction.getLocalSymbolMap().getSymbols()` and take `sym.getHighVariable()` /
   `sym.getStorage()`. To enumerate what a **human** has recorded, use `getLocalVariables()` (or
   `getAllVariables()`, which adds the parameters). They are different questions and the second one
-  is almost never the one you meant. **Audit what such a predicate FEEDS before asking how wrong
-  it is**: one that selects a *control group* is worse than one that selects a population, because
-  the same defect then shrinks the treatment group and poisons the baseline, and both errors push
-  a measured payoff toward "no effect".
+  is almost never the one you meant.
+
+  **Audit what such a predicate FEEDS before grading how bad it is — the same under-count has
+  opposite signatures depending on the consumer.** Feeding a *population* or a *census*, it is a
+  silent understatement. Feeding a **control group**, it depends entirely on whether anything
+  checks that group: where the control is only a denominator, contamination biases the result
+  toward "no effect" invisibly; where the control is a **must-not-change assertion that raises**,
+  the identical under-count instead produces a *loud false alarm*, and the failure mode to guard
+  is the tempting fix — widening the control group until the strays fall out of it — rather than
+  finding the dependency route the predicate is missing. Measured on one project: two applies
+  splitting every function that way were graded "contaminated control" from the selection code
+  alone; both consumers turned out to be instrumented (one raising twice, one printing every stray
+  for adjudication), and one had already gained **two extra dependency routes** — globals typed
+  with a target class, and functions referencing an embedded element table's byte range — because
+  those gates fired. Read the consumer.
 
 ### `AlignedStructureInspector` (`ghidra.program.model.data`)
 

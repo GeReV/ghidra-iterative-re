@@ -397,15 +397,26 @@ scripting rules: `references/api.md`.**
   occurrences are still producing confident numbers, and they will be believed precisely
   because nothing about them looks wrong. Measured: a round found two such patterns, fixed
   each for one class, wrote both up, and stopped; the sweep afterwards cost **one grep and
-  two artifact-side censuses** and returned three closed answers — eight more call sites
-  (two of them poisoning a *control group*), a measured zero, and a six-item list of what
-  remained. That ratio is why this is a rule and not a judgement call.
+  two artifact-side censuses** and returned three closed answers — eight more call sites, a
+  measured zero in the committed artifact, and a six-item list of what remained. That ratio
+  is why this is a rule and not a judgement call.
 
   Three things make the sweep cheap and worth doing every time:
-  **(a) ask what each occurrence FEEDS before asking how wrong it is** — an under-counting
-  predicate that selects a *control* is worse than one that selects a population, because
-  the same defect shrinks the treatment group *and* poisons the baseline, and both errors
-  push the result toward "no effect";
+  **(a) ask what each occurrence FEEDS before asking how wrong it is** — the same
+  under-count is a silent bias where nothing checks the group, and a *loud false alarm*
+  where something does, and those need opposite responses. **This is the step that sweep
+  itself got wrong**: it found two applies splitting every function into a treatment and a
+  **control** group with the under-counting predicate, ranked them the round's most severe
+  finding on that basis, and had not opened the code that *consumes* the groups. Both
+  consumers were instrumented — one **raises** on any control stray (twice: post-apply and
+  post-cascade) and the other prints every stray under *"adjudicate, do not widen the
+  control group"* — and one of them had already gained two extra dependency routes by
+  exactly those gates firing. The severity claim was retracted the same day; what survived
+  was much weaker (the treatment *pool* is understated, so the apply's measured **reach**
+  is, not its soundness). One `sed` on the consumer would have caught it, and the reason it
+  was skipped is that *"contaminated control"* is a **satisfying** finding — which is
+  precisely when a claim needs its consumer read. **A rule written in the same round is not
+  a rule applied.**
   **(b) sweep the committed ARTIFACTS, not only the scripts** — a wrong artifact poisons
   every later round while a wrong script only wastes the next one, and the check is usually
   a pure join against sizes or bounds you already have;
