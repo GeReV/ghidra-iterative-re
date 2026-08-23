@@ -521,9 +521,9 @@ just fired and you are deciding what it means.
 ### Reading a gate that fired
 
 - **APPLYING NAMES TO A POPULATION A HARVESTER READS IS THE CHEAPEST AUDIT OF THAT HARVESTER'S
-  FILTER — AND THE PASSING DIRECTION IS THE ONE WORTH CITING.** This document already says a
-  wide naming round finds filter holes, because that is how the only leak on one project was
-  found. The mirror is worth stating separately, because it looks like churn and gets reverted:
+  FILTER — AND THE PASSING DIRECTION IS THE ONE WORTH CITING.** The trust-model reference
+  (`references/trust-and-circularity.md`) already says a wide naming round finds filter
+  holes, because that is how the only leak on one project was found. The mirror is worth stating separately, because it looks like churn and gets reverted:
   measured, naming 16 vtable slot targets made the project's OLDEST sweep — the one that had
   once folded 578 agent-applied names back into committed evidence — move 12 `primary_name`
   cells from the default `FUN_…` spelling to **blank**. It met sixteen freshly applied names and

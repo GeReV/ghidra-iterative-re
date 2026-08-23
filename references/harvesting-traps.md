@@ -467,7 +467,7 @@ reach estimate it produced.
   over the whole population it covers **2.7%** of bytes with 106 of 133 classes under 5% — the
   difference between "supplement it" and "it cannot carry the round".
 - **A CONSTRUCTION WRITE SET IS A PROPERTY OF THE CHAIN, NOT OF THE BODY — AND THE QUIET RESULT
-  IS THE TELL.** This document already says a vptr-store chain names ancestors because MSVC
+  IS THE TELL.** `references/cpp-abi.md` says a vptr-store chain names ancestors because MSVC
   deletes unobservable stores. The layout consequence is the same mechanism read forward: MSVC
   emits a derived constructor as `call base_ctor; mov [this], own_vftable`, so essentially all
   field initialisation lives in the **base's** body. A flat per-body write set therefore reports
@@ -610,8 +610,8 @@ reach estimate it produced.
   rule and to fail under the old one, and derive it from the program with a guard, so the
   round that finally fixes that case retires the arm by name instead of leaving it inert.
 - **Running a sibling tool purely as an INERTNESS PROOF is also a CENSUS of that tool, and
-  that is where the next orphaned mutator is found.** The harness in this document drives
-  read-only sweeps and structurally cannot run appliers, so an applier's queue of work grows
+  that is where the next orphaned mutator is found.** The stability harness
+  (`references/assertions.md`) drives read-only sweeps and structurally cannot run appliers, so an applier's queue of work grows
   silently. Measured: a sibling applier was invoked only to show a moved rule had not changed
   its behaviour, and its dry run reported an entity that had become eligible two rounds
   earlier under a rule added one round after that — an approved-census round nobody had

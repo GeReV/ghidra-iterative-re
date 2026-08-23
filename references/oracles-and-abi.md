@@ -15,7 +15,7 @@ layout that a 64-bit host will silently relay.
 
 ## The external oracle — the only check that is not the program grading itself
 
-Everything in Part 1 is internal: the program adjudicating claims about itself. Independent
+Everything in the loop is internal: the program adjudicating claims about itself. Independent
 witness kinds help, invariants help, poisons help — but they are all computed from the same
 database by the same agent, and a systematically wrong assumption survives all of them. Four
 routes step outside that, ordered by how directly they falsify a layout claim.
@@ -53,17 +53,19 @@ decided — and know that identical-code folding merges classes, so an ICF-heavy
 degrades it further.
 
 **3. A similarity witness that states its own error rate.** See the BSim VT correlator under
-library separation: corpus-free, and it publishes a false-positive model. Nothing else here
-does.
+"Separating library code from game code" (`references/game-recon.md`): corpus-free, and it
+publishes a false-positive model. Nothing else here does.
 
 **4. `ProgramDiff` against a checkpoint version** — the change-set measurement under
-Mutation safety. Not an external *source*, but it is the program's own record of what you
-did rather than your memory of it.
+"Mutation safety — the rest of the bracket" (`references/applying-changes.md`). Not an
+external *source*, but it is the program's own record of what you did rather than your
+memory of it.
 
 **AND IF YOU HAVE ONE, WIRE IT TO SOMETHING THAT RUNS IT — AN UNWIRED ORACLE ROTS SILENTLY AND
 NOTHING ELSE CAN NOTICE.** Measured, and it is the worst-placed instance of this document's "a
 harness is blind to what it does not run" rule: a project that emits its recovered layouts as C
-with `offsetof` assertions and compiles them — the recommendation above — had that header
+with `offsetof` assertions and compiles them — the recommendation under "Emit a C header"
+in `references/applying-changes.md` — had that header
 **failing to compile for 90 commits** and three program versions, 161 errors. It was found only
 because an unrelated side project ran the generator for a baseline. The cause is worth carrying
 on its own:
@@ -80,8 +82,9 @@ on its own:
   `-fsyntax-only` (`bits/libc-header-start.h`), for want of multilib. **A check that needs a
   toolchain you do not have is a check that will not be run**, which is how it came to rot.
 - **The sibling generator had already made the right decision and documented it.** Two emitters,
-  one convention, one follower — the copy-instead-of-move divergence this document warns about,
-  between two files nobody thought of as sharing a rule.
+  one convention, one follower — the copy-instead-of-move divergence "A rule built for one
+  population must be offered to its SIBLING populations" (`references/harvesting-traps.md`)
+  warns about, between two files nobody thought of as sharing a rule.
 
 **Why this is a standing instruction:** a methodology built around never corroborating your
 own guesses should want, more than anything, one check it cannot influence. If none of these

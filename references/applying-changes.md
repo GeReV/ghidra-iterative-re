@@ -96,13 +96,13 @@ Then wrap that output yourself with `_Static_assert(offsetof(T, field) == K)` pe
 a `sizeof` assertion per class, and **compile it**. No Ghidra exporter emits compile-time
 offset assertions, and the compile is the only step that recomputes offsets from the C
 object model rather than from your own arithmetic — which is precisely the step worth
-having. Hand-rolling the *type* emitter is the failure this skill warns about; hand-rolling
-the *assertions* is the whole point.
+having. Hand-rolling the *type* emitter is the failure "Check for a built-in before writing
+your own" (`references/api.md`) warns about; hand-rolling the *assertions* is the whole point.
 
 **And emit FIXED-WIDTH types, not `char *` or `long`.** The target's word size is not the
 host's, and getting this wrong silently relays every field after the offender. It breaks the
 header, the recompile and the reimplementation — in that order of discovery and the reverse
-order of cost. See **Target ABI vs host ABI** in Part 2.
+order of cost. See **Target ABI vs host ABI** in `references/oracles-and-abi.md`.
 
 ### Mutation safety — the rest of the bracket
 

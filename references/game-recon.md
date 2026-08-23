@@ -288,9 +288,9 @@ Caveats that cost real time here, all of which generalize:
   CORRECT answer for a VC6 image matched against a VC4.2/2003+ corpus — a near-miss, not a
   misconfiguration, and not something a score-threshold tweak will rescue. **Check which
   compilers your install's databases actually contain before explaining a zero, and before
-  budgeting a round on tuning.** The generalisation is one this document already makes about
-  artifacts versus prose: a shipped doc describing a build PROCESS is not a manifest of that
-  build's OUTPUT.
+  budgeting a round on tuning.** The generalisation is one `references/assertions.md` already
+  makes about artifacts versus prose ("when a new artifact replaces prose, diff it against the
+  prose"): a shipped doc describing a build PROCESS is not a manifest of that build's OUTPUT.
 - **You can BUILD a FID database from period libraries**, which converts FID from a lower
   bound into near-complete identification of whatever you fed it. Shipped machinery:
   `ImportMSLibs.java` ("Massive recursive import for a MS Visual Studio installation

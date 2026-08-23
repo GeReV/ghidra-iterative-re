@@ -194,7 +194,8 @@ of the harvest.
 **The filter is needed before a harvester's *second* run, not its first** — which is why
 it is so often missing. Written before any apply exists, a harvester is correct; it turns
 circular the moment it is re-run after one, with nothing in it having changed. See
-"Harvesting traps" for the measured case and the assertion that catches it.
+"Self-harvest and circular evidence" in `references/harvesting-traps.md` for the
+measured case and the assertion that catches it.
 
 **Four corollaries make this cheap to exploit rather than merely to fear; types have no
 `SourceType` at all; and a tier cannot tell two sources apart that share it** — all
