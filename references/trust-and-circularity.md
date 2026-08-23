@@ -196,3 +196,34 @@ which tiers are actually populated, whether the tier you plan to trust is the on
 your ground truth, and whether name-based and tier-based counts disagree (they did here, by
 exactly the thunks). `SourceType.AI` is script-usable and orders as documented — verified:
 priority 2, equal to `ANALYSIS`, below `IMPORTED` and `USER_DEFINED`.
+
+### What an apply costs the witness that justified it
+
+- **THE WITNESS THAT MEASURED A SIZE STOPS BEING EVIDENCE THE MOMENT THAT SIZE IS APPLIED.**
+  Measured: a probe established a class's size by following a pointer and recording the furthest
+  byte the code reached. Applying a struct of exactly that size made the same probe return the
+  same number **because the applied type now bounds what the decompiler will report** — the
+  answer became a consequence of the apply rather than of the program. Nothing about the probe
+  changed, and its output looked like an independent confirmation. Two rules follow:
+  - **Re-running a probe after acting on it produces a CONFIRMATION, not a measurement.** Record
+    that distinction in the artifact itself, in a column, naming which run was the measurement.
+    A future reader has no other way to tell, and "the probe agrees" is the most persuasive
+    wrong sentence available.
+  - **This is the self-harvest trap on the TYPE axis**, where there is no `SourceType` to filter
+    on. The symbol filter that stops you reading your own names back has no equivalent here; the
+    only defence is the recorded provenance of the number.
+- **A PRE-APPLY ARTIFACT IS AN ORACLE THE POST-APPLY RUN CANNOT INFLUENCE — USE IT WHILE IT
+  EXISTS.** The committed copy of a witness file, taken before the mutation, is the one piece of
+  evidence the apply provably did not touch. Diff against it *keyed on identity*, not
+  positionally: row counts and ordering both move, and a positional diff on a grown file reports
+  most rows as changed and hides the few that actually are. Measured, that turned a 387-of-566
+  "everything moved" into the true answer — **518 rows in common, of which 8 differed, all in one
+  column.** The pre-apply copy is also what lets you state a payoff against a *structural zero*:
+  names that did not exist in the struct before the apply cannot have appeared in any earlier
+  decompilation, so every occurrence is necessarily new and a post-apply-only count is a real
+  delta rather than the "before == after by construction" trap.
+- **THE OUTCOME TO WANT FROM A RE-APPLY IS MORE EVIDENCE AND THE SAME DECISION — STATE BOTH
+  HALVES.** Measured: the raw evidence file grew 380 → 502 rows with **zero rows removed**, while
+  the adjudicated layout it feeds stayed byte-identical. Growth alone could be noise; stability
+  alone could be a sweep that failed to see anything new. Together they are corroboration, and
+  neither number means much reported without the other.

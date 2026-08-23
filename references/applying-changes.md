@@ -180,3 +180,53 @@ order of cost. See **Target ABI vs host ABI** in `references/oracles-and-abi.md`
   `/Demangler/`, not at the root where they had been, and every consumer looking up
   `"/" + name` silently reported them ABSENT. When you fold types, enumerate the consumers
   of the type's PATH, not just of its name.
+- **AN INVARIANT BRACKET THAT CHECKS A *DELTA* GOES BLIND THE MOMENT A RUN RAISES.** Measured:
+  an apply died part-way, and the next run's before/after delta compared two states that were
+  *both* already wrong — the delta was clean and the program was damaged. Pin the bracket to an
+  **absolute** expected value, not to "the same as when I started". The cost is that the pin must
+  be re-set whenever you legitimately change the number, and that is the point: **a re-pin is a
+  decision with a reason attached, a range is a decision to stop noticing.** Measured again two
+  rounds later — a probe stopped on `datatypes=1396, expected 1395` after an apply that created
+  exactly one array type. The temptation is `>=` or a tolerance; the correct move is to account
+  for the delta from the apply's own record (one `created` row at that version boundary) and
+  re-pin to 1396 with the reason in the comment. A range would have silently absorbed the next
+  apply's collateral damage.
+- **AN APPLIER THAT REBUILDS FROM AN ARTIFACT WILL DISCARD EVERY REFINEMENT THAT LIVES ONLY IN
+  THE PROGRAM — AND NOTHING WILL NOTICE.** Measured: a re-run would have replaced a 268-field
+  embedded record, applied by a later round directly into the program, with the one opaque
+  `uint8_t[300]` the artifact still carried. The struct still tiles, its length is unchanged, and
+  a bracket counting functions, symbols and datatypes sees nothing — the discarded type is still
+  in the DataTypeManager, merely unreferenced. **Diff each already-final class against its own
+  plan before writing, and hold back any class the program types more specifically.** Two traps
+  inside that guard, both paid for:
+  - **Compare RESOLVED types, not names.** The first version compared `getName()` and called every
+    `dword` component richer than the plan's `uint32_t` — the same type under two names — so every
+    already-applied class came back held-back for a reason unrelated to any refinement. It was
+    right for two classes and wrong for a third: a check passing for the wrong reason.
+  - **Decide what "more specific" means, explicitly, because that predicate is load-bearing in
+    BOTH directions.** Placeholder shapes (`undefined*`, `uint8_t[N]`) must not count as richer.
+    That one line is what later let the same guard handle the *opposite* case — an artifact that
+    had grown FINER than the program — without modification: the coarse cells being replaced were
+    placeholder-shaped, so they offered no resistance, while the genuine refinement did. **The
+    guard was right for a case nobody designed it for, which is worth writing down**: the next
+    edit to that predicate silently decides whether re-applies still work.
+- **APPLYING AN OPAQUE `uint8_t[N]` OVER A REGION DOES NOT MERELY FAIL TO HELP — IT DEGRADES THE
+  EVIDENCE NEEDED TO SUBDIVIDE THAT VERY REGION.** Measured: filling a class tail with a byte
+  array made the decompiler re-render two dword stores as twelve one-byte stores, and one-byte
+  cells across the harvest went 15 → 109. The round that applied it understated its own cost,
+  because "the placeholder is neutral until we learn more" is the natural assumption and it is
+  false. Two consequences: **take widths from the INSTRUCTION, never from the decompiler's
+  varnode**, and expect any later attempt to subdivide that cell to be arguing against evidence
+  your own apply corrupted. It is reversible — subdividing the cell later restored the same
+  accesses to single dwords, with the instruction width identical throughout, which is the proof
+  of which rendering was the false one.
+- **A "NOTHING CHANGED" DETECTOR MUST COMPARE WHAT THE RUN WOULD WRITE AGAINST WHAT THE PROGRAM
+  HOLDS — NOT A PROXY LIKE SIZE.** An idempotent applier needs to distinguish a genuine re-run
+  (where before == after by construction, so a payoff delta is *unavailable* rather than *zero*)
+  from a real change. Measured: the test was "is every target already at its final length", which
+  cannot see a class at the same size whose contents the artifact has since subdivided. It would
+  have reported a real, measured payoff as *"UNAVAILABLE ... not a gain this run produced"* —
+  the same lie of form the unavailable branch exists to prevent, pointed the other way. Ask the
+  question of the classes the run actually WRITES: one it deliberately holds back says nothing
+  about whether anything changed. **When you change such a rule, print both the old verdict and
+  the new one permanently** — that is the two-step diff baked in, and it costs one line.

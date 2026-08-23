@@ -826,3 +826,42 @@ reach estimate it produced.
   rather than a broken test. This exact bug produced four dead checks in this project.
   Likewise raw mangled names and demangled short names are different string spaces that
   never intersect; converting one to the other is required before comparison.
+
+### Samples, headers and new witness kinds
+
+- **A PINNED SAMPLE MEASURES THE ROUND THAT CHOSE IT, FOREVER — AND IT FAILS QUIETLY, BY
+  UNDERSTATING.** Measured: an applier scored its own payoff over five literal function addresses
+  picked several rounds earlier for a different class. The round that finally mattered applied 13
+  fields witnessed in **ten other bodies, none of them in the sample**, so the applier reported
+  "no change" and concluded it had bought nothing. The number was true and the claim was false:
+  it was a statement about the sample. **When a measurement over a fixed sample returns zero,
+  verify the sample intersects the change before reporting the zero** — and prefer a sample
+  DERIVED from the same artifact the round is applying, so it grows with the evidence. Here that
+  was 5 → 38 bodies and a real payoff of 110 lines. Same shape as a literal row index beside an
+  editable header, or a pinned census beside a growing population: **a literal sitting next to
+  something that evolves.** Sweep for the shape rather than fixing the instance — in that repo,
+  four such lists existed and exactly one was the defect; naming the other three (one already
+  derived, two pinned on purpose) is what turns a worry into a closed answer.
+- **THE SCRIPT'S OWN WARNING IS THE FINDING, AND IT IS ONE LINE FROM BEING IGNORED.** That
+  applier printed *"the payoff did NOT increase ... check the sample reaches bodies these types
+  are ON."* Everything needed was on screen; the available failure was to read the clean
+  invariants and move on. **An honesty check earns nothing unless the round budgets the
+  follow-up** — a printed caveat nobody acts on is worse than absent, because it documents that
+  you were told.
+- **`csv.DictReader` SILENTLY COLLAPSES A DUPLICATE FIELDNAME AND SHIFTS EVERY COLUMN AFTER IT.**
+  Measured: a header carried **10 names over 9 values** (one name twice), so a late column had
+  been quietly returning a different field's data — in that case the program version — for
+  however long the defect had existed. No exception, no warning, and the values are all
+  plausible strings. **Guard the header explicitly**: assert the names are unique and that their
+  count equals the first data row's field count. Both are one line, and nothing else in the
+  stack will tell you.
+- **BEFORE ADDING A WITNESS KIND, NAME THE POPULATION IT ALONE REACHES.** Measured: a producer's
+  four existing kinds were all constructor initialisations and serialiser records, so **a field
+  written elsewhere and never saved was invisible to every one of them** — and the artifact
+  said "no witness reaches these bytes" over a region the game writes seven dwords into every
+  tick. The note was true of the kinds it had and false about the program. A fifth kind is worth
+  its cost exactly when that sentence can be written for it; if it only agrees with what the
+  others already see, it is a confidence upgrade, not a new witness. And **a new kind arrives
+  with its exclusion rules already paid for by earlier rounds — do not re-derive them at
+  intake**, because a consumer that re-derives an upstream adjudication is a second copy of one
+  rule, and the two drift.
