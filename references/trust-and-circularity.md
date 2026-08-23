@@ -67,7 +67,7 @@ rather than merely to fear:
 
 ### The TYPE axis: `DataType` has no `SourceType` at all
 
-The whole trust model above is about *symbols*. **Types have no provenance field
+The trust model in `SKILL.md` is about *symbols*. **Types have no provenance field
 whatsoever** — no tier to filter on, no `getSource()`, nothing marking a struct you
 grew as yours. So the anti-circularity rule has no mechanism on the type axis, and a
 harvester that reads a type name back is unguarded by construction.

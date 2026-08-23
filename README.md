@@ -41,7 +41,7 @@ why the specific numbers in it are not thresholds.
 
 | File | Contents |
 |---|---|
-| `SKILL.md` | The methodology: the round loop, the `SourceType` trust model, invariant bracketing, ceremony-vs-blast-radius, the free-names checklist, and a routing table to everything below. |
+| `SKILL.md` | The methodology. Opens with **Start here** — what to do first on a fresh binary versus a project already under way — then round zero (the free-names column), the round loop, the `SourceType` trust model, invariant bracketing, ceremony-vs-blast-radius, and a routing table to everything below. |
 | `references/harvesting-traps.md` | 62 measured traps in reading evidence back out: self-harvest, blank censuses, skip counters, reach pricing, the byte-pattern engine. |
 | `references/assertions.md` | 53 on assertion discipline under iteration: checks that cannot fire, cannot pass, or go inert as the program moves underneath them. |
 | `references/trust-and-circularity.md` | The deep end of the trust model: laundering paths, the TYPE axis (types have no `SourceType` at all), and why a tier cannot tell two sources apart that share it. |

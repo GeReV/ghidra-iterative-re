@@ -500,7 +500,8 @@ Three things to know here; the mechanics are in **`references/cpp-abi.md`**.
   A negative result is only as strong as the strongest mechanism you actually ran. Name the
   mechanism in the finding, or the next round inherits a conclusion it cannot audit.
 - **A VPTR-STORE CHAIN NAMES ANCESTORS, NOT PARENTS — the optimizer deletes the links you
-  need most.** The rule above ("get parentage from constructors, not from table similarity")
+  need most.** The parentage rule at the end of this section ("get parentage from constructors,
+  not from table similarity")
   is right about *direction* and silently optimistic about *immediacy*. MSVC writes
   `*this = &vftable` once per class in each constructor and each destructor — and then
   **deletes any such store nothing can observe before the next one overwrites it.** An

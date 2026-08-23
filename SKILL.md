@@ -12,13 +12,53 @@ throws away the tool's main mechanism and is the more expensive choice.
 
 But the loop has a failure mode batch analysis does not: **you can corroborate your own
 guesses.** Apply an inference, re-read, and the confirming read looks independent when it
-is not. Part 1 makes the loop safe. Part 2 is what to point it at in a game. Part 3 is
-the tool surface. The catalogues behind all three are in `references/` — the table below
-says which.
+is not. This file is the loop and the rules that bind every round; the catalogues behind
+it are in `references/`, keyed by the kind of work you are about to do.
 
 **Confidence convention.** Claims marked *(doc)* come from Ghidra's own documentation but
 have not been executed. Unmarked claims were either measured live or are project history.
 Quoted numbers from one binary are examples for calibration, not properties of yours.
+
+## Start here
+
+**The loop below begins at `apply`, and on a binary you have just opened there is nothing
+to apply yet.** Two different things bring you to this file, and they have different first
+moves. Find yours before reading further.
+
+**A — A binary nobody has worked yet.** Do not enter the loop. Round zero is measurement,
+not inference:
+
+1. **Confirm what you are looking at.** Architecture, endianness and the compiler
+   toolchain, from the file itself — getting endianness wrong at import garbles the whole
+   disassembly and no later analysis recovers from it (`references/platforms-eras.md`). For
+   a managed or scripted engine, stop and check: a dumper may print in a minute what a month
+   of disassembly would not (`references/game-recon.md`).
+2. **Run the whole free-names column below**, before interpreting a single function. Each
+   row is a hypothesis about *your* binary with a one-command test, and a measured zero is a
+   finding — it stops you budgeting a phase around a source that is not there.
+3. **Record every result, zeros included**, and keep *measured-zero* distinct from
+   *not-yet-run*. This is the round's output. Nothing has been applied and that is correct.
+4. **Only now enter the loop**, with the highest-certainty source the sweep actually found.
+
+**B — A project already under way.** The premises of a queued round decay, and the decay is
+invisible from inside the plan:
+
+1. **Read the project's own state record first** — program version, last mutating round,
+   the gate numbers currently expected. Notes are not evidence: they were written when they
+   were true.
+2. **Price the round against the program before scoping it.** One read-only census routinely
+   refutes a round three separate notes describe as ready. A refuted round is a cheap round.
+3. **Check what the gates say right now**, not what the last write-up said they said. A
+   sweep whose current output differs from its committed artifact is a perturbation that
+   already happened and nobody noticed.
+4. **Then enter the loop**, at the certainty tier the pricing probe established.
+
+**In both cases, before the first mutation:** the invariant bracket and the checkpoint are
+not optional ceremony — they are the only things that notice Ghidra's silent collateral
+damage. Read "Mutation safety" below before writing anything to the program.
+
+Once you know what kind of round you are running, the table below routes you to the
+catalogue for it.
 
 ## What is in this skill, and where the rest of it lives
 
@@ -54,9 +94,48 @@ among the ones that bind a particular kind of round.
 
 ---
 
-# Part 1 — The loop (any binary)
+## Round zero — sweep for free names before analyzing anything
 
-## Rounds
+Games differ from other targets in three useful ways: they leak an unusual amount of
+developer-facing text, they have a large body of external documentation written by
+players and modders, and **you can make them change state on demand**, which is a search
+primitive static analysis does not have.
+
+Ordered by payoff. Every row is a *hypothesis about your binary* with a one-command
+test, and a measured zero is a finding. The sources in detail, plus separating library
+code from game code, data shapes, modern engines, platforms and runtime observation:
+**`references/game-recon.md`**.
+
+The right-hand column is **one worked example — a single 1999-era MSVC/x86 retail game
+binary, as of that project's Phase 4 — not a property of the technique.** It is here to show
+how wildly yields differ, and because the *zeros* are the instructive entries.
+
+| Source | Test | Example yield (one 1999 MSVC/x86 retail binary) |
+|---|---|---|
+| MSVC RTTI | strings `.?AV`, `type_info` | **0** — `/GR-`, and no typed EH either (see item 9) |
+| Exported vftable symbols | strings `??_7` | **14** authoritative class→vtable pairs |
+| Virtual / multiple inheritance | strings `??_8`, `??_9`; mangled access chars `G/H/O/P/W/X` | **0** by both tests — plain single inheritance, two independent ways |
+| Mangled export symbols | count symbols starting `?` | **981**, carrying class + virtualness + full signature |
+| Data exports | PE export directory entries outside `.text` | **73** typed named symbols — but **50 class statics** (`@@0/1/2`) vs **17 true globals** (`@@3`) |
+| Companion-DLL linkage | shipped DLLs' import tables naming the exe | **2 renderer plugins** importing 46/47 exe symbols — the whole renderer API vocabulary |
+| Static-initializer table | `.CRT$XC*` bounds, null-terminated `.text` pointer array | **1429** function starts, by linker contract |
+| Middleware / engine | version banners, known import sets | Miles Sound System and DirectInput identified |
+| Assert source paths | strings `.cpp`, `.c`, `.h`, drive-letter prefixes | **1** `.cpp`, **1** `.h` — source root only; release build compiled the asserts out |
+| Debug/PDB residue | `.pdb` paths, `RSDS`/`NB10`, `.debug`, and `.MAP`/`.DBG`/`.DEF` beside the exe | **measured 0** — a `.pdb` *path string* survives, the file was never shipped |
+| Localization / string tables | large contiguous string blocks, id→string arrays | **measured 0** as a *naming* source — present, but names nothing in the binary |
+| Embedded scripting VM | strings `lua`, `Lua_`, registration-table shapes | **measured 0** |
+| Config / CVar parser | strings for known setting keys, `.ini`, `.cfg` | **measured 0** as a field-naming source |
+| GUI/property registration | a per-class registrar taking `{name, type, offset}` | **the live one** — 15 records naming fields at exact offsets |
+
+Record every result, including the zeros, and distinguish **measured-zero** ("searched,
+absent") from **not-yet-run**. Conflating those is how a project convinces itself a source
+was exhausted when it was never tried — and note that four rows above read "not yet run" for
+several revisions of this document *after* the project had measured them, which is the same
+failure pointed the other way: a stale "unknown" reads as an opportunity forever.
+
+---
+
+## The round loop
 
 ```
 checkpoint → apply (highest-certainty tier only) → cascade (scoped)
@@ -268,8 +347,8 @@ actually improves decompilation" in `references/applying-changes.md`.
 
 ## Match the ceremony to the blast radius
 
-The discipline below is expensive, and applying all of it to everything is how a round
-becomes a week. Sort by what a wrong answer actually costs:
+The discipline in this skill is expensive, and applying all of it to everything is how
+a round becomes a week. Sort by what a wrong answer actually costs:
 
 | Claim class | Minimum evidence | What being wrong costs |
 |---|---|---|
@@ -290,68 +369,12 @@ under iteration). Read the one for the kind of round you are designing, not both
 
 ---
 
-# Part 2 — Game reverse engineering
-
-Games differ from other targets in three useful ways: they leak an unusual amount of
-developer-facing text, they have a large body of external documentation written by
-players and modders, and **you can make them change state on demand**, which is a search
-primitive static analysis does not have.
-
-Ordered by payoff, and each is a *hypothesis about your binary* with a one-command test.
-Run the whole column before interpreting a single function — a measured zero is a
-finding, and it stops you planning a phase around a source that is not there. The
-sources in detail, plus separating library code from game code, data shapes, modern
-engines, platforms and runtime observation: **`references/game-recon.md`**.
-
-## Sweep for free names before analyzing anything
-
-### Run the cheap test for each before budgeting work on it
-
-Every item above is a *hypothesis about your binary*, and each has a one-command test.
-Run the whole column first: a measured zero is a finding, and it stops you planning a
-phase around a source that isn't there. The right-hand column is what these returned on
-one 1999-era MSVC/x86 retail game binary — illustrating that yields differ wildly and
-must be measured, not assumed.
-
-The right-hand column is **one worked example — a single 1999-era MSVC/x86 retail game
-binary, as of that project's Phase 4 — not a property of the technique.** It is here to show
-how wildly yields differ, and because the *zeros* are the instructive entries.
-
-| Source | Test | Example yield (one 1999 MSVC/x86 retail binary) |
-|---|---|---|
-| MSVC RTTI | strings `.?AV`, `type_info` | **0** — `/GR-`, and no typed EH either (see item 9) |
-| Exported vftable symbols | strings `??_7` | **14** authoritative class→vtable pairs |
-| Virtual / multiple inheritance | strings `??_8`, `??_9`; mangled access chars `G/H/O/P/W/X` | **0** by both tests — plain single inheritance, two independent ways |
-| Mangled export symbols | count symbols starting `?` | **981**, carrying class + virtualness + full signature |
-| Data exports | PE export directory entries outside `.text` | **73** typed named symbols — but **50 class statics** (`@@0/1/2`) vs **17 true globals** (`@@3`) |
-| Companion-DLL linkage | shipped DLLs' import tables naming the exe | **2 renderer plugins** importing 46/47 exe symbols — the whole renderer API vocabulary |
-| Static-initializer table | `.CRT$XC*` bounds, null-terminated `.text` pointer array | **1429** function starts, by linker contract |
-| Middleware / engine | version banners, known import sets | Miles Sound System and DirectInput identified |
-| Assert source paths | strings `.cpp`, `.c`, `.h`, drive-letter prefixes | **1** `.cpp`, **1** `.h` — source root only; release build compiled the asserts out |
-| Debug/PDB residue | `.pdb` paths, `RSDS`/`NB10`, `.debug`, and `.MAP`/`.DBG`/`.DEF` beside the exe | **measured 0** — a `.pdb` *path string* survives, the file was never shipped |
-| Localization / string tables | large contiguous string blocks, id→string arrays | **measured 0** as a *naming* source — present, but names nothing in the binary |
-| Embedded scripting VM | strings `lua`, `Lua_`, registration-table shapes | **measured 0** |
-| Config / CVar parser | strings for known setting keys, `.ini`, `.cfg` | **measured 0** as a field-naming source |
-| GUI/property registration | a per-class registrar taking `{name, type, offset}` | **the live one** — 15 records naming fields at exact offsets |
-
-Record every result, including the zeros, and distinguish **measured-zero** ("searched,
-absent") from **not-yet-run**. Conflating those is how a project convinces itself a source
-was exhausted when it was never tried — and note that four rows above read "not yet run" for
-several revisions of this document *after* the project had measured them, which is the same
-failure pointed the other way: a stale "unknown" reads as an opportunity forever.
-
 **The external oracle — the only check that is not the program grading itself — and the
 target-vs-host pointer width that breaks a header, a recompile-and-diff and a
 reimplementation in that order: `references/oracles-and-abi.md`. Dispatch recovery and
-C++ class mechanics: `references/cpp-abi.md`.**
-
----
-
-# Part 3 — Tool surface
-
-**Cascade triggers, the built-in-before-you-hand-roll table, driving Ghidra in library
-mode, and the PyGhidra scripting rules are all in `references/api.md`.** What stays here
-is the half that is about the agent rather than the tool.
+C++ class mechanics: `references/cpp-abi.md`. Cascade triggers, the
+built-in-before-you-hand-roll table, driving Ghidra in library mode and the PyGhidra
+scripting rules: `references/api.md`.**
 
 ## Failure modes to design against
 

@@ -686,7 +686,7 @@ We wrote a vtable sweeper from scratch without checking that the first item exis
 | Build a FID database from period libs | `ImportMSLibs`, `CreateEmptyFidDatabase`, `CreateMultipleLibraries`, `RepackFid`; procedure in `data/building_fid.txt` |
 | **Carry provenance inside the program** | `FunctionTag` (name + comment, DB-backed, and `CppExporter` can filter on it) — tag every function a round touches with the round id, and the ledger becomes reconstructible *from the program* instead of only from your CSV. `BookmarkType.{NOTE,ANALYSIS,WARNING}` for "recorded unresolved" caveats that travel with the address | **Also: a PLATE comment at every address you named, so the GUI reader sees it** — measured, 3618 of them over 1909 functions and 1709 data symbols, with `functions_total` and the AI-symbol count asserted unmoved and a full read-only-sweep harness confirming 0 artifacts perturbed. Make the text rename-proof: say *the name here is ours*, never quote the name, or you have planted one stale copy per address
 | Record the analyzer configuration | `pyghidra.analysis_properties(program)` — results are a function of it, so a metrics row omitting it is not a reproducible snapshot |
-| Machine-readable export for replay debt | `ghidra.app.util.xml.*Mgr`, and the shipped **SARIF** exporter (`Features/Sarif`) — both carry the `SourceType` laundering hazard above |
+| Machine-readable export for replay debt | `ghidra.app.util.xml.*Mgr`, and the shipped **SARIF** exporter (`Features/Sarif`) — both carry the `SourceType` laundering hazard in `references/trust-and-circularity.md` |
 
 ## How to drive Ghidra — prefer library mode
 
