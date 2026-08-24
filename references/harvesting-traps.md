@@ -865,3 +865,33 @@ reach estimate it produced.
   with its exclusion rules already paid for by earlier rounds — do not re-derive them at
   intake**, because a consumer that re-derives an upstream adjudication is a second copy of one
   rule, and the two drift.
+
+### Register conventions you "know" are per-function facts
+
+- **`EBP` IS NOT A FRAME POINTER JUST BECAUSE IT USUALLY IS.** With frame-pointer omission (MSVC
+  `/Oy`, on by default at `/O2`) `EBP` is an ordinary general register, and compilers use it to
+  hold whatever is hot — including an object pointer. Measured: a probe classifying `rep movsd`
+  destinations hardcoded `("ESP", "EBP")` as frame registers, and so read
+  `LEA EDI,[EBP + 0x7c]` — the copy that establishes a 268-byte embedded record at
+  `<object> + 0x7c`, the single fact the whole analysis line was built on — as *"a write to a
+  stack local at offset 124."* **And 124 is 0x7c in decimal**, so the wrong answer looked
+  plausible. Decide the frame register **per function**, from the prologue (`PUSH EBP;
+  MOV EBP,ESP`), not per program. The same caution applies to any "this register means X"
+  assumption: `ESI`/`EDI` as string pointers, `ECX` as `this`, `EBX` as a preserved base — all are
+  conventions the optimizer is free to ignore between calls.
+- **A SMALL DELTA IN A CENSUS IS NOT EVIDENCE THAT THE DEFECT WAS SMALL.** Fixing the above moved
+  **3 of 176** destination classifications — under 2% — and one of the three was the fact the
+  entire arc rested on. **Grade a correction by WHICH rows moved, not how many.** The instinct to
+  shrug at a 2% change is exactly wrong when the population is heterogeneous in importance.
+- **CALIBRATE ON THE PROPERTY THE PROBE EXISTS TO MEASURE, NOT A CORRELATE OF IT.** That probe
+  carried a deliberate calibration: re-derive the hand reading that motivated it. It asked for *a
+  copy of the right SIZE in the right function* and found seven — and never asked where any of
+  them wrote to, which was the entire output of the round that added destination resolution. It
+  therefore **passed for two rounds while the one row it was calibrating against was
+  misclassified.** A calibration that cannot fail when the headline is wrong is decoration. Pin
+  the output, not an input that correlates with it.
+- **QUERY YOUR OWN ARTIFACT FOR A FACT YOU ALREADY KNOW BEFORE TRUSTING IT FOR ONE YOU DO NOT.**
+  The defect surfaced only because a later task needed the artifact to answer a different
+  question, and the row that should obviously have been there was absent. That is a one-line check
+  against a known answer, and it caught a two-round defect that every internal consistency check
+  had passed.
