@@ -936,3 +936,48 @@ And when re-pinning: **account for the delta BY NAME, never by subtraction.** Ke
 of the names the apply is expected to have added and assert the list is present (here 15 of 15),
 and have the *applier itself* assert the added name-set across its own mutation — so the count and
 the account cannot drift apart on a replay the way a bare number lets them.
+
+### A change log is not a census — and two nearly-right accounts are worse than none
+
+**Measured.** A whole-program datatype bracket moved **+136** on a round that applied *no types at
+all* (naming functions into new class namespaces materialises a placeholder type per namespace).
+The standing rule is that re-pinning such a bracket requires accounting for the delta **by name**,
+so two reconstructions were tried: counting placeholder types among the affected classes gave
+**140**; asking the project's own applied-types ledger which of those already existed gave **138**.
+
+Both were close enough to write up. Neither was right, and the reason generalises: **that ledger
+records what YOUR rounds created. It is a change log, not a census** — it cannot see a type that
+arrived with the importer, the demangler, or an analyzer. Deriving "what existed before" from a
+record of "what I did" is only valid if you are the only writer, and on a Ghidra project you never
+are.
+
+**A 2-to-4 row residual is exactly the size of a real defect and exactly small enough to round
+off.** So measure instead of reconstructing: restore the pre-round snapshot into a scratch project
+file, enumerate the full name census on both sides, and diff. Result here: 136 added, 0 removed,
+all placeholders — and the probe **asserts** that `added - removed` reconciles with the count
+rather than leaving a reader to eyeball it.
+
+Two riders:
+
+- **Census everything the invariant counts, not just the interesting kind.** A datatype count
+  counts pointers, arrays and function definitions too. A struct-only census would have reported a
+  residual it structurally could not explain, and the natural next move — widening the tolerance —
+  would have destroyed the check.
+- **Snapshot-diffing is cheap and nobody does it.** The snapshot already exists because the
+  checkpoint discipline created it. Restoring it read-only into a scratch file, diffing, and
+  deleting the scratch is a few dozen lines, and it answers "what actually changed" for any
+  program-wide quantity — permanently, instead of per-round detective work.
+
+### A measured zero needs its mechanism, or it is a bug you have not found yet
+
+**Measured, twice in one round.** "No ancestor's exported symbols name any of these vtable slots:
+**0 of 179**" was produced, doubted on sight, and re-run — the first version had walked only the
+*immediate* base, which was a genuine defect in the reader. The zero survived the fix, and only
+then was it worth anything, because it acquired an explanation: the relevant ancestor's
+mangled-named slots stop at index 151, while every override in question sits at slot 38 or in the
+152–176 range that is the class's own extension.
+
+A zero with a mechanism is a finding you can build on. A zero without one is indistinguishable from
+a scanner that looked in the wrong place — and it reads as *"nothing to find here"* to every later
+round. **Before recording any zero, state the mechanism that produces it and check that the
+mechanism predicts the non-zeros too.**

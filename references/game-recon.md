@@ -446,3 +446,33 @@ You can *cause* a change: take damage, move, spend currency, open a menu. That c
   evidence and it is not `IMPORTED`.
 
 ---
+
+### A naming source can be EXHAUSTED program-wide — measure that once and record it
+
+Round zero's table says to record measured zeros. This is the follow-on: a source that *did* yield
+names can later have nothing left, and that fact is worth establishing globally rather than
+rediscovering per round.
+
+**Measured on one binary.** The "self-announce" source — debug/diagnostic strings of the form
+`ClassName::MethodName`, which the developers emit for their own logging — had previously named two
+classes that nothing else reached. Asked globally, it holds **62 strings naming 13 distinct
+classes, and all 13 are already known**. The source is not weak; it is *finished*. Likewise the
+export route: of the class-shaped type names appearing inside mangled export symbols but not yet
+claimed, all were value types and subsystems (`CLVector`, `CMatrix44`, `CSoundSystem`), not
+hierarchy nodes.
+
+Recording "exhausted, as of this measurement" costs one query and saves every future round the same
+hopeful detour. It is also honest in a way "not yet tried" is not: a stale unknown reads as an
+opportunity forever.
+
+### When a round prices out, ask what the blocked population has in COMMON
+
+A refuted round is cheap only if you read what refuted it. **Measured:** a naming round for 81
+classes died on two measured zeros — no source could name their methods. The autopsy found a shared
+property nobody had looked at: **every one of the 81 overrode the same vtable slot**, and an earlier
+phase had already established what that slot is. Sweeping that property across the whole program
+found **224** classes with the same shape, not 81, and three independent witnesses for the claim.
+
+The instance was a naming problem with no evidence. The pattern was a naming problem with ground
+truth behind it. Before abandoning a blocked population, enumerate what its members share — a slot
+index, an allocation size, a call site, a base — and ask whether any of those is already decided.

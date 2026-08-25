@@ -255,3 +255,38 @@ Two riders that generalise past this instance:
 - **Any column that answers "where did this come from" should be an enum with a documented meaning
   per value, and the producer should RAISE on a value it cannot classify** rather than defaulting.
   A default is how a fifth tier gets silently absorbed into one of the four.
+
+### Find the corroborating constant by COUNTING, not by knowing it
+
+**Measured.** A naming round needed a third, independent witness that a set of 224 bodies were
+deleting destructors. The natural check is "does it call `operator delete`" — and hardcoding that
+address would have made the third leg a restatement of the first, since the address was known only
+because of earlier work on the same hierarchy.
+
+Instead the probe **counted callees across all 224 bodies and reported whichever dominated**,
+refusing (raising) if no callee reached even half the population. One address came back at
+**224 of 224**. Only afterwards was it looked up — and the binary's own export table names it
+`operator_delete`.
+
+That ordering converts the weakest leg into the strongest one. A discovered constant that ground
+truth then confirms is evidence; the same constant typed in from the start is an assumption wearing
+a check's clothing. **Whenever a check needs a magic address, ask whether the data can be made to
+volunteer it, and make "nothing dominates" a refusal rather than a fallback.**
+
+### An artifact changing is not automatically a leak — read the DIRECTION, and read the consumers
+
+Two adjacent lessons from one round, because the instinct they correct is the same one.
+
+**Direction.** A committed evidence artifact changed on **exactly** the addresses a naming round had
+just written to — the precise signature of an AI-name leak. It was the opposite: the values went
+`FUN_xxxx → ""`, the anti-circularity filter dropping the round's own names *out* of evidence,
+which is the filter working. Had the direction been `"" → <our name>` it would have been the defect.
+**The count of changed rows tells you nothing; the before-and-after values tell you everything.**
+
+**Consumers.** In the same round a second artifact's `signature` column genuinely did start carrying
+values derived from the round's own markup, and that column is not name-filtered. Rather than rank
+it as a finding, its two real consumers were opened first: one keys on an unrelated enum name, the
+other covers a disjoint population — **overlap with the affected rows: 0 in both**. Severity is a
+property of what a column FEEDS, not of how contaminated it looks. This is the same rule as
+"ask what each occurrence feeds before asking how wrong it is", and it is worth restating here
+because a contaminated-evidence finding is *satisfying*, which is precisely when it goes unchecked.

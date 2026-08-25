@@ -295,3 +295,19 @@ there), **ours-refreshed** (drop your previous block by marker, re-add — so a 
 accumulate copies of itself), **appended below foreign text** (kept intact). Print all three; a
 round that expected `fresh` and got `foreign_append` has learned something about the address space
 before it writes.
+
+### A naming apply creates TYPES you did not ask for
+
+**Measured.** A round that applied **no types at all** — it named 203 functions into 98 newly
+created class namespaces — moved the program's whole-datatype count by **+136** and changed a
+`signature` column in an artifact three steps downstream.
+
+The mechanism: creating a class namespace materialises a 1-byte placeholder *type* of that name,
+and the cascade then types a `__thiscall` function's `this` against it. So "this is a naming round,
+the type invariants cannot move" is false, and a round that reasons that way will be surprised by
+its own gate.
+
+Budget for it: **a naming round that creates namespaces should expect the datatype bracket to
+fire**, and should plan the by-name account for the placeholders before running, not after. The
+payoff is real and worth having — `this` typed at the class is what turns raw pointer arithmetic
+into member access — but it is a type change arriving through a name-shaped door.
