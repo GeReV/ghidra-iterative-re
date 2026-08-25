@@ -895,3 +895,44 @@ reach estimate it produced.
   question, and the row that should obviously have been there was absent. That is a one-line check
   against a known answer, and it caught a two-round defect that every internal consistency check
   had passed.
+
+### An artifact carrying program-state columns must be regenerated AFTER its own round's apply — and if a column flips, fix the COLUMN
+
+**Measured.** A round produced a new artifact, then applied types to the program, then ran the
+stability harness — which reported the artifact `CHANGED`. It had: the sweep recorded per-class
+program state (`does a type exist`, `which route applies`) and the round's own apply had changed
+exactly that.
+
+The tempting fixes are both wrong. Excusing the artifact from the harness removes the only thing
+that would notice it going stale later; annotating "expect churn here" is the same thing written
+politely. The two fixes that were right:
+
+- **Make the column mean something stable.** `struct_route` was rewritten to name the route a class
+  *belongs to*, not whether the work has been done yet — so it reads the same before and after the
+  apply. A column that answers "what kind of thing is this" is stable; one that answers "is it
+  finished" is a progress indicator and does not belong beside evidence.
+- **Make the sweep and the applier share ONE state machine.** They had independent copies of the
+  same rule and disagreed about what `applied` meant. Two producers with private copies of one rule
+  is the divergence hazard, inside a single repo — and here the applier re-derives the rule and
+  **raises if it disagrees with the artifact's own column**, so the two cannot drift apart quietly.
+
+Residual, and worth stating rather than hiding: some columns are irreducibly program-state
+(`type_state` here). Those change once, at the apply, and are stable thereafter — so **regenerate
+and commit the post-apply version**, and expect exactly one churned generation per mutating round.
+
+### One bracket's raise costs a reach fault too — expect two faults with one cause
+
+**Measured twice, in different rounds.** A probe pins an absolute whole-program invariant (the
+datatype count). A round legitimately changes it; the probe raises — the bracket working. But **a
+producer that raises does not regenerate its artifact**, so that artifact is then counted
+`unchanged` with nothing having re-derived it, and the reach adjudicator reports it as a second,
+apparently unrelated fault.
+
+A round that changes the pinned quantity should expect **two complaints and one cause**, and must
+not go hunting for a second one. Write the pairing down beside the bracket, because the second
+fault names a completely different file and reads like an independent problem.
+
+And when re-pinning: **account for the delta BY NAME, never by subtraction.** Keep a per-round list
+of the names the apply is expected to have added and assert the list is present (here 15 of 15),
+and have the *applier itself* assert the added name-set across its own mutation — so the count and
+the account cannot drift apart on a replay the way a bare number lets them.

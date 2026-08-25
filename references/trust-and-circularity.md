@@ -227,3 +227,31 @@ priority 2, equal to `ANALYSIS`, below `IMPORTED` and `USER_DEFINED`.
   the adjudicated layout it feeds stayed byte-identical. Growth alone could be noise; stability
   alone could be a sweep that failed to see anything new. Together they are corroboration, and
   neither number means much reported without the other.
+
+### A provenance boolean is almost always too few tiers — and a claim written INTO the program is read by someone who cannot re-derive it
+
+**Measured.** A round was about to stamp a comment into the program for each of 101 classes,
+recording whether its base class's name came from the binary. The first cut carried
+`base_named = not name.startswith("UNKNOWN_")`. Checked properly, the 17 bases fall into **four**
+tiers, not two:
+
+| tier | n | what it means |
+|---|---|---|
+| exported mangled vftable symbol | 4 | the binary states the name outright — ground truth |
+| the program's own registry name string | 100 (of the classes) | the binary states it, at a weaker tier |
+| the project's adjudicated inference | 5 | **not stated by the binary at all** |
+| none | 8 | no name recovered; the placeholder is an address |
+
+The boolean would have written a comment calling an *inferred* class name a name from the binary.
+That is the `SourceType` laundering the trust model exists to prevent — committed in prose instead
+of in the symbol table, where no filter can catch it.
+
+Two riders that generalise past this instance:
+
+- **An annotation written into the program is the one artifact whose reader cannot re-derive it.**
+  A CSV row sits beside its producer and its evidence columns; a comment in a disassembler is read
+  months later by someone with no way to check where the claim came from. So the provenance goes
+  *in the comment text*, at the tier's real name, not compressed to "named".
+- **Any column that answers "where did this come from" should be an enum with a documented meaning
+  per value, and the producer should RAISE on a value it cannot classify** rather than defaulting.
+  A default is how a fifth tier gets silently absorbed into one of the four.

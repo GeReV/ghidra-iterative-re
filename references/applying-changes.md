@@ -230,3 +230,68 @@ order of cost. See **Target ABI vs host ABI** in `references/oracles-and-abi.md`
   question of the classes the run actually WRITES: one it deliberately holds back says nothing
   about whether anything changed. **When you change such a rule, print both the old verdict and
   the new one permanently** — that is the two-step diff baked in, and it costs one line.
+
+### An applier's population rule does not follow the evidence; somebody has to move it
+
+**Measured: 137 classes had no applied struct, and the cause was one gate keyed to the wrong
+source.** The applier accepted a class only if a *naming* registry announced it. That was correct
+when written — the naming registry was the layout source. The layout evidence later came from a
+different witness entirely (constructor writes, 925 of 1046 rows), and **the gate did not follow**.
+Over the 137: size decided **137/137**, base already laid out **137/137**, namespace 54/137,
+declarer **0/137**.
+
+Nothing warned, and nothing could: **a population rule that reaches nothing looks exactly like a
+population that has nothing in it.** Both print zero and both leave the artifact empty.
+
+- **The tell is a gate whose pass rate is 0 while every other gate on the same population passes
+  ~100%.** Print every gate's pass count as a fraction of the population, always, including the
+  ones you expect to pass — a single `ALL FOUR: 0 of 137` line beside four per-gate lines locates
+  the binding constraint in one read.
+- **Ask it of every applier you own, periodically and not only when a round stalls:** is this gate
+  keyed to the evidence it applies, or to whatever source happened to exist the day it was written?
+- The reason this survives so long is that the *stalled* population is invisible from inside the
+  applier. It is only visible by joining the applier's gates against the population the evidence
+  now covers — which is a read-only query nobody runs, because the applier reports success.
+
+### Every mutating applier needs a state meaning "already exactly what I would write"
+
+**Measured: an apply raised part-way — after writing all 19 types, before the cascade — and could
+not be restarted.** Undo was unavailable (`canUndo=False`; the script provider's transaction was
+not rolled back on the exception). The applier's state machine had three states: `absent`,
+`placeholder`, `applied` — and `applied` meant *"somebody else's, refuse to touch it"*. So the 19
+types the round had just written were indistinguishable from another round's, the route flipped to
+`already_applied`, and the population guard would have raised on the disagreement. **A partial
+failure is precisely when a resume is needed, and a three-state machine cannot offer one.**
+
+The fix is a fourth state — *this is already exactly what I would write* — verified rather than
+rewritten. Note it is not a weakening: it checks the shape in full (one component, right offset,
+right field name, right type, right length) before granting it.
+
+- **A sibling script in the same repo had the missing arm from the start.** Before designing a new
+  applier's state machine, read the states of the most similar existing one; the expensive states
+  are the ones somebody already learned to need.
+- **Pin the census to the ROUTE population, not the number of writes.** A human approved "19". On
+  the resumed run 0 needed writing; pinning to writes would have demanded `apply 0` and silently
+  broken the tie to what was approved. The route population is 19 on both runs.
+- **A raised run is not a no-op run.** Check what actually landed before deciding how to recover —
+  here, querying one type settled it in one call, and the answer (not rolled back) determined the
+  whole recovery path.
+
+### Before choosing where an annotation lives, count how many of the population can carry it
+
+**Measured: the obvious home for "this class adds no data members" is the type's own description,
+and 96 of the 101 classes had no type at all.** That route would have recorded the finding for 5 of
+101 and printed a clean summary — coverage theatre with no bug in it, because every write it
+attempted would have succeeded.
+
+Pick the anchor that **all** of the population has (here the dispatch table's address, which every
+class has by construction), and state the coverage as a fraction before writing anything.
+
+### Never destroy an existing annotation; append below it, and count the three cases separately
+
+An address that already carries a comment usually carries *provenance* — which round named it, on
+what evidence. Overwriting is silent and unrecoverable. Distinguish and count: **fresh** (nothing
+there), **ours-refreshed** (drop your previous block by marker, re-add — so a re-run cannot
+accumulate copies of itself), **appended below foreign text** (kept intact). Print all three; a
+round that expected `fresh` and got `foreign_append` has learned something about the address space
+before it writes.

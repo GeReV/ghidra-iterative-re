@@ -635,3 +635,32 @@ just fired and you are deciding what it means.
   "a calibration population must share the fire population's code shape."
 
 ---
+
+### A tool property your design rests on is a standing gate, not a one-off check
+
+**Measured.** A round represented 19 derived classes as `struct Derived { Base base; }` — a *typed*
+member rather than a flattened copy — specifically so they would track their base and could not
+drift. The whole argument rests on one property: **that Ghidra propagates a length change through a
+typed member.** That is a property of *the tool*, not of the binary, so a version upgrade could
+remove it and nothing else in the project would notice: the structs would still exist, still have
+the right length today, and silently stop tracking.
+
+So it is measured, and the measurement is **driven on every canary pass**, not once at design time.
+
+Two things make it a real check rather than a ceremony:
+
+- **Run it where it cannot touch the program.** A `StandAloneDataTypeManager` is a real
+  `DataTypeManager` with no program behind it, so throwaway types can be built, grown and read back
+  with zero blast radius. Bracket it anyway — assert the *program's* type count is unmoved either
+  side, because "this cannot have touched anything" is the reasoning this discipline refuses
+  everywhere else.
+- **Give it a negative control, or it proves nothing.** Alongside the typed member, build the
+  design you are *rejecting* — here an opaque `byte[N]` copy of the same base — and require that it
+  does **not** follow. A run where both appear to track is measuring something other than
+  propagation, and without the control it reads as a pass. The control also produced a finding of
+  its own: the project's 13 existing opaque-copy structs are drift-**invisible**, not drift-free.
+
+**Generalise:** whenever a design's safety argument reduces to "the tool does X", write the
+smallest experiment that would fail if the tool stopped doing X, pair it with a control that must
+fail, and put it in the recurring gate set. Design premises decay silently; program facts get
+re-derived every round.

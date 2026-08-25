@@ -819,3 +819,16 @@ through Ghidra, these apply:
   its compile check (the only step recomputing offsets from a C compiler rather than from
   the project's own arithmetic) had *never once run*. Resolve paths from a shared
   constants module.
+
+### `getComment` and `setComment` are not mirror images
+
+`Listing.getComment(int commentType, Address)` but `Listing.setComment(Address, int commentType,
+String)`. Writing them symmetrically type-checks fine in Python and fails at the JVM boundary at
+**run time** — which is to say, after whatever mutations ran before it. Measured: an apply raised
+there having already written 19 struct types, leaving a half-applied program with no cascade and no
+post-condition check. (Ghidra 12.x also offers `setComment(Address, CommentType, String)`; the
+error message enumerates the real overloads, which is the fastest way to settle it.)
+
+**The general rule this stands for: any API pair used read-then-write in one script is worth
+checking against the actual signature, not against the other call.** Symmetry is an assumption
+about the library's taste, and it is wrong often enough to cost a mutating run.
