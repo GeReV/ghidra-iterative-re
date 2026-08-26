@@ -1110,3 +1110,78 @@ Generalise it: **when a body carries no evidence, look one frame up.** Argument 
 fact, and in code that resolves resources by name at start-up it is routinely more self-documenting
 than the callee. The same shape appears wherever a program interns strings to ids: resource
 managers, event systems, script bindings, message dispatch.
+
+---
+
+## A pruning sweep is a reachability sweep, and reachability finds load-bearing things nobody can find
+
+Run periodically: **which scripts and artifacts is nothing pointing at?** The framing is "delete the
+redundant", and on a healthy project the answer will mostly not be deletions.
+
+Measured on one long-running project — 374 scripts, **6 referenced nowhere outside themselves, and
+none of the six was redundant**:
+
+- One **created three functions that a whole-program invariant depends on.** The project's function
+  count is checked as `baseline + <enumerated creations>` by every gate it has, and this script
+  contributed one of the terms — while appearing in **no** run-order document, gate list or log. It
+  read as a dead one-off. It was a step nobody could have replayed.
+- One was **the tool to run first after a bad apply** (does the undo stack still reach the last
+  checked-in version, or is a snapshot the only route left?) — precisely the thing you cannot afford
+  to go looking for during the emergency.
+- The remaining four were genuine one-offs of a few kilobytes each, and each was **the evidence
+  trail for a recorded finding**. Deleting them saves nothing and costs provenance.
+
+> **A gate checks what it is pointed at.** Nothing in a verification harness can notice a component
+> that no list contains — that is the one defect class gates are structurally blind to, and a
+> reachability sweep is the only cheap instrument that sees it.
+
+Practical form, and it is a dozen lines: enumerate every script and artifact, concatenate every
+document/script/config as a corpus, and report the ones whose name never appears outside their own
+file. Then **read each result before deciding anything** — the interesting ones are load-bearing.
+
+### Excusing an artifact repeatedly is a deferral, not a decision
+
+Verification harnesses grow exclusion lists — "this artifact has no producer, skip it". Once an
+entry's reason is effectively *nobody maintains this*, the artifact should be **retired, not
+excused**. One had been carried under `(none — orphaned)` with an entry saying in as many words that
+it was excluded *"because it has no producer, not because it is trusted"*; its row count was one per
+pre-merge item against a set that had since been merged.
+
+**An excused artifact is still a FILE**, in the directory everything joins against, and **a stale
+artifact that nothing regenerates is worse than an absent one, because it ANSWERS** — plausible rows,
+no warning. The exclusion list protects the harness; it does not protect the next author, who will
+find the file and use it.
+
+Delete the exclusion entry together with the artifact, and make sure the harness has an arm that
+catches an exclusion outliving its file — otherwise the list accumulates ghosts.
+
+### Grade deletion targets by RECOVERABILITY before size
+
+Three targets in one round, three risk classes, and only one needed real ceremony:
+
+| target | recoverable? | what it needs |
+|---|---|---|
+| a version-controlled artifact | yes, from history | a write-up, no more |
+| a scratch directory | *usually* — check, don't assume | verify the claim first (below) |
+| ~1 GB of version-control-ignored snapshots | **no** | a stated retention RULE, not a per-file judgement |
+
+For the irreversible one, a rule beats judgement: **keep everything a document names by name, plus a
+fixed newest-N window, plus the test fixtures** — mechanical, auditable, and it survives the reviewer
+disagreeing with you about any individual file. And check first whether the *primary* recovery path
+is something else entirely; here the tool's own version control held every version and the snapshots
+were the belt to its braces, which is what made the deletion sane at all.
+
+### "Fully regenerable" is a claim to check, not an adjective to apply
+
+A scratch directory was approved for deletion on that basis and it was **not true**. The mechanical
+outputs regenerated from one command. The *delegated readings* did not: their rationale column held
+**why a reader believed a conclusion**, and the permanent records kept the conclusion and its
+supporting facts but not the reasoning. A judgment cannot be recomputed — which is exactly why its
+output has to be **stored** rather than regenerated.
+
+> Before deleting anything called scratch, ask which of its files were produced by a **decision**
+> rather than by a script. Those are not scratch, whatever directory they are sitting in.
+
+Keep such records in their **pre-adjudication** form. A quarter of that batch's rows were rejected,
+and what a reader got *wrong* is the evidence that priced the filter — the survivors alone cannot
+tell you how good the process was.
