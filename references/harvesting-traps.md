@@ -1301,3 +1301,71 @@ the save format, those were the highest-value rows in the artifact and nobody ha
 **A cross-check that is described but never executed is a claim, not a check.** When a producer's
 header advertises one, run it in the same round, print the number, and treat any disagreement as
 either a probe defect or a genuine asymmetry — both worth a round.
+
+## When a self-checking witness disagrees with itself, price the INSTRUMENT first
+
+Some witnesses come in matched pairs that must agree — a serializer and its deserializer, a
+constructor and its destructor, a writer and its reader. Running that comparison is always worth it
+(see *a built-in cross-check must be MEASURED, not admired*). What to do with the failures is the
+part that goes wrong.
+
+The temptation is to read every disagreement as a finding about the BINARY: a field written and
+never read back, an allocation never freed. **Enumerate your own instrument's failure modes first.**
+They are a short list, you already know them, and they are far more likely.
+
+**Measured.** A cross-check over 144 classes found **19 disagreements**, recorded as the artifact's
+highest-value rows and as candidate format bugs. Reading the bodies: **18 of 19 were the probe's own
+limits, and 0 were a genuine write-without-read.**
+
+- **The access is one call deep.** A checked-read helper — `fread(dst,4,1,f)` plus an error bail —
+  had **32 call sites**. A scanner that walks each body's own instructions cannot see a read
+  performed by a callee, by construction.
+- **The value passes through a local.** `tmp = [this+0x1f8] + [this+0x78]; fwrite(&tmp,…)` reads a
+  field and writes a stack slot, so the field never appears as a written field. Same for unit
+  conversions (`ticks * 1/60`) on the way out and back.
+- **A branch is flattened into a set.** A record whose writer branches on a status byte contributes
+  the UNION of both arms, which no single reader path will ever match.
+
+All three are one shape: **the field access and the I/O call are not the same instruction.** If your
+witness assumes they are, say so in its header, because every disagreement it reports is that
+assumption failing before it is anything about the binary.
+
+**And the messiest row can be the only real one.** The single genuine finding in those 19 was the
+case that looked most like noise — a discriminated union keyed on an object's status, which a
+reimplementation must reproduce. Do not rank rows by tidiness.
+
+## Collapse a population by its shared witness BEFORE investigating any member
+
+A population defined by a negative — *"77 classes have save records and no load records"* — reads as
+N investigations and a coverage gap. Check what its members SHARE first; a uniform population is one
+question wearing N hats.
+
+**Measured.** Those 77 shared exactly one slot-45 target and one slot-46 target: a single inherited
+pair. So it was never 77 questions. And the one question — *why would a base deserializer
+legitimately be EMPTY?* — exposed an entire unexamined layer of the file format: the base serializer
+writes the object HEADER (type id, handle, parent), and the base deserializer is empty **because the
+object cannot read its own type id — you need the id before you have an object to read into.** The
+header is consumed by a container above the per-object pair.
+
+- **Group by the witness, not by the members.** One join answered it; 77 readings would not have.
+- **An empty inherited method is a design statement, not an omission.** The emptiness names a
+  boundary — here, between an object and its container — and points at whatever is on the other side
+  of it. That container is where a file format's STRUCTURE lives (framing, null markers, type
+  dispatch, pointer fixup), and it is the half that cannot be inferred from field lists.
+
+## A forbidden column does not error — it returns a plausible wrong answer
+
+Projects accumulate columns that are known-bad and marked *do not use*: a deprecated heuristic, a
+superseded attribution, a field kept only for history. The prohibition lives in a document; the
+column keeps sitting in the CSV, correctly typed and fully populated.
+
+**Measured.** A grouping keyed on such a column returned *"72 of them have no entry"*; keyed on the
+correct column the answer was *"all 77 share one entry"*. Nothing failed, nothing warned, and the
+wrong answer was the right shape and the right order of magnitude.
+
+- **Cross-check a surprising count against a number the same artifact already prints.** This one was
+  caught only because *"72 with no slot-46 target"* contradicted the producer's own headline,
+  *"224 tables with a slot-46 target"*, three lines up in its output.
+- If a column must not be used, the durable fix is to make reading it loud — drop it from the
+  regenerated artifact, or rename it `deprecated_*` so a join on the old name raises a `KeyError`
+  instead of quietly succeeding.

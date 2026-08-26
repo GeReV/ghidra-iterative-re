@@ -788,3 +788,23 @@ X before Y", the durable fix is a structure or a check that cannot proceed witho
 selftest pinning the branch boundary in both directions, so a merged map fails loudly instead of
 producing plausible names.
 
+## An EMPTY virtual in a base class is a design statement — read it as one
+
+An inherited virtual whose body is `ret` looks like an omission, a stub, or dead weight, and it is
+usually skipped. It is often the most informative method on the class, because **it marks a boundary
+the design deliberately put somewhere else.**
+
+**Measured.** A game's `CGobject::Load(FILE*)` — ground truth, an exported mangled symbol — is
+completely empty, while its sibling `CGobject::Save(FILE*, int)` writes the object's header: type
+id, handle, parent. 77 classes inherit both unchanged, which read as a coverage gap ("they save and
+never load").
+
+The asymmetry is correct and necessary: **the object cannot read its own type id, because the type
+id is what decides which object to construct.** The header must be consumed by a container that
+reads the id, dispatches to a factory, constructs, and only then calls the virtual. The empty
+override is where the object's responsibility ends and the container's begins.
+
+Generalising: when a base virtual is empty while its counterpart is not, ask *what would have to be
+true elsewhere for this to be correct?* The usual answers are a container, a dispatcher, or a
+two-phase construction — all of them structure you have not found yet, and all of them worth more
+than the field lists the non-empty side yields.
