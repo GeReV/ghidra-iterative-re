@@ -311,3 +311,49 @@ Budget for it: **a naming round that creates namespaces should expect the dataty
 fire**, and should plan the by-name account for the placeholders before running, not after. The
 payoff is real and worth having — `this` typed at the class is what turns raw pointer arithmetic
 into member access — but it is a type change arriving through a name-shaped door.
+
+### When an apply's payoff disappoints, ask whether it is the wrong apply or the wrong ORDER
+
+**Measured, on the same script run twice.** A struct apply over ~100 classes retyped **7 of 40**
+functions and said so. Two rounds later the *identical* script, artifact and population rule
+retyped **107 of 140**. Nothing about the apply changed; in between, a naming round had attributed
+203 functions to those classes, and **a struct only retypes where a signature already points at
+the class type**.
+
+Both readings of the first result would have been wrong. "The apply is not worth it" would have
+discarded a 15x payoff sitting one round away. "The measurement is pessimistic" would have been
+dressing up a real number. What was right: apply anyway (the work was correct and the artifact was
+needed), **state the small number plainly**, and record what the payoff was gated on — which is what
+made the multiplier visible when it arrived.
+
+The generalisation: an apply's benefit is often a product of two applies, and the one you are
+holding may be the second factor. Before concluding a route is low-value, ask what its payoff is
+*conditional on*, and whether that precondition is cheap and already on the backlog.
+
+### Predict whether a round moves the type count, and be suspicious when the bracket disagrees
+
+Two rounds, opposite shapes, measured:
+
+| round | what it applied | datatype count |
+|---|---|---|
+| naming into new namespaces | **no types at all** | **+136** — `createClass` materialises a 1-byte placeholder per namespace, and the cascade types `__thiscall` `this` against it |
+| structs over existing placeholders | **81 structs** | **0** — `replaceDataType` swaps in place under the same name |
+
+So the intuitive rule is exactly backwards, and both surprises are cheap to avoid by predicting the
+number before the run. A bracket that fires when you expected silence — or stays silent when you
+expected a delta — means the apply did something other than what you believe, and that is worth
+stopping for rather than re-pinning past.
+
+### A derived type that is the same size as its base ties with it on every size-keyed join
+
+**Measured.** Representing "this class adds no data members" as `struct Derived { Base base; }` is
+correct and drift-free — and it necessarily creates a type of *exactly* its base's size. Do that
+100 times and every witness that identifies a type BY SIZE gains candidates: a 128-byte block-copy
+site went from two possible types to five, the three new ones being classes that had been 1-byte
+placeholders the round before.
+
+The new candidates are genuinely that size, so this is **dilution, not error** — but it is
+permanent, it is invisible unless you diff the artifact, and it is a property of the design rather
+than of any one round. Record it where the size-keyed witness is documented, and require later
+rounds that lean on such a join to state the candidate count as a fraction rather than quoting it
+as if it were narrow.
