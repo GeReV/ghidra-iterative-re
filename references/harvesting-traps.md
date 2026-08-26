@@ -1185,3 +1185,61 @@ output has to be **stored** rather than regenerated.
 Keep such records in their **pre-adjudication** form. A quarter of that batch's rows were rejected,
 and what a reader got *wrong* is the evidence that priced the filter — the survivors alone cannot
 tell you how good the process was.
+
+## A producer written this hour is not safer than one written last year — it is less tested
+
+The instinct is to trust fresh code and audit old code. Invert it. An old producer has survived
+every consumer that ever read it; a new one has survived none, and its selftest was written by the
+same person, in the same hour, from the same wrong mental model.
+
+Measured: a round built a class-level evidence-pack generator, ran its selftest (10/10, after one
+genuine failure it fixed), generated five packs and dispatched five delegated readers. The generator
+carried a defect that would have produced **7 confidently wrong names out of 61**. Two independent
+readers caught it within the hour. Nothing else was watching, precisely *because* it was new — the
+round's attention was on the readers' judgment, not on the instrument that fed them.
+
+- **Treat a new producer's FIRST output as a hypothesis the first consumer is testing**, and say so
+  in the brief. Both readers who caught the defect had been told explicitly that defects in our own
+  probes were a valuable finding; both delivered one.
+- **A passing selftest on a new producer means the author's model is self-consistent**, not that it
+  matches the binary. The failing check is worth more than the passing suite: write checks that pin
+  a MEASURED value rather than a bound, so that being wrong about the value fires immediately. One
+  such check here was written as `< 20`, fired on first run against real data, and the correct
+  answer turned out to be 18 — the threshold was wrong, not the artifact.
+
+## No silent caps — a truncated list reads as a measured absence
+
+A harvester that emits `"|".join(items[:8])` is not making a display choice. A consumer that reads
+eight strings and a body that references ten cannot tell the difference between *"this body has
+eight strings"* and *"someone stopped counting at eight"* — and the first reading is the one every
+consumer will make, because a full-looking list is indistinguishable from a complete one.
+
+Measured: a census capped nine separate list columns (`[:8]`, `[:4]`, `[:12]`) with no ellipsis and
+no count. A delegated reader working a body that builds a **six**-wide resolution array saw the cell
+stop at the fourth entry, and called it *"the finding that would have most changed my reading."*
+The reader recovered the rest by hand from the disassembly; one who had not noticed would have
+reported a four-resolution screen with full confidence and a clean citation.
+
+- **Emit the horizon: `+N more`.** The cap itself is usually fine and worth keeping — it is the
+  silence that is the defect.
+- **Sweep the file when you find one.** Caps cluster: they are written in one sitting, in one
+  `rows.append([...])`, and fixing one of nine leaves eight producing confident wrong numbers.
+- **The same rule applies to an empty block.** When a per-item report has nothing to say about an
+  item because the item was never gathered, say *that*, loudly. The same round found evidence packs
+  printing a blank citation menu for bodies that already carried a name — because the census
+  covering them was scoped to unnamed bodies — and the blank read as *"references nothing."*
+
+## When you fix a join in one checker, grep the file for the same join
+
+The cheapest possible instance of *sweep the pattern, not the instance*, and it was still missed.
+
+A citation checker resolved a class NAME through a hierarchy artifact, which made an entire family
+uncitable because none of its 45 tables appears in that artifact. The fix — accept a raw table
+ADDRESS as an alternative — was applied to that one checker, with a comment explaining the
+reasoning. **Four lines below, in the same file, a second checker did the identical lookup and was
+left alone for two rounds.** Measured when a later round tried to use it: **0 of 45** tables
+resolvable, and the failure message read *"no vtable for class X"* — which sounds like a fact about
+the class rather than a defect in the join.
+
+**Grep for the HELPER, not for the symptom.** `vt_of.get(norm_table(...))` had exactly two call
+sites and one of them was fixed. A one-line grep at fix time would have closed both.
