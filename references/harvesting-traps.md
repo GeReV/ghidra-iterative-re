@@ -1243,3 +1243,61 @@ the class rather than a defect in the join.
 
 **Grep for the HELPER, not for the symptom.** `vt_of.get(norm_table(...))` had exactly two call
 sites and one of them was fixed. A one-line grep at fix time would have closed both.
+
+## The fresh measurement is not automatically the right one
+
+When a number you just computed disagrees with a committed one, the instinct is to trust yours: it
+is visible, it is recent, and its code is in front of you. That instinct is backwards. The committed
+producer has survived every consumer that ever read it and carries calibrations you have not
+reproduced; your ad-hoc join has neither.
+
+**Measured.** A project had 547 recorded as the size of a residue. An ad-hoc join written to re-check
+it said **979** — wrong by 432 in the alarming direction, and enough to have scoped the next round
+against a problem 76% larger than the real one. The committed producer attributed each offset to
+whichever class **in the inheritance chain** owned it; the ad-hoc join compared against the class's
+own fields only, so every inherited field counted as unexplained. The explanation was already in a
+comment beside the chain walk.
+
+- **Before believing the disagreement, read what the committed producer DOES THAT YOURS DOES NOT** —
+  the specific operation, not "which looks right".
+- **An ad-hoc join is a HYPOTHESIS about the committed one, never a check on it.** Use it to locate a
+  disagreement; resolve the disagreement by reading, never by preferring the newer number.
+- This is the mirror of *a producer written this hour is less tested*: the same asymmetry, pointed at
+  a number instead of at a tool.
+
+## Decompose a residue before pricing it
+
+A residue quoted as a single number is not yet a price, and the number is usually inflated by
+structure rather than by content.
+
+**Measured**, on the 547 above:
+
+1. **Duplication by design.** Save and Load each contributed a row for the same field, so 547 ROWS
+   were **283 distinct `(class, offset)` pairs**. That duplication was the witness's built-in
+   cross-check, not noise — halving the number and gaining a check.
+2. **Inheritance replication.** Grouping by immediate base, **32 base-class fields explained 445 of
+   the 547 (81%)**: one field on a base with 26 subclasses appears 52 times.
+
+Real backlog: **83 decisions with a 32-item head**, against a headline of 547. Always ask of a
+residue: *how many DISTINCT facts is this, and how many of them are one fact seen from N places?*
+
+**Group by IMMEDIATE parent, not by root, when one root dominates.** Root grouping put all 283 pairs
+in a single bucket because 223 of 224 tables descended from one class. A key whose distribution you
+have not checked is not a key — see *check the distribution of whatever you key on before trusting
+the key*.
+
+## A built-in cross-check must be MEASURED, not admired
+
+Some witnesses carry their own consistency check: two independently compiled bodies that must agree
+(a serializer and its deserializer, a constructor and its destructor, a writer and its reader). That
+property is worth a lot and is usually written proudly into the producer's header.
+
+**Measured: it had been described in the header since the day the probe was written, and never once
+run.** One join executed it: **19 of 144 classes disagreed** between their save field set and their
+load field set — a field written and never read back, or read and never written — and a further
+**77 classes had save rows and no load rows at all.** For a project whose stated recovery target was
+the save format, those were the highest-value rows in the artifact and nobody had looked.
+
+**A cross-check that is described but never executed is a claim, not a check.** When a producer's
+header advertises one, run it in the same round, print the number, and treat any disagreement as
+either a probe defect or a genuine asymmetry — both worth a round.
