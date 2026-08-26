@@ -274,6 +274,33 @@ mechanics, not inference.
 
 Preconditions, all of which must be checked, not assumed:
 
+- **The two tables are in an ANCESTOR–DESCENDANT relation, and the slot index lies within
+  the ancestor's table.** This is the precondition that gets dropped, because "slot *i* in
+  both tables" is trivially computable and the relationship is not. New virtuals are
+  *appended*, so every branch of a hierarchy starts numbering its own additions at the same
+  index — two classes in **sibling** branches are therefore **guaranteed** to hold unrelated
+  methods at the same slot, not merely likely to. Formally: slot *i* is comparable between
+  classes A and B only if their nearest common ancestor's table has **more than *i***
+  entries. Above that boundary the index carries no information at all.
+
+  **Measured, on a 1999 MSVC/x86 game.** A round was scoped, priced and approved on the
+  rule without this test, keyed on the hierarchy **root** and slot index — a key that looked
+  conservative and was not, because **223 of 224 tables rooted at one class**, so "per
+  hierarchy" was the global rule wearing a hat. It produced **111 candidate names; exactly
+  1 survived** the ancestor-length test. The shape of the collision: the shared ancestor's
+  table held 152 slots, one branch grew to 171 and another to 215, so every index past 152
+  named two different methods depending on the branch — and two of the round's headline
+  groups (14 candidates each) were a single 47-vs-53-slot collision counted twice. *Check
+  the distribution of whatever you key on before trusting the key.*
+
+- **A second witness that is blind to the hierarchy — on MSVC x86 the cheapest is the
+  `RET imm16`.** `__thiscall` makes the callee pop its arguments, so the terminal return
+  instruction's immediate **is** the argument byte count, straight from the instruction
+  stream. In the incident above it refuted **60 of 108** readable candidates on its own,
+  knowing nothing about tables or names, and passed the single survivor. Note the asymmetry
+  before using it as confirmation: most virtuals take 0 or 1 argument, so *agreement* is
+  what two unrelated functions do and only *disagreement* carries information.
+
 - Single inheritance (the `??_8`/`??_9`/qualified-`??_7` test above).
 - Correct slot alignment between the tables — join on **target addresses**, not demangled
   short names, since an override shares its base's name and makes different tables look
