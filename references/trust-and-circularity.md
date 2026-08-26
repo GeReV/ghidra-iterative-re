@@ -290,3 +290,28 @@ other covers a disjoint population — **overlap with the affected rows: 0 in bo
 property of what a column FEEDS, not of how contaminated it looks. This is the same rule as
 "ask what each occurrence feeds before asking how wrong it is", and it is worth restating here
 because a contaminated-evidence finding is *satisfying*, which is precisely when it goes unchecked.
+
+### Before discarding a circular witness, try restating it WITHOUT the name
+
+A witness rejected as circular is often circular only in the way it was *phrased*. The underlying
+fact frequently involves no name at all, and rewriting it costs one line.
+
+**Measured.** Naming a class's scalar destructor, the obvious corroboration was *"`X::vector_deleting_dtor`
+calls this body"* — and it is genuinely circular, because an earlier round applied that name. But the
+name is doing no work in the claim. The same structural fact stated positionally is
+*"the target of **slot 38** of `X`'s vtable calls this body"*: the slot index is ground truth from an
+earlier ABI finding, the pointer is read out of **memory**, and the call edge is read out of the
+instruction stream. **No symbol is consulted at any point**, so the witness cannot be satisfied by
+the project's own markup — and it is the same evidence, minus the laundering.
+
+The general move: write the candidate witness as a sentence, then delete every proper noun. If what
+remains still identifies the thing — an address, an ordinal, a slot, an offset, a byte pattern —
+the witness was never circular, only badly worded. If nothing remains, it really was the name doing
+the work, and it should be dropped.
+
+**Budget for a sibling witness that survives inlining.** In the same round, four of six targets could
+cite a call to an exported base constructor/destructor; the other two could not, because the compiler
+had **inlined** the base destructor and there was no call left to cite. A witness kind that depends
+on the compiler not having inlined something will silently cover only part of any population, and
+the gap is not random — it correlates with small, hot, frequently-called bodies, which is exactly
+where the high-fan-in naming targets live.
