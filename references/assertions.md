@@ -759,3 +759,35 @@ Two consequences worth planning for: a checker's coverage is bounded by the arti
 so **enumerate what those artifacts exclude** before believing a population is unciteable; and when
 you add the address form, keep the name form working — existing rows rest on it, and loosening is
 safe where replacing is not.
+
+## A gate keyed on IDENTITY cannot police a change to an ATTRIBUTE
+
+A ledger gate that joins "every markup symbol" to "every ledger row" **by address**, in both
+directions, is the standard whole-program consistency check and it is a good one. It catches an
+off-the-books apply (a symbol with no row), a rollback (a row with no symbol), and any drift in the
+counts.
+
+**It is structurally blind to a RENAME.** Change the name on one side only and the address is still
+present in both directions, both counts are unchanged, and the gate passes. Measured: a project ran
+this gate for dozens of rounds and it was never wrong, because every applier it had ever seen
+**appended** — the failure mode simply could not arise. The first applier that rewrote a row
+introduced a defect class no existing gate could express.
+
+- **When you add an operation whose failure mode no existing gate can state, name the gate that does
+  cover it — in the new script's own header**, where the next person looks. Here that was a separate
+  probe joining by NAME rather than by address.
+- **Ask of every gate: what does its KEY make invisible?** A join on address cannot see a name; a
+  join on name cannot see an address move; a count sees neither. This is the same failure as *a
+  wrong join key produces a MISSING answer, not a wrong one*, pointed at the gate rather than the
+  harvester.
+
+## Re-tighten a ratchet when the backlog SHRINKS
+
+A ratchet — a committed ceiling on some backlog, asserted every gate pass — exists so the backlog
+cannot grow without somebody deciding it should. Raising it is a deliberate act, usually recorded
+with the round that earned it.
+
+**Lowering it is just as load-bearing and is the half that gets forgotten.** A ceiling of 73 against
+a true value of 68 silently permits five new unjustified entries, and the gate will report healthy
+the whole time. The ratchet only measures anything while it is touching the number it tracks, so
+move it down whenever the work moves the number down.

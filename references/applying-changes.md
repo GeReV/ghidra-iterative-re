@@ -357,3 +357,39 @@ permanent, it is invisible unless you diff the artifact, and it is a property of
 than of any one round. Record it where the size-keyed witness is documented, and require later
 rounds that lean on such a join to state the candidate count as a fraction rather than quoting it
 as if it were narrow.
+
+## Before reverting a raised apply, establish WHICH SIDE IS AHEAD
+
+The standing repair for an apply that raised is *do not promote its output — revert the artifacts it
+touched, by name.* That rule is right, and it encodes an assumption worth making explicit: **the
+artifacts ran ahead of the program.** Which is the normal failure, because artifacts are written
+last, after the program mutation has already succeeded.
+
+There is a second shape, and the standing rule makes it worse rather than better.
+
+**Measured.** A script renamed five symbols, rewrote both its side ledgers, then raised on a mistyped
+cascade call. Program and ledgers had moved **together** and agreed with each other exactly; only the
+cascade and the post-cascade re-assert had not run. Reverting the ledgers there would have
+**manufactured** the desync the rule exists to prevent — turning a consistent, unfinished state into
+an inconsistent one.
+
+- **Diff the program against the ledger before deciding.** The correct repair is whichever action
+  restores agreement. Sometimes that is finishing the operation, not undoing it.
+- **The rule is about CONSISTENCY, not about undoing.** "Revert on raise" is a heuristic for the
+  common case; the invariant underneath it is that the program and its ledger must agree.
+
+## An applier that REWRITES rows must be convergent from the start
+
+Most appliers append: a row is written once and never touched again, so a half-finished run always
+leaves the artifact ahead of or behind the program in a detectable way. An applier that **rewrites**
+existing rows is different — a partial run can leave both sides consistent, and then re-running is
+the natural repair rather than a hazard.
+
+So write it to converge: **a target that already carries the intended value is a corroboration, not
+a conflict.** Skip it and continue. This is the same three-way guard a good applier already uses to
+tolerate a name it applied in an earlier session (*present and correct → skip; present and different
+→ raise; absent → apply*), and it costs three lines.
+
+Written that way, the incident above would have been a re-run rather than a diagnosis. Written the
+other way, a raise leaves an operation that **cannot be completed except by hand** — which is how a
+careful project ends up hand-editing a ledger.
