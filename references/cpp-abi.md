@@ -145,6 +145,30 @@ rule above. Note the binary exported **no `??_E` or `??_G` symbol at all** (only
 `??_B`), so it could not adjudicate its own naming; the identification came from the body
 shape plus the documented MSVC rule, not from a symbol.
 
+**The converse trap, and it bites when you go looking for the SCALAR destructor.** There are
+**two** destructor bodies per polymorphic class, and the obvious way to recognise either one
+recognises *both*: the scalar `~X` and the vector deleting destructor **both install the
+class vptr into `[this+0]`, and both call the base-class destructor.** A recovery rule built
+from "installs this class's vptr, then calls an ancestor's destructor" is therefore
+structurally unable to separate them, and it will confidently hand you the deleting
+destructor under the name `~X`.
+
+Measured: a program-wide sweep for scalar destructors proposed `CRobotPart::~CRobotPart` for
+a body that was in fact the slot-38 **deleting** destructor of a *different* (unnamed) class —
+wrong class and wrong kind — and it was caught only because that name had been correctly
+applied to another address one round earlier. The discriminator costs one predicate and was
+already known from the deleting-destructor work above:
+
+> a body carrying the **`flags & 1` test** *and* a **call to `operator delete`** is the
+> DELETING destructor; the scalar one has neither.
+
+Two general points fall out of that incident. **When a rule targets a shape, enumerate the
+other populations that share the shape and encode the exclusion**, rather than waiting for a
+collision to reveal it — here the exclusion already existed in a sibling round's applier and
+simply had not been carried across. And **put the discriminator in the probe that first
+proposes the answer, not only in the applier that would refuse it**: a pricing probe's output
+is read, quoted and scoped against long before any applier sees it.
+
 ### Comparing names — the string-space trap
 
 Raw mangled names (`?Sleep@CGobject@@QAEXXZ`) and Ghidra's demangled short names (`Sleep`)
