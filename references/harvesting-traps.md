@@ -981,3 +981,32 @@ A zero with a mechanism is a finding you can build on. A zero without one is ind
 a scanner that looked in the wrong place — and it reads as *"nothing to find here"* to every later
 round. **Before recording any zero, state the mechanism that produces it and check that the
 mechanism predicts the non-zeros too.**
+
+### A wrong join key produces a MISSING answer, not a wrong one — re-key before believing an absence
+
+The sibling of the rule above, and the more dangerous half. A mislabelled row invites a challenge:
+somebody reads `CHoverTruck` where they expected `CVehicle` and asks why. **An absence invites
+nothing.** Nobody audits a blank.
+
+**Measured.** A harvester attributed each function to a class through a *derived* label column that a
+long-standing project rule had already deprecated as unreliable. The consequence was not a wrong
+class — it was that a corroborating witness was found for **0 of 30** functions. Re-keyed on the
+address instead of the label, the same join found it for **24 of 30**, every one independently
+verified against memory. The defect had survived in a committed producer precisely because its
+output was an emptiness, and an emptiness looks like the world rather than like a bug.
+
+Worse, an intermediate finding built on the bad join — a tidy, quotable claim about a standing
+backlog item — was entirely an artefact of it, and was caught only because the next step happened to
+re-key the same join. **The satisfying lead derived from a suspect instrument is the one to
+re-derive first**, because its appeal is exactly what stops you checking it.
+
+Three cheap habits, in order of payoff:
+
+- **Join on identity, not on a label.** An address, an ordinal, a file offset — something the
+  program defines. A name or a derived class label is a *display* of identity and can be produced by
+  a heuristic somebody deprecated years ago.
+- **When a join returns nothing, re-run it with a second key before writing the zero down.** One
+  line, and it separates "the evidence is absent" from "my key was wrong".
+- **Normalise before joining, and check spelling divergence between artifacts.** Two files in the
+  same repo spelled the same table `UNKNOWN_004dda7c` and `UNKNOWN_0x004dda7c`; a naive join reports
+  every row as missing, which reads as a finding about the program.
