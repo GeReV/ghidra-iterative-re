@@ -748,39 +748,43 @@ Three shapes worth recognising while reading such a family:
   bit selects the "disabled" artwork, the method that sets that bit is `Disable` — witnessed rather
   than guessed.
 
-## A slot map is a claim about inheritance, and inheritance is not in the table
+### The same trap, one round later, with the rule already written down
 
-You recover what a vtable slot MEANS by reading the body in it, then reuse that meaning across
-every class that has a body at the same index. That reuse is the payoff — one interface read
-explains hundreds of overrides — and it is only valid **inside one inheritance branch**.
+**This section was written on 2026-08-26 from the incident above. On 2026-08-27 the next
+project round walked into the same trap anyway, and the failure is worth more than the rule.**
 
-**Two classes that both derive from the same base share nothing above that base's vtable length.**
-If `Base` has 20 slots and `DerivedA` has 28 while `DerivedB` has 24, then `DerivedA` and `DerivedB`
-are siblings that each appended their OWN virtuals starting at index 20. Slot 20 is one method in
-one and a completely unrelated method in the other. Nothing in the vtable marks the boundary: both
-are just arrays of code pointers, and index 20 exists in both.
+A round built a fresh evidence-pack generator that mapped vtable slot -> method name for a
+45-class GUI family, and merged TWO roots into one map. The family is four branches: a 20-slot
+base, and siblings of 28, 24 and 21 slots each extending it independently. The merged map
+propagated the 28-slot branch's `Open`/`Close`/`SelectByCommandId` onto panels and buttons that
+have no such methods. **7 of 61 mechanically-derived names would have been confidently wrong.**
 
-Measured on one 1999 MSVC/x86 binary: a 45-class GUI family that a previous round had recorded as
-sharing *"ONE virtual interface"* was **four branches** — a 20-slot root, and three siblings of 28,
-24 and 21 slots each extending it independently. A slot map merged across the roots propagated the
-28-slot branch's `Open`/`Close`/`SelectByCommandId` onto panels and buttons that have no such
-methods. **7 of 61 mechanically-derived names would have been confidently wrong.**
+Nothing above is new — the rule states the sibling case as *guaranteed*, not likely. What is new
+is **why the rule did not fire**:
 
-**The check costs one read and settles it:**
+- **The round never asked the question, because the slot map came from an ARTIFACT JOIN.** The
+  earlier incident keyed on the hierarchy root and got caught pricing candidate names. Here the
+  map was assembled by a producer as a lookup table, and a lookup table has no step at which
+  anyone asks *"is this index within the common ancestor?"* **Encode the precondition in the
+  data structure, not in the analyst's attention**: key the map by `(branch_root, slot)`, never by
+  `slot` alone. The bug is a `dict` that should have been two.
+- **The check is one artifact column.** Comparing the ancestors' vtable LENGTHS settles it, and
+  most projects already store the length. It costs one read and it was not taken.
+- **Where a class's own branch has no decided name for a slot, SKIP — do not borrow.** Borrowing
+  across the boundary is free, silent, and produces exactly the confident-wrong-name outcome the
+  trust model exists to prevent. List the skipped addresses so the gap is a backlog item.
 
-- **Compare the ANCESTORS' vtable LENGTHS before extending a slot map past the base.** A slot map
-  is safe for indices `< len(vtable(base))` and needs a branch qualifier above it. Most projects
-  already have the length in an artifact column.
-- **Key the map by `(branch_root, slot)`, never by `slot` alone.** The bug is a `dict` that should
-  have been two.
-- **Where a class's own branch has no decided name for a slot, SKIP it — do not borrow.** Borrowing
-  is free, invisible, and produces exactly the confident-wrong-name outcome the whole trust model
-  exists to prevent. List the skipped addresses so the gap is a backlog item rather than a silence.
+**What caught it was `RET imm16` — the second witness this section already recommended.** A
+delegated reader counted pushed arguments in the disassembly: the 24-slot branch's slot 21 takes a
+`char *` and copies it into a field, while a screen calls its slot 21 with nothing pushed, and one
+virtual index cannot carry both signatures. **A join over a slot table structurally cannot see a
+signature** — it sees occupancy only — so no amount of artifact cross-referencing would have found
+this. That is the general rule (*a producer only finds what its witness kinds can see*) landing on
+the producer itself.
 
-**What actually caught it was ARGUMENT COUNT, which is why a human or an agent reading the
-disassembly beats a join over artifacts here.** The 24-slot branch's slot 21 takes a `char *` and
-copies it into a field; the 28-slot branch's slot 21 is called with nothing pushed. One virtual
-index cannot have both signatures, so they cannot be the same method. A join over a slot table
-cannot see a signature — it only sees occupancy — so **no amount of artifact cross-referencing
-would have found this.** This is the general rule (a producer only finds what its witness kinds can
-see) landing on the producer itself.
+**The transferable lesson is not about vtables.** A rule written in a reference file is not a rule
+applied; it fires only where something in the workflow ASKS it. When a lesson's remedy is "check
+X before Y", the durable fix is a structure or a check that cannot proceed without X — here, a
+selftest pinning the branch boundary in both directions, so a merged map fails loudly instead of
+producing plausible names.
+
