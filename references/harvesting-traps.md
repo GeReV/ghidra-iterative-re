@@ -1032,3 +1032,81 @@ Three cheap habits, in order of payoff:
 - **Normalise before joining, and check spelling divergence between artifacts.** Two files in the
   same repo spelled the same table `UNKNOWN_004dda7c` and `UNKNOWN_0x004dda7c`; a naive join reports
   every row as missing, which reads as a finding about the program.
+
+---
+
+## Delegating a batch to a reader who does not trust your probe is a test of the probe
+
+The largest source of independent scrutiny a producer will ever get is not a review of its code. It
+is **handing its output to someone who has to act on it and does not already know what each column
+means.**
+
+Measured on one 1999 MSVC/x86 project: six evidence packs, built by one census script, went to six
+independent readers with instructions to name the functions in them. Four defects came back and
+**all four were in the instruments, not in the readings.**
+
+- **A `vptr_store` column fired on every `MOV [reg], imm32`** — including a body assigning a *string
+  pointer* to a field. The program's message pump was reported as installing a vtable, because it
+  does `pCrashTracer = "PeekWindows"`. **Three of the six readers refused that citation
+  independently**, one observing that a message pump cannot be a constructor. The fix is a property
+  of the *target*, not of the store: a vftable's first slot holds a pointer into `.text`; a string's
+  first four bytes do not. The column fell 217 → 187, i.e. **14% of it was noise** that had been in
+  a committed producer, unremarked, for as long as the column existed.
+- **An external callee's address was emitted as if it were citable.** Ghidra puts external functions
+  in their own address space, where `getOffset()` returns a small ordinal — so a callee census
+  reported `RegCloseKey` as the address `0x00000015`. A reader cited it faithfully; the defect was
+  never theirs. **Filter on `isMemoryAddress()` (or `isExternal()`) before emitting any address a
+  consumer might use as a key.**
+
+The general shape: **a probe's output is normally read only by its author, who knows what each
+column means and unconsciously discounts the cells that look wrong.** A reader who has no such
+prior is the cheapest external check the producer will ever get, and the cost is one file.
+
+### The join that is correct only until somebody does the project's work
+
+A calibration arm compared `function.getName()` — unfiltered — against the name its own scanner had
+recorded through the **agent-source filter**. Those two agree only while the function is unnamed.
+The moment the project named it, they disagreed, and the arm raised claiming the scanner had lost
+all five of its hand-verified answers. It had lost none.
+
+The lesson was **already written forty lines further down the same file**, where a different arm in
+the same probe says *"MEMBERSHIP BY ADDRESS, never by name — a short name is not an identity"*. That
+arm had learned it the hard way. The first one was left keyed on a name because, at the time, the
+name was a `FUN_`-style placeholder and therefore *accidentally unique*.
+
+> **A key that is unique only because nothing has been named yet is a time bomb primed by success.**
+> When a probe teaches you a lesson, grep the file it lives in before grepping the repo — the same
+> author made the same assumption twice within one screen more often than not.
+
+### Apply the anti-circularity guard to the SEARCH, not only to the comparison
+
+A new witness kind guarded every instruction test with a helper that read **both** Ghidra references
+and raw operand scalars — precisely because Ghidra does not create a reference for a
+`MOV [imm32], reg`. It then *discovered* the candidate bodies to test by calling
+`getReferencesTo(...)`, which has exactly that blind spot, and duly reported *"the initializer shape
+is gone"* for a five-instruction body sitting in plain sight.
+
+Then, once the search was rebuilt as a program-wide index, it matched only the operand spelling
+`dword ptr [0x…]` — while an **absolute** store renders as bare `[0x…]`, which is the form the
+target used.
+
+> **Two levels, two chances to be blind.** A correct comparison fed by an incomplete candidate set
+> produces a confident zero. Whenever a check filters, ask what *enumerated* the things it filters.
+
+### An argument can name a function that nothing inside it can
+
+A function with **82 call sites**, no import call, no string literal of its own and four anonymous
+globals was looked at by three separate rounds and declined each time — there was nothing inside it
+to read.
+
+What named it was **what its callers pass in**. At 34 of the 82 sites the caller loads a global that
+some initializer filled with `GetId("<some name>")`, and every one of the 26 distinct globals so
+reached traced to a developer-written label. The chain — *a caller loads G within the argument
+window of the call; some body stores to G and references the string at S; the bytes at S read as a
+string* — is three program facts and consults no symbol, so it is checkable forever and cannot be
+satisfied by your own markup.
+
+Generalise it: **when a body carries no evidence, look one frame up.** Argument setup is program
+fact, and in code that resolves resources by name at start-up it is routinely more self-documenting
+than the callee. The same shape appears wherever a program interns strings to ids: resource
+managers, event systems, script bindings, message dispatch.

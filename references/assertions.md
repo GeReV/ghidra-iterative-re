@@ -664,3 +664,56 @@ Two things make it a real check rather than a ceremony:
 smallest experiment that would fail if the tool stopped doing X, pair it with a control that must
 fail, and put it in the recurring gate set. Design premises decay silently; program facts get
 re-derived every round.
+
+---
+
+## Checking a delegated batch: the three checks that are not about the evidence
+
+When work is delegated in a fixed schema — a batch of proposed names, types or layouts, each with
+citations a probe can re-verify — the obvious check is *do the citations hold against the program?*
+That check is necessary and it is not close to sufficient. Measured on a 104-row batch where **every
+citation in every row it flagged verified perfectly**:
+
+**1. Pre-flight, before the apply, not after.** The citation verifier normally runs over committed
+data and therefore requires the rows to exist in the ledger. Give it a mode that runs the same
+checkers over an **uncommitted candidate file**, with the ledger join skipped **by name** in the
+output rather than silently dropped. It refused ten fabricated citations in the first batch it saw.
+Found after the apply, each one costs a program version and a rollback; found before, nothing.
+
+> A verifier that can only run on committed data finds everything exactly one round too late.
+
+**2. The collisions no per-row check can see.** Three defect classes are invisible from inside any
+single row *and* invisible to a citation checker:
+
+| what | example |
+|---|---|
+| the proposed name is **already applied at a different address** | `LoadScreen::LoadScreen` proposed for one address when the ledger has carried it at another for 56 program versions |
+| the same name proposed for **two addresses within the batch** | two batches independently reached the same label for different bodies |
+| a row with **no name at all** | a reader that declines should emit no row; one that emits a blank leaves the applier to invent something |
+
+Each needs a join over *the whole batch plus the whole ledger*. On the batch that motivated this, a
+careful human read-through caught the first three defects in the delegation and **would have missed
+the collision**, because nothing about that row looks wrong in isolation. That is the argument for
+making the adjudicator a committed script with a selftest rather than a review pass.
+
+**3. Refusal rules need their refusals sampled — a rule that refuses real evidence looks exactly
+like a rule working.** The adjudicator's "is this class real?" rule reported a class as invented. It
+had no exported member and appeared in no namespace anywhere — but four exported **mangled
+signatures returned a pointer to it**, which is the linker asserting the class exists and spelling
+its name. A drop is silent by construction: nothing downstream ever says *"a row was refused for a
+bad reason."*
+
+> Every refusal rule needs a selftest arm for **what it must NOT refuse**, written at the same time
+> as the arm for what it must. Poison the rule and confirm the count moves in both directions.
+
+**A delegated-batch adjudicator's rule set, as a starting point** (each demonstrated firing by
+poisoning it, both directions):
+
+- citations whose address is outside the image — external-space ordinals look like addresses
+- a namespace/class the project cannot already justify from ground truth
+- a qualified name already applied elsewhere, or proposed twice in the batch
+- a citation that names *your own* applied markup rather than ground truth — the anti-circularity
+  rule, at the adjudication layer, where it costs nothing
+- two citations that are the same fact twice (an import and that import's own IAT slot)
+- the confidence bar re-applied *after* citations have been dropped, demoting rather than deleting
+- blank names and duplicate addresses
