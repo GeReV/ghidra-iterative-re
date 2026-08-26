@@ -293,6 +293,24 @@ Preconditions, all of which must be checked, not assumed:
   groups (14 candidates each) were a single 47-vs-53-slot collision counted twice. *Check
   the distribution of whatever you key on before trusting the key.*
 
+  **Calibrate this on ground truth before trusting either direction, and note that the
+  population you need contains no candidates at all**: take every PAIR of tables that
+  carry a mangled export name at the same slot — both ends ground truth, no inference
+  anywhere — and split by whether the slot is comparable between them. On the binary
+  above: **1,957,540 comparable pairs agree and 0 disagree; 10,526 cross-branch pairs
+  disagree and 0 agree.** The regimes separate *perfectly*, which is the useful shape of
+  the result in both directions — off-branch the index is noise rather than a weak signal,
+  and on-branch the propagation is confirmed nearly two million times over, which is a far
+  better warrant for applying it than any candidate-level argument. Make that split an
+  assertion that raises if either side empties or either regime stops separating.
+
+  **And before pricing this route at all, check whether the project has already APPLIED
+  it.** In the incident above the repo had shipped an applier using the correct
+  ancestor-form rule 56 program versions earlier, carrying its own calibration in its
+  header; the round that priced the loose rule had not read it. An applier is a rule plus
+  its calibration plus the population it deliberately abstained from — a pricing probe
+  written from scratch starts from none of those and can regress against all three.
+
 - **A second witness that is blind to the hierarchy — on MSVC x86 the cheapest is the
   `RET imm16`.** `__thiscall` makes the callee pop its arguments, so the terminal return
   instruction's immediate **is** the argument byte count, straight from the instruction
