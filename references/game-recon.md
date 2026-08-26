@@ -476,3 +476,36 @@ found **224** classes with the same shape, not 81, and three independent witness
 The instance was a naming problem with no evidence. The pattern was a naming problem with ground
 truth behind it. Before abandoning a blocked population, enumerate what its members share — a slot
 index, an allocation size, a call site, a base — and ask whether any of those is already decided.
+
+### The IMPORT TABLE is a naming source, and grouping by it groups by mechanism, not purpose
+
+A stripped binary still tells you the name of every function it borrows from another module. Those
+names came out of the **file**, are self-documenting, and cost nothing to collect — on a target with
+no debug information this is often the strongest evidence tier available, and it is routinely left
+unused because it looks like plumbing rather than like recovery.
+
+Two things it does well:
+
+- **It bounds a subsystem mechanically.** Sweeping for bodies that call any of a middleware's imports
+  turns "the audio code, wherever that is" into a finite list. Measured: 26 `_AIL_*` (Miles Sound
+  System) plus one MCI import bounded a game's audio layer to **exactly 9 unnamed bodies**, all of
+  which could then be read.
+- **The uniqueness form is far stronger than the membership form.** "This body calls
+  `_AIL_start_sample`" is weak when several do. "**This is the only body in the program that starts
+  a sample**" nearly names the function on its own, is mechanically checkable, and fails loudly if a
+  later change splits the body. Prefer sole-caller-ship wherever the population is small enough for
+  it to hold, and assert it rather than assuming it.
+
+And the trap, which is what makes this a rule rather than a tip:
+
+> **A shared API is a shared MECHANISM. Purpose has to come from the body.**
+
+In the same sweep, **2 of the 9 "audio" bodies were copy protection** — they reach the CD through
+`mciSendCommandA`, the same multimedia API the music does, and what they actually do is XOR-decrypt
+a file with a fixed key, close any CD-player window, and read the disc's table of contents. Naming by
+import group would have shipped two `Sound*` names onto a disc check. Let the import table decide the
+**candidate set** and never the name; read the body for the verb.
+
+The same caution applies in the other direction to library-vs-game separation above: a game function
+that wraps one middleware call is game code, and a middleware routine statically linked into the
+binary calls nothing imported at all.
