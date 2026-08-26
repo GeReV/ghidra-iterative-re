@@ -421,6 +421,28 @@ reach estimate it produced.
   up, into the PREDICATE rather than the reader, where no census of the output can see it.
 ### Calibrating and pricing a witness
 
+- **A RANKING TELLS YOU WHERE TO LOOK AND NEVER WHAT YOU WILL FIND — SO A READ-IT-BY-HAND ROUND
+  CANNOT BE PRICED BEFORE SOME OF IT HAS BEEN READ.** A pricing probe over a ranked list sees only
+  the columns it computed — address, size, call count — and those columns are blind to the one thing
+  that decides the round's cost: whether the population has a SHAPE. Measured: a fan-in ranking of
+  unnamed functions was priced as *"25–50 bodies, no mechanical rule, a hand-read round"*, which was
+  an honest reading of what the ranking showed. Nine bodies later the head was **dominated by
+  constructors and destructors**, which carry the most exact class evidence in the binary — the
+  address the code writes into `[this+0]` **is** the class, an instruction operand rather than an
+  inference. The rule was there the whole time; the ranking could not display it.
+
+  Two consequences worth acting on:
+  - **Read a handful before quoting a price.** Five to ten bodies is cheap next to scoping a round
+    around "no mechanical rule" and then discovering one — or worse, budgeting for a mechanical rule
+    that is not there.
+  - **Then write the producer that re-derives what the reading found**, so the population is
+    checkable rather than a claim about what somebody noticed. The reading supplies the hypothesis;
+    the producer supplies the census. Neither substitutes for the other.
+
+  The same asymmetry runs the other way: a ranking that looks *promising* can price a route that
+  does not exist. Pricing is a claim about a population, and a claim about a population needs a
+  sample.
+
 - **CALIBRATE A NEW LAYOUT WITNESS ON THE BASE SUBOBJECTS IT ALREADY WALKS THROUGH — IT IS A FREE
   OUTSIDE ROUTE — AND PARTITION THE RESULT INTO THREE BUCKETS, NOT TWO.** Any construction-chain
   or member-access witness for a derived class necessarily crosses its base subobjects, so
