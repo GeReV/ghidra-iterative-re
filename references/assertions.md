@@ -717,3 +717,45 @@ poisoning it, both directions):
 - two citations that are the same fact twice (an import and that import's own IAT slot)
 - the confidence bar re-applied *after* citations have been dropped, demoting rather than deleting
 - blank names and duplicate addresses
+
+---
+
+## Two things that bite when evidence is graded, not just checked
+
+### Certainty and citability diverge, and the tier is where that goes
+
+The most obvious identification in a batch is frequently the one with the **least** citable
+evidence. Measured: a four-byte accessor, `return *(this+0x1c)`, whose reading is not seriously
+arguable — and which touches no global, calls nothing, references no string, so exactly **one**
+witness kind could be produced for it. Under a two-witness bar it is recorded at the lower tier,
+beside readings far less certain than itself.
+
+That is the grading working, not failing. The temptation at that moment is to reach for a second
+citation that *technically* verifies — a neighbouring global, the vtable it happens to sit in — and
+that is the move that turns a tier into a rubber stamp.
+
+> **Record the reading at the tier its evidence supports, and say in the row why the evidence is
+> thin.** A confident reading with one witness is more useful to the next round than a padded one
+> with two, because the padding is invisible six months later and the note is not.
+
+The corollary for anyone setting a bar: expect small leaf functions to cluster at the bottom tier,
+and do not read that clustering as low quality.
+
+### A checker that resolves a name through an artifact cannot see what the artifact omits
+
+A citation of the form `slot <k> of class <C>` had its checker resolve `<C>` to a table address
+through a committed hierarchy artifact. Classes absent from that artifact — which, on this project,
+was *by definition* the entire population of unattributed tables — were **unciteable, even though
+the slot pointer was sitting in memory the whole time.** The check was not wrong; it simply could
+not be reached.
+
+Letting the citation name the **address** (`slot <k> of table 0x…`) removed the lookup, and with it
+the failure mode. Same rule as every other join in this document, applied one level up:
+
+> **When a check needs a lookup to reach the program, the lookup is the weak link.** Prefer a
+> citation that names a program address over one that names a label some artifact must translate.
+
+Two consequences worth planning for: a checker's coverage is bounded by the artifacts it consults,
+so **enumerate what those artifacts exclude** before believing a population is unciteable; and when
+you add the address form, keep the name form working — existing rows rest on it, and loosening is
+safe where replacing is not.

@@ -683,3 +683,67 @@ Three things to know here; the mechanics are in **`references/cpp-abi.md`**.
   A constructor stores each base's vftable into offset 0 in turn, which *is* directional.
   Mechanics and the measured failure: `references/cpp-abi.md`, "Recovering *which* class
   derives from which".
+
+---
+
+## Recover the INTERFACE before the classes, and read the roots, not the leaves
+
+When a family of classes shares a vtable layout, the unit worth reading is **the interface, not the
+class**. Measured on one 1999 MSVC/x86 binary, over 45 related GUI classes:
+
+| | |
+|---|---|
+| distinct method bodies across the 45 tables | 188 |
+| supplied by the two root tables | **33** |
+| subclass overrides | 155 |
+| slots a median class overrides | **4** |
+
+The two roots turned out to **share 15 of their 20 base slots outright** — identical target
+addresses — so one derived from the other and 33 bodies explained all 188. A round priced at "220
+unnamed functions" was really priced at 33.
+
+The order that follows from this:
+
+1. **Diff the tables against each other first.** Equal target address at equal slot = inherited;
+   different = override. That partitions the whole family before a single body is opened, and it
+   costs one join over the vtable dump.
+2. **Read the root's slots.** Each one you understand is understood for every class in the family —
+   and if your citation system has a `slot k of table T` witness, each is *citable* for all of them
+   at once.
+3. **Read the overrides last.** They are the class-defining behaviour, and they only make sense once
+   you know what the slot they replace is *for*.
+
+### Identity is an OUTPUT of this, not an input
+
+The tempting move is the opposite one: name the classes first, so the methods have somewhere to
+live. It inverts the dependency. **A vtable is unattributed precisely because no name-supplying
+route reaches it** — no RTTI, no mangled export naming the type, no registration string — so the
+only evidence about it is what its methods DO. Naming the class first means inferring it from
+behaviour you have not read yet.
+
+Check before you start whether a name route really is exhausted: on that family, **no exported
+mangled signature named a single one of the 51 unattributed tables**, and confirming that took one
+join and settled the question.
+
+### Validate an interface reading against a SUBCLASS before applying any of it
+
+A claim about slot *k* is a claim about every class in the family, so it is worth far more than one
+body's worth of care — and it is cheap to test, because the overrides are independent evidence.
+
+Worked: slot 13 was read as "a child element told me it was chosen" from an **empty** base
+implementation plus its two call sites. Two override bodies confirmed it outright — each compared
+its argument against the child pointers that class had stored at construction and dispatched
+accordingly. In the same pass, one of those overrides fetched a string by calling **slot 11** on a
+child, which independently confirmed a `GetText` reading taken minutes earlier from a four-byte
+body.
+
+Three shapes worth recognising while reading such a family:
+
+- **A slot that recurses into a child list through a fixed vtable displacement tells you its own
+  index.** `(**(code **)(*child + 0x40))()` inside slot 16 is slot 16 calling itself on children —
+  a free self-consistency check on your slot numbering.
+- **An empty body (`ret`) in the base is a hook, not a stub.** Name it from its callers and its
+  overrides, or leave it: a hook with no observed caller has no recoverable meaning.
+- **A flag word tested by the resource/branch logic is the key to the verbs.** Once you know which
+  bit selects the "disabled" artwork, the method that sets that bit is `Disable` — witnessed rather
+  than guessed.
