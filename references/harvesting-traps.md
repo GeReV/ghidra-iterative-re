@@ -1369,3 +1369,19 @@ wrong answer was the right shape and the right order of magnitude.
 - If a column must not be used, the durable fix is to make reading it loud — drop it from the
   regenerated artifact, or rename it `deprecated_*` so a join on the old name raises a `KeyError`
   instead of quietly succeeding.
+
+## A backlog is made of things already NOTICED — budget "loose ends" as exploration
+
+The finding that reframes a subsystem is structurally not on your open-items list, because every
+item on it is something a previous round SAW and deferred. The thing nobody saw is not there.
+
+**Measured.** Four items were logged after a round as tidy-up: two unnamed helpers, an unexplained
+constant array, an unidentified predicate. Closing them cost four function bodies and produced the
+arc's most consequential fact about the file format under study — one that changed what a
+reimplementation would have to do, and that appeared on no list. It was reached only because closing
+item 1 required finding a counterpart function, which nobody had opened.
+
+- **Open the NEIGHBOURS of what you are closing**, not just the item. Callers, counterparts, the
+  function next to it in the address space.
+- **Do not schedule a loose-ends round as a chore and time-box it accordingly.** Its expected value
+  is not the items; it is the unlabelled region you have to cross to reach them.

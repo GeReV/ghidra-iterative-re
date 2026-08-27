@@ -219,3 +219,50 @@ Measured here: all three were present, and the loader turned out to be **two-pas
 every object from its header while seeking past every payload, then rewind and populate. That second
 structure follows from objects referencing each other by handle, and it is worth checking for
 whenever a format stores cross-references.
+
+## Read BOTH sides of a symmetric pair — the reader carries the semantics
+
+When a format has a writer and a reader, analysing the writer feels sufficient: it enumerates the
+fields in order, which is what a layout question asks for. **Read the reader anyway, even when the
+open item does not ask for it.**
+
+A serializer tells you the LAYOUT. A deserializer tells you the SEMANTICS, because it has to decide
+what to DO with each value — and that forces it to reveal structure the writer can leave implicit.
+
+**Measured.** One round read a save format's writer and stopped. Reading the matching loader
+afterwards yielded three things the writer could not have shown:
+
+- the section markers were not merely written but **fully validated**, both fields, each with its
+  own bail — a second oracle the writer-side read had classified as bookkeeping;
+- the file stored a level NAME and the loader **called the mission loader** before applying any
+  state, which made the whole file a DELTA over a shipped data file rather than a self-contained
+  world;
+- both unnamed writer helpers were **paired** with reader counterparts, naming them by symmetry.
+
+## Check for validation at EVERY granularity, not just the one you found
+
+Finding one integrity check is not finishing the search. Formats written by careful teams guard at
+several scales at once, and each scale localises failure differently.
+
+**Measured**, on one save format: a per-OBJECT check (`ftell() != recorded_end_offset`) found in one
+round, and a per-SECTION check (an incrementing tag AND the section's own recorded offset, both
+compared, both bailing) found in the next — plus a whole-file magic and an end sentinel. Four scales.
+
+For grading a reimplementation, prefer the FINEST-grained guard available: a per-file check says
+something is wrong, a per-section check says where, a per-object check says which class.
+
+## An unexplained constant array is usually allocator or index state — read its MERGE RULE first
+
+When a format writes a small fixed-size block of integers that no field list explains, do not start
+by decoding the values. **Start with how the reader combines them with what is already in memory**,
+because the combine operation names the purpose almost by itself.
+
+**Measured.** Nine ints, written near the head of the file, and on load merged with
+`existing[i] = max(existing[i], loaded[i])` rather than overwritten. `max` on a next-free cursor
+means exactly one thing: *never re-issue an identifier that is already in use somewhere in this
+file.* That identified the block as the object-handle allocator's per-bucket cursor before a single
+value was examined — and, with a flag that makes each constructed object adopt its saved handle, it
+completed the format's identity-preservation mechanism.
+
+Overwrite means "the file is authoritative". `max`/`min` means "a cursor that must not go backwards".
+Accumulate means "a running total". Ask what the merge protects against.
