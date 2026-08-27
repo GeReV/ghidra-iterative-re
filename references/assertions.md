@@ -791,3 +791,26 @@ with the round that earned it.
 a true value of 68 silently permits five new unjustified entries, and the gate will report healthy
 the whole time. The ratchet only measures anything while it is touching the number it tracks, so
 move it down whenever the work moves the number down.
+
+## A ratchet is an instrument only while it is FLUSH against the true value
+
+A ratchet — a committed ceiling on some backlog, asserted every gate pass — is usually thought of
+as a guard against growth, so the instinct is that only RAISING it matters. That is backwards, and
+the cost is invisible.
+
+**A ceiling left above the true value grants exactly as much unnoticed growth as the slack.** With a
+ceiling of 73 against a true value of 68, five entries can accumulate one round at a time while the
+gate reports healthy at every step.
+
+**Measured.** One round promoted five backlog rows out of the tier and then tightened the ceiling
+73 → 68 to follow — a step that read as bookkeeping at the time. Six rounds later another round
+added **exactly one** row, and the gate raised at **69 vs 68**, forcing that single row to be
+justified in writing before the ceiling moved. At 73 it would have been silent.
+
+- **Lower the ratchet whenever the work lowers the number.** Slack accumulates across rounds because
+  nothing reports it.
+- **Price the tightening by what it will make VISIBLE, not by what it finds.** Its value never shows
+  up in the round that does it; it shows up in the next round that adds one.
+- **A ratchet that has never fired is not evidence of discipline — it may simply be slack.** Check
+  the distance between the ceiling and the current value. If that distance is not zero, the gate is
+  measuring nothing until the backlog grows past the gap.

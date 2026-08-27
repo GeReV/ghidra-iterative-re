@@ -315,3 +315,41 @@ had **inlined** the base destructor and there was no call left to cite. A witnes
 on the compiler not having inlined something will silently cover only part of any population, and
 the gap is not random — it correlates with small, hot, frequently-called bodies, which is exactly
 where the high-fan-in naming targets live.
+
+## The lower tier is for a strong ARGUMENT with a weak CITATION — they are different things
+
+A two-tier confidence scheme (`decided` / `held`, or any equivalent) is usually explained as
+"confident" versus "unsure". That framing is what erodes it, because a reader with a genuinely
+convincing case will reach for a weaker citation to clear the bar rather than record the case
+honestly at the lower tier.
+
+The distinction that actually holds up: **`decided` is about what a MACHINE can re-check; the lower
+tier is where a strong human argument goes when no machine-checkable witness exists.**
+
+**Measured.** A function was identified as the writer half of a save/load pair on an excellent
+argument — it walks the same two globals as the already-`decided` reader, and writes exactly the
+five values per entry that the reader consumes, with the same terminator. It had no citable witness:
+no string of its own, and its only caller carried the PROJECT's own name rather than a ground-truth
+one, so the "called by a ground-truth name" witness was unavailable and the weak "references this
+global" witness never decides by policy. Recorded at the lower tier with the argument in the
+rationale, and the ledger stayed honest.
+
+- **Never strengthen a citation to match your confidence.** If the argument is good and the witness
+  is not, that is exactly the state the lower tier exists to record.
+- **Symmetry with a decided sibling is an ARGUMENT, not a witness.** It is often right, and it is
+  never something a probe can re-check at an address.
+
+## When a name encodes a claim about SAMENESS, verify it at the byte level
+
+Naming several functions `Foo`, `Foo2`, `Foo3` asserts that they are the same routine emitted more
+than once. That is a real claim about the binary and it is cheap to check: **compare the raw bytes.**
+
+**Measured.** Three candidate duplicates of a small checked-read helper were compared 50 bytes at a
+time; all three were identical to the original apart from the two relative `CALL` displacements,
+which necessarily differ by position. That turned "these look like duplicates" into "these ARE
+duplicates, and the numeral records emission per translation unit rather than any difference in
+behaviour" — a sentence that can go in the rationale and be checked by anyone later.
+
+Without the check, a numeric suffix silently asserts sameness on the strength of a decompiler
+listing looking similar, which is exactly the kind of unrecorded inference the tiering exists to
+prevent.
