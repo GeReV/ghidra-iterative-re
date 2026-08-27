@@ -162,3 +162,60 @@ authority; your build host is not.
 
 Endianness and fixed-point are the same family of problem on non-x86 targets and are covered in
 `references/platforms-eras.md`.
+
+## The format's own integrity checks ARE the oracle — find them first
+
+An external oracle is the only check that is not the program grading itself, and the usual ones are
+expensive: a shipped file to round-trip, a companion tool, a second implementation. Before reaching
+for any of those, **look for the checks the format performs on ITSELF.** A serialised format written
+by a careful team usually validates as it reads, and those validations encode the invariants the
+authors considered load-bearing — which is exactly what a reimplementation must preserve.
+
+**Measured**, on a 1999 game's save format. The loader guards every object record three ways:
+
+- a leading sequence number that must equal a running counter,
+- a trailing sequence number that must equal it again,
+- and, after populating the object, **`ftell() != recorded_end_offset -> bail`**.
+
+That third check asserts the single most useful invariant available: **the reader consumed exactly
+the bytes the writer produced.** And it runs **once per OBJECT**, so a failure localises to one
+class rather than to the file — a far sharper instrument than "does the save load".
+
+- **Grep the bail/assert/panic strings early.** Five strings fenced this entire format
+  (`"Savegame File Invalid!"`, `"Corrupted loadgame file"` at three sites, `"Undefined object type
+  during load game"`, `"Expected object non-existant during loadgame"`, `"Cannot save a non-handlized
+  object!"`), and each one names an invariant for free. In a release build with asserts compiled
+  out, these survive because they are error paths, not asserts.
+- **Prefer a per-record check to a whole-file one** when grading a reimplementation. Pass/fail on a
+  file tells you something is wrong; a per-object bound tells you which class.
+- **A length or end-offset field is the check.** Any format that records where a record ends is
+  telling you it intends to verify that, or to skip — either way it hands you a boundary you can
+  assert against.
+
+## An in-binary check can corroborate a TOOLING conclusion by an unrelated route
+
+When your instruments say a thing about the binary, the program's own assertions may say the same
+thing independently — and that pairing is worth much more than either alone, because the two routes
+share no failure modes.
+
+**Measured.** A probe comparison had flagged 19 classes whose serializer and deserializer appeared
+to touch different fields. Reading the bodies concluded they were all artefacts of the probe. The
+loader's own `ftell() != end_offset` check then said the same thing from inside the program: a
+genuine field-written-never-read would make the game unable to load its own save, so the disagreement
+could not have been real. Neither route was cheap to doubt afterwards.
+
+Look for this deliberately: after concluding "our tool was wrong, not the binary", ask **what the
+binary would have to do at runtime if we were wrong** — and whether it checks for it.
+
+## A back-patched length field tells you the reader's shape
+
+`write placeholder -> write payload -> seek back -> write the real position -> seek forward` is a
+distinctive idiom, and it is not just bookkeeping. A format that records where each record ends was
+designed for a reader that can **skip a record it does not understand.**
+
+Seeing it, predict the rest before reading it: a dispatch loop keyed on a type tag, a registry
+mapping tag to constructor, and at least one pass in which the payload is **not** read at all.
+Measured here: all three were present, and the loader turned out to be **two-pass** — construct
+every object from its header while seeking past every payload, then rewind and populate. That second
+structure follows from objects referencing each other by handle, and it is worth checking for
+whenever a format stores cross-references.

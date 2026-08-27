@@ -808,3 +808,21 @@ Generalising: when a base virtual is empty while its counterpart is not, ask *wh
 true elsewhere for this to be correct?* The usual answers are a container, a dispatcher, or a
 two-phase construction — all of them structure you have not found yet, and all of them worth more
 than the field lists the non-empty side yields.
+
+### Read the EXPORT-NAMED subsystem before building an instrument for it
+
+A corollary of the free-names sweep that is easy to lose once a project is under way. Round zero
+counts the mangled exports and moves on; rounds twenty through thirty build probes.
+
+**Measured.** An arc spent three rounds inferring the shape of a save format — a probe over the
+per-object serializers, a residue census, a cross-check adjudication — and the layer that explained
+all of it consisted of six functions the binary **had already named itself**:
+`?SaveAll@CGobject@@SAXPAU_iobuf@@H@Z`, `?LoadAll@…`, `?AddClassId@…`, `?Create@…`,
+`?GetClassNameA@…`, `?GetExtraData@…`. Reading them applied no names, inferred no identities, and
+answered every open question the three previous rounds had produced.
+
+**Before writing a probe for a subsystem, list the exported symbols whose names contain the
+subsystem's vocabulary.** `Save`, `Load`, `Create`, `Add`, `Get`, `All` — the static-member and
+manager functions are exactly the ones a C++ codebase tends to export, and they are exactly the
+container/dispatch layer that per-object analysis cannot see. It costs one grep against the export
+table you already harvested in round zero.
