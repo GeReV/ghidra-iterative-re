@@ -935,3 +935,63 @@ subsystem's vocabulary.** `Save`, `Load`, `Create`, `Add`, `Get`, `All` — the 
 manager functions are exactly the ones a C++ codebase tends to export, and they are exactly the
 container/dispatch layer that per-object analysis cannot see. It costs one grep against the export
 table you already harvested in round zero.
+
+
+## A debug string names where code WAS, not where it IS
+
+A common and productive naming route in a stripped C++ binary: the developers' own self-announce
+idiom, where a method passes a literal like `"CFoo::Bar"` to a logging or debug-string call. Bind
+the literal to the class whose vtable **declares** the slot that body occupies, and you have named
+the class.
+
+**Measured on one 1999 MSVC/x86 binary, that rule decided two class identities correctly and would
+have decided a third one wrongly.** The literal `"COutpost::WaitingToTeleportBrain"` sits in the
+`.rdata` block of vtable `V_base`, referenced from a body `V_base` declares and no ancestor does —
+textbook. But the game's own class-id registry binds `COutpost` to a **different** vtable entirely.
+The method had been **hoisted out of `COutpost` into a shared base during development, and its debug
+string went with it.**
+
+**The precondition the rule needs, and it is cheap:**
+
+> The class named by the string must not already be bound to a *different* vtable by an independent
+> route — a factory/class-id registry, an RTTI record, an exported symbol, a constructor's vptr
+> store.
+
+Two checks make the audit mechanical, and both are joins you already have:
+
+1. **Shallowest carrier.** Of every vtable carrying that body at that slot, take the one that is an
+   ancestor of all the others. If it is not the class the string names, the string is hoisted.
+2. **Competing binding.** Look the string's class name up in every independent name→vtable route. A
+   hit on a different vtable refutes outright.
+
+Applied to the two live decisions, both passed on both checks; the counterexample fails both. **A
+rule that has never met its counterexample has an unwritten precondition — and you learn it by being
+handed one, not by re-reading the rule.**
+
+The same hazard shows up wherever a symbol outlives a refactor: `__FUNCTION__`/`__PRETTY_FUNCTION__`
+strings, assert text carrying a stale class name, and format strings in logging macros. Treat a
+class name inside a *string* as evidence about the string's ORIGIN, and only then, with the
+precondition checked, as evidence about the code that now carries it.
+
+## Corollary: a citation must be true at the scope the checker verifies
+
+The same binary produced a genuinely correct identification that a naming applier **refused, rightly**.
+A save/load pair was identified from a literal pushed by a resolver stub **in the same translation
+unit** — the stub resolves the name into a cache that the initialiser dereferences to build the very
+global the pair iterates. Real evidence, and it even explained an open puzzle about the format.
+
+The applier rejected it: *"this body does not touch that address."* Disassembly confirmed the body
+references no string and no global — it operates purely on `this`. The witness kind claimed
+`string_literal`, which in that project's vocabulary means *this body references this string*, and
+the row asserted something false.
+
+**Keep the witness vocabulary's scope honest.** If every accepted witness kind is body-scoped, a
+translation-unit argument cannot be encoded as one, however sound it is — record it as held. If you
+add a TU-scope kind, its boundary must be mechanically checkable (the contiguous range between two
+exported symbols is one such definition), or it degenerates into a licence to attribute any nearby
+string to any body.
+
+And note which way the earlier failure ran: that pair had been declined once with *"no strings, no
+ground-truth callees"* — true of the two **bodies**, false of the **translation unit**. **Scope the
+naming SEARCH to the TU; scope the CITATION to what the checker can verify.** They are different
+questions and conflating them costs you either a name or a false citation.
