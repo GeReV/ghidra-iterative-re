@@ -814,3 +814,61 @@ justified in writing before the ceiling moved. At 73 it would have been silent.
 - **A ratchet that has never fired is not evidence of discipline — it may simply be slack.** Check
   the distance between the ceiling and the current value. If that distance is not zero, the gate is
   measuring nothing until the backlog grows past the gap.
+
+## A poison that cannot REACH its guard is not a poison
+
+A population guard was written inside a per-class loop, *after* the filter that selects the classes
+to repair. It could therefore only ever fire on a class that had already passed classification — so
+a misattributed class that classifies as *sparse*, which is most of them, could never trip it. The
+check sat in the file reading like a defence, and was unreachable.
+
+Moving it to run over the whole population **before** anything is classified made it reachable, and
+then it needed **two** poisons rather than one: any injected class present in both parentage records
+trips the earlier *contradiction* arm first, so demonstrating the *descendant* arm required a class
+one record has never heard of. **If one poison fires an arm you were not aiming at, you have not yet
+demonstrated the arm you were aiming at** — add the second poison rather than accept the first
+exit code.
+
+## Grade what the artifact CONTAINS, not what a variable holds
+
+An AI-provenance filter check computed the filtered name into a variable, wrote a *different*
+expression to the artifact, and asserted against the variable. Bypassing the filter therefore
+changed only the output; the assertion compared the same two values it always had. The poison run
+printed
+
+```
+A4: 1200 of 1947 referring functions are ledgered; the filter changed 1200 of them, 0 leaked
+```
+
+— **which is exactly what a healthy run prints** — and failed only on a backstop line at the
+bottom. Regraded against the spelling actually written, it raises on 1044 of 1200.
+
+Two things follow. **Run the poison FIRST**, before the clean run makes the output look
+familiar; and when it reports nothing, believe it — a poison that produces a healthy-looking pass
+is a defect in the check, not a clean program. The general form: **an assertion must read the
+artifact's own value, not an intermediate the writer may have diverged from.**
+
+## A census sent for approval is a CLAIM, and its prose is part of it
+
+A repair census printed *"past the end of this struct"* for four records at an offset more than 60
+bytes **inside** them. Every cell COUNT in that census was correct and survived unchanged into the
+applied run. Only the *explanation* was invented — by an API assumption that had never been
+measured — and it was caught because the number was impossible on its face, which is luck rather
+than process.
+
+A reviewer uses the prose to decide whether the numbers mean what they appear to. **A wrong reason
+attached to a right row is still a false statement someone is being asked to sign**, and it is the
+part of a census that nothing else checks: the counts get re-derived by the applier, the sentences
+do not. Read them as critically as the figures, and when a sentence explains *why* a row was
+skipped or refused, confirm the mechanism rather than inferring it from a return value.
+
+## Record the MARGIN when a gate is cleared narrowly
+
+A repair left four classes modelling 100 of 101 members — 99.0099% — against a threshold of
+`>= 99.0`. The gate is green, honestly and by its own rule, and it is green **by 0.01 points**.
+
+State that at the ratchet, with the reason the margin is thin and the change that would widen it.
+A threshold cleared narrowly and silently becomes an unstated assumption that the margin will hold;
+the next unrelated change in the same range tips it red, and the round that inherits the failure
+has nothing to tell it whether it broke something or merely landed on a knife edge that was always
+there.

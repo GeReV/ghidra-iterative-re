@@ -1385,3 +1385,71 @@ item 1 required finding a counterpart function, which nobody had opened.
   function next to it in the address space.
 - **Do not schedule a loose-ends round as a chore and time-box it accordingly.** Its expected value
   is not the items; it is the unlabelled region you have to cross to reach them.
+
+## A defect recorded as a property of one TOOL is a hypothesis about every tool that reads the same kind of thing
+
+A project documented, at length and correctly, that a **printable-run scanner cannot observe where
+a string STARTS** — only its NUL terminator is a real boundary — because a preceding float
+constant's printable low byte silently prefixes the real name. That defect hid two class names for
+**eleven rounds**, and the write-up was thorough: the mechanism, the two names, the bounded-suffix
+fix, the cost.
+
+It was filed under the tool that taught it. Nobody asked whether the *disassembler* had the same
+blind spot. It does: **71 of 2975 defined strings in the same binary start one or two bytes early**,
+absorbing the previous literal's tail, so the code's reference lands strictly INSIDE the datum and
+the string reads as *referenced by nothing* — which is precisely the signal a naming round uses to
+write a literal off as dead. Same defect, different instrument, one sweep to find, and it sat
+unexamined for months beside a document describing it.
+
+**When a round writes up a blind spot, name the CLASS of instrument it applies to, then spend one
+probe asking each of the others.** The lesson generalises by *what is being read* (byte runs,
+string data, symbol tables, relocation entries), not by which tool happened to expose it. The
+question is cheap and the alternative is a correct write-up that protects exactly one code path.
+
+## A guard on the CELL cannot compensate for a wrong POPULATION — and the cell guard is what hides it
+
+A propagator was written to copy a base class's new fields into the descendants that carry a
+flattened copy of its layout. Its population rule was *"any struct at least as long as the base
+that differs at these offsets"*. That is not "flattened copies of the base"; it is **every class
+with bytes at those addresses**. The dry run swept in 19 unrelated classes and 84 cells.
+
+It had a second, correct guard: never overwrite a cell holding a decided name, only a placeholder.
+That guard **refused 49 cells in the bad run**, and the refusals were the loudest thing in the
+output. Every one of them was true. The run therefore *read as a guard doing its job* — and the
+84 cells that sailed through were never printed, because nothing was wrong with them individually.
+
+Two rules come out of this:
+
+- **When a check refuses a lot and the round feels safe, ask what the refusals are a sample OF.**
+  A high refusal count over the wrong denominator is evidence of a bad population, not of a good
+  guard. Refusal counts are a property of the population you fed in.
+- **Put the population rule where it can be tested without the analysis tool running.** Parentage,
+  descendant sets, and classification are pure functions over data you already have. Moved into a
+  plain-language library with its own poisons, the rule above is one test case — and the test can
+  be written from the exact wrong classes the bad run produced, which is a far better fixture than
+  anything invented.
+
+## Classify against the state BEFORE the change you are propagating
+
+A repair that copies a base's new members into stale copies has an ordering trap that is invisible
+from inside it. Classification asks *"how much of the base does this descendant model?"* — and
+adding 7 members to the base takes a descendant from 98-of-102 to 98-of-109, i.e. from
+**FLATTENED to PARTIAL**. A rule that classifies against the post-change base therefore
+**excludes exactly the classes that need repairing**, and reports a clean population while the
+drift it exists to fix sits untouched.
+
+The fix is to exclude the pending change from the denominator: classify against the base's members
+*minus the ones being propagated*. It costs one parameter and it is the difference between a
+repair that runs and one that silently no-ops.
+
+## An apply whose own writes change what the next census can see should be run to CONVERGENCE
+
+Replacing a 484-byte placeholder with a 4-byte member leaves 480 bytes reverting to single-byte
+undefined fillers — and those fillers are *visible to the next pass's query* where the original
+blob was not. So a second run of the same applier legitimately finds work the first could not
+reach: 44 cells, then 8, then 0.
+
+"Write a multi-step apply to converge rather than assume" is usually read as advice about analyzer
+cascades. It applies just as much to an applier whose writes alter the shape its own census reads.
+**Run it until it reports zero, and record the per-pass counts** — a single pass that "finished"
+is indistinguishable from one that stopped early.
