@@ -182,6 +182,115 @@ Ghidra 12.1 added Microsoft demangler **output options** controlling user-define
 (`_anon_ABCD01234` vs the generic form). Both affect whether demangled and non-demangled
 symbols land in the same namespace, so they affect name-based joins.
 
+## The demangler is a TYPE witness, not just a name witness
+
+A mangled symbol encodes the **full signature** — return type, parameter types, `const`,
+calling convention. Most projects use it for the name and throw the rest away. That is the
+single largest free-evidence source in a stripped C++ binary after the vtables, and it is
+worth being precise about what tier it carries, because the honest answer is not the obvious
+one.
+
+**The tier is a property of AGREEMENT, not of "the demangler".**
+
+| situation | tier | what to do |
+|---|---|---|
+| the mangled string is in the binary, and **two independent decoders agree** | **ground-truth-adjacent** — the compiler wrote this down and you recovered it twice | cite it |
+| the two decoders **disagree** | a **finding**, never an average | stop; one decoder is broken, find out which |
+| only one decoder resolves it | a **clue** | record it, do not cite it |
+| the mangled string is one **you** synthesised | worthless | you are reading your own inference back |
+
+The reasoning: the mangled string is bytes in the file, so it is ground truth. The decoding
+is not an inference, it is a **parse against a published grammar** — and a parse can be
+wrong in a *checkable* way, which a guess cannot. Your disassembler ships a demangler that is
+an **independent implementation of that same grammar**, so you already have a second decoder.
+Use it as one.
+
+Measured on one 1999 MSVC/x86 binary: **979 mangled exports, 669 comparable, 669 agree, 0
+disagree.** A zero there is what promotes the whole channel from clue to evidence — and the
+check costs one sweep.
+
+**Report DISAGREEMENTS as the headline, never a match percentage.** A 98% match rate with the
+2% hidden is exactly how a decoder bug survives: see below, where a parser was wrong about
+13.9% of a binary's functions and nothing in its output looked wrong.
+
+### Field types from accessor return types
+
+The highest-value derived use. An exported accessor whose body is a **single load from
+`this`** declares the type of the field it returns:
+
+```
+?GetTotalMetajoulesUsed@CStructure@@UAEMXZ   ->   FLD [ECX+0x468]   ->   +0x468 is float
+                                     ^ M = float, the compiler's own statement
+```
+
+This is a different *kind* of witness from everything else in a layout toolkit: every other
+field-type route reads **instructions** and infers (x87 vs integer opcodes, scaled-index
+widths, copy extents); this one reads a **declaration**. On the same binary it typed **43
+fields across 9 classes**, of which **35 corroborated an already-decided type, 3 contradicted
+one, and 5 were new**. All three contradictions were real findings — including a field the
+project had recorded as `float` that the binary declares `int`, and a `float` hiding inside a
+20-byte blob nobody had resolved.
+
+**Two structural requirements, both learned by getting it wrong first:**
+
+1. **Zero parameters** — the mangling must end `XZ` (MSVC) / `v` (Itanium). A function taking
+   an argument may return anything computed from it, so its return type says nothing about a
+   field. Without this, four `CCamera` coordinate-transform functions all "declared" the same
+   offset.
+2. **A real memory operand** — require the operand to carry *both* a register and a
+   displacement. Without this, `MOV EAX,1` in a `return true;` stub reads as a load from
+   `+0x1`, and you get a confident field type at an offset that is not a field.
+
+Both false positives looked entirely plausible in a summary and were obvious in a full
+listing. **Print the promoted population in full.**
+
+### This generalises past MSVC
+
+The mechanism is "the ABI encodes types in the symbol", which is true of every scheme that
+mangles overloads:
+
+- **Itanium C++ ABI** (GCC, Clang, and most non-Windows targets): `_Z` names encode
+  parameter types with the same one-letter vocabulary — `i` int, `f` float, `d` double, `j`
+  unsigned int, `v` void, `P` pointer, `K` const. **Return types are encoded only for
+  function templates**, so the accessor route above is weaker there: you get parameter types
+  for free and must recover returns another way. Setters, not getters, are the productive
+  half.
+- **CodeWarrior** (GameCube/Wii, PS2-era): its own scheme, and neither shipped demangler
+  decodes it — see the platform notes. If names look mangled and decode under nothing, that
+  is the likely cause.
+- **Borland/Watcom**: their own schemes again, with their own tooling.
+
+The rule to carry across all of them: **decode with two implementations and treat the
+disagreement set as the product.**
+
+### A decoder bug is invisible from its own output
+
+Measured, and the reason this section exists. A project's hand-rolled MSVC parser used a
+**fixed index** for the return type — correct for instance members, wrong for static members
+and free functions, which have no `cv` slot and so sit one byte earlier. **126 of 905
+exported functions, 13.9%, were mis-read for the life of the project.**
+
+It was undetectable from the output because **a wrong letter is still a plausible answer**:
+`??3CGobject@@SAXPAX@Z` yielded `P`, the first byte of the parameter `PAX`, which reads as
+"returns a pointer" rather than as "you indexed the wrong slot". The same fixed index also
+walked into **data symbols**, which have no return slot at all, and produced the third letter
+of a *type name* as a type code.
+
+Two things catch this class of bug, and neither is code review:
+
+- **Census the alphabet.** Ask "which characters appear in this slot across every symbol in
+  the binary", and read the list. Codes no type should ever be are the tell — it is how both
+  bugs above surfaced, in one query.
+- **A lookup must not return the same value for "absent" and "undeterminable".** The same
+  parser's primitive table was missing one code entirely; the lookup returned `None`, every
+  consumer read `None` as "this cell has no determinable type", and two fields sat
+  unprovable for months that the binary plainly typed. Distinguish the two, or the gap is
+  unauditable.
+
+**And check whether your own documentation already said so.** The cv-slot rule was written
+in this very file, correctly, while the parser three directories away violated it. A rule
+recorded is not a rule applied.
+
 ## Itanium ABI (GCC/Clang — Linux, most consoles' modern toolchains)
 
 | Symbol | Meaning |
