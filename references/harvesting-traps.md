@@ -1586,3 +1586,59 @@ settled the whole thing on six witnesses.
   often a sharper instrument than any structural inference over the bytes.
 - And keep the calibration arm: the same probe's first two versions could not see the *known*
   array either, so a bare "nothing touches +0x1e0" would have been a fact about the probe.
+
+## A bijection closes over the two sides it was given — ask what could be in NEITHER
+
+A join that reconciles perfectly in both directions is the most convincing form a census can take,
+and it is a bare count wearing a proof's clothing. `A ∩ B = A = B, zero residue` establishes that
+your artifact and your probe agree. It establishes **nothing** about a population outside both.
+
+Measured (1999 MSVC/x86 game, toolbar button descriptors). One round reported
+`77 ∩ 77 = 77, zero residue in both directions` between a committed CSV and the call sites of the
+constructor that registers those buttons; a later session re-verified it independently; an applier
+re-derived it a third time. All three were correct. The conclusion drawn from it — that the button
+vocabulary was closed — was wrong: **97** such objects exist. The join compared the artifact against
+**the one registrar that had produced the artifact**, and two sibling registrars — *identified by
+the same round, in the same findings file* — supply the other 20.
+
+Nothing in the join could have found this. It surfaced only by accident, when applying the recovered
+type made an unrelated function legible and that function was seen comparing its argument against
+six descriptors that appear in no artifact.
+
+- **Before believing a bijection, name the mechanism that could produce a member of neither set.**
+  Here: "is this the only registrar?" — one `getReferencesTo` on each sibling, and the round's own
+  notes already listed them.
+- **State the DENOMINATOR the join covers, not just the residue.** "77 of 97 descriptors" is the
+  honest form; "zero residue in both directions" is true and misleading. This is the
+  coverage-as-a-fraction rule from `SKILL.md` applied to joins, and a bijection is the most
+  persuasive possible way to state a bare count.
+- **A perfect join between an artifact and its own producer is a REPRODUCIBILITY check, not a
+  coverage check.** Those are different claims and only one of them is usually the one being made.
+
+## Parse operand OBJECTS, never the rendered instruction text
+
+Two instrument defects in one round, both from reading Ghidra's *printed* form of an instruction
+instead of its structured operands, and both producing a confidently absurd number:
+
+- **A `CALL`'s target is not a `Scalar`.** A check that collected `Scalar` operands and looked for
+  `fwrite`'s address among them reported **0** calls in a body that plainly makes three. Call
+  destinations come from `ins.getFlows()` when `ins.getFlowType().isCall()`.
+- **An absolute store is not a member write.** A check that found member offsets by splitting
+  `getDefaultOperandRepresentation(0)` on `+` and taking any `0x…` piece read the absolute
+  destination `[0x00577190]` as an offset of `+0x577190`, and concluded the object was 5.7 MB. The
+  discriminator is structural, not textual: a `[reg + K]` write has a `Register` among its operand
+  objects; an absolute one does not.
+
+Related, same round: a body scan bounded at a guessed instruction count (24) cut a 29-instruction
+function short and lost its third call. **Bound a body scan at the `RET`** —
+`ins.getFlowType().isTerminal()` — not at a number you picked.
+
+The rendered text is a *presentation*: it varies by processor module, by operand-display options,
+and by whether a reference has been applied to the operand. `getOpObjects(i)`, `getFlows()`,
+`getFlowType()` and `getReferencesFrom()` are the interfaces that mean what they say.
+
+> All three failed **closed** — each check's pass condition was a positive assertion about the
+> binary, so a broken parser refuses rather than approving. That is worth designing for
+> deliberately: a check phrased as "assert the thing I expect is present" survives a parser bug,
+> and one phrased as "assert nothing bad was found" is silently satisfied by a parser that finds
+> nothing at all.

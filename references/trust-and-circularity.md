@@ -353,3 +353,35 @@ behaviour" — a sentence that can go in the rationale and be checked by anyone 
 Without the check, a numeric suffix silently asserts sameness on the strength of a decompiler
 listing looking similar, which is exactly the kind of unrecorded inference the tiering exists to
 prevent.
+
+## An APPLIED `provisional` is treated as fact, because the decompiler does not render a tier
+
+Confidence columns are read by people and by adjudication scripts. They are not read by the
+decompiler, by a struct listing, or by the next round's author opening a body. **The moment a
+provisional layout is applied to the program, every consumer sees a layout.**
+
+Measured (1999 MSVC/x86 game). A 12-byte record was inferred early on from **one** witness kind,
+recorded honestly as `provisional` with `witness_kind_count == 1`, and applied. It is 8 bytes. It
+stood for **124 program versions** — through dozens of rounds, several of which worked in the very
+subsystem that contains it — and was refuted, when someone finally looked, by **three separate
+exported functions**, none of them obscure: one indexed the records at `i*8`, one allocated `n*8`,
+and one asked for 40 records and received 320 bytes.
+
+The tier was correct and changed nothing. Nobody was ever prompted to revisit it, because a
+provisional row that has been applied looks exactly like a decided one from every direction that
+matters.
+
+- **A provisional row that is APPLIED needs a standing route back to it**: a backlog line naming it,
+  a probe that re-derives it, or a periodic sweep of the low-witness rows. A tier with no mechanism
+  behind it is a label, not a plan.
+- **The cheap first pass is a query, not a project.** "Which applied rows have
+  `witness_kind_count == 1`?" is one filter over the layout artifact, and it ranks the whole
+  backlog by exactly the property that produced this defect.
+- **Prefer NOT applying a one-witness layout to applying it with a caveat.** An unapplied inference
+  costs a round its decompilation improvement; an applied wrong one costs every later round its
+  premises, and is much harder to notice because the improvement it bought is real.
+
+> Corollary for the gate: when the correction lands, the drift detector that compares program
+> against artifact WILL fire, and that is the gate working. Move the artifact row. Do not relabel
+> the row `confirmed` to satisfy a check that defines `confirmed` in terms of an evidence file the
+> new witness does not live in — that is forging a witness kind to pass your own gate.
