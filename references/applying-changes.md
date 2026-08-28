@@ -464,3 +464,63 @@ shape its claimed role requires, which is a witness nobody had to design. And wh
 functions, check the change shows your name **filtered out**: seeing the agent-name filter visibly
 suppress your own fresh name in a regenerated artifact is the anti-circularity rule being exercised
 rather than merely present.
+
+### When a gate refuses your row, change the row's HOME before you change the gate
+
+**Measured, twice in one round, and both refusals were right.** A round wrote a recovered 16-byte
+type into the program and then had to record it. The first artifact it tried was the project's
+decided-types file, on the strength of an earlier round's note saying *"adding a row here is an
+approved step"*. The type gate raised: every row in that file is joined against a harvested
+evidence file which the project may not regenerate, and the type in question had been discovered
+in a later phase with no such evidence. The second was the field-type-upgrade file, on a precedent
+that matched the situation exactly in substance — an exported member accessing a block cell at
+element width, with an in-body element-count bound. That gate raised too: its guard verifies
+`element_size * N == span` **from the ctype string**, so it accepts only scalar element names and
+cannot size a struct.
+
+Widening the second guard's pattern was one line. It would have been wrong, and the reasons
+generalise:
+
+- **A guard in a producing sweep is a rule, and changing it owes the full two-step diff and its
+  own poison.** That cost is worth paying when the rule is wrong. It was not wrong; it was simply
+  built on a mechanism (string arithmetic) that cannot express this case.
+- **It was unnecessary.** A third committed artifact — the one whose stated purpose is that *"a
+  rebuild-from-artifact is only safe if every decision lives in an artifact"* — already resolved a
+  ctype's base through the type manager and built arrays from it, so it accepted the row unchanged.
+- **The test to run first:** is there another committed artifact whose consumer already takes this
+  row as written? If yes, the guard is not the problem and the row is in the wrong file.
+
+Two smaller things fell out of the same round:
+
+- **A note that authorises an artifact write grants the PERMISSION and does not settle the HOME.**
+  *"Adding a row to X is an approved step"* is a statement about sign-off. Whether the row belongs
+  in X is a separate question with its own answer, and the gate is the thing that knows it.
+- **Verify the retreat.** After reverting both rejected appends, the check that the withdrawal was
+  clean rather than approximate is that both files are **byte-identical to the base revision** and
+  appear in no diff. A revert that leaves a stray blank line or a re-ordered row is a content
+  change nobody adjudicated.
+
+### A report that cannot see the effect it claims to measure is worse than no report
+
+**Measured.** An applier ended with a section printing each affected function's signature, to show
+the payoff: a 16-byte by-value return should switch to the hidden return-storage-pointer
+convention. It printed `getPrototypeString(...)`, which omits both `this` and the hidden return
+pointer — so it rendered the identical string before and after, while the committed symbol
+artifact recorded the parameter count going **1 → 2** with the storage pointer added. The round's
+genuine result read as a non-result, and was only recovered by diffing the artifact.
+
+- **Pick the accessor by what it is documented to include**, not by which name reads best. Where a
+  compiler-introduced parameter is the thing you are looking for, walk the parameter list (which
+  includes auto-params) rather than a formatted prototype string.
+- **When a predicted effect appears not to have happened, suspect the instrument before the
+  prediction.** A silent report and a real non-event are indistinguishable from inside the script,
+  and one cheap artifact diff separates them.
+
+### Predict the datatype delta with an account BY NAME, before the run
+
+Same round: predicted `+1` and got `+1`, where the naive reading says `+2`. The apply wrote a
+struct **and** an array of it, but the struct already existed as a demangler-created 1-byte
+placeholder and was **edited in place**, so only the array was new. That is knowable before
+running — check whether each type you are about to write already exists — and it converts the
+bracket from something you re-pin after the fact into something that confirms your model of what
+the apply does.
