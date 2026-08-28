@@ -1453,3 +1453,36 @@ reach: 44 cells, then 8, then 0.
 cascades. It applies just as much to an applier whose writes alter the shape its own census reads.
 **Run it until it reports zero, and record the per-pass counts** — a single pass that "finished"
 is indistinguishable from one that stopped early.
+
+### A read-only round that writes no artifact cannot be distinguished from a round that never ran
+
+**Measured, and it cost a whole round.** A read-only round recovered a type's size and field count
+from two return-buffer spans, applied nothing, and wrote no artifact — deliberately and correctly,
+because the artifact in question was a *decided* one whose rows require sign-off, not a side effect
+of a read. The finding went into the round's notes file and nowhere else.
+
+Seventy-one rounds later, two *other* notes files still asserted the type was unmeasured. A new
+round priced itself the way this skill prescribes — **check the committed artifacts before
+believing a note** — and the grep returned the type in six artifacts, every hit derived from its
+mangled name and none from any layout or size file. That is precisely what *"named by three
+manglings and nothing else"* predicts, so the pricing check **agreed with the stale claim** and the
+round proceeded to re-derive an answer the project already had.
+
+The stale sentence is not the defect; stale sentences are why the pricing check exists. **The
+defect is that the check and the stale claim shared a blind spot**, so running it produced false
+confidence rather than no confidence.
+
+- **A read-only finding is only as durable as the cheapest thing that can contradict it.** When a
+  round decides not to write an artifact — often the right call — it should record *where the
+  finding lives and what would contradict it*, so a later "this is unmeasured" claim is falsifiable
+  by searching the notes, not only the artifacts.
+- **Give the verdict a name and use it.** If your project already distinguishes *"recorded by
+  harvested evidence"* from *"recorded only by our own ledger"*, this is the next rung down —
+  **recorded only by prose** — and it is the weakest, because a ledger is machine-readable and a
+  paragraph is not.
+- **When two records disagree, believe neither until you have opened the body.** Here the two
+  loud claims were wrong and the quiet findings file was right. What settled it was reading four
+  function bodies. The body-first rule is usually stated as *how you find a layout*; it is also
+  **how you adjudicate a project against itself**.
+- The round is still worth writing up, **at the original lead's location** rather than as a fresh
+  finding — otherwise the next reader sees two independent-looking discoveries of one fact.
