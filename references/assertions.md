@@ -872,3 +872,34 @@ A threshold cleared narrowly and silently becomes an unstated assumption that th
 the next unrelated change in the same range tips it red, and the round that inherits the failure
 has nothing to tell it whether it broke something or merely landed on a knife edge that was always
 there.
+
+
+## A fixture written from a description tests the description's author, not the format
+
+When a file format is recovered by reading a binary, the recovery is prose: *"seventeen table
+dwords in reverse order"*, *"a count followed by entries"*. A parser is then written from that
+prose — and so, usually by the same person in the same sitting, is the synthetic fixture that
+exercises it. The two agree by construction. They are one claim stated twice, and a passing suite
+measures only that the author was self-consistent.
+
+Measured instance: a container's tamper-protection footer was described as holding
+`crc_table[17], [16], … [1]`. The bytes ascend; the phrase described the loader's *backwards scan*.
+Parser and fixture both descended, six unit tests passed, and the parser found **zero** footers in
+540 shipped files that all have one.
+
+**So the acceptance test for a recovered format is the real artifact, and its expected numbers must
+be measured before the parser exists** — otherwise they drift into agreement with it. Practically:
+
+- Take a census of the shipped data with a throwaway script *first*, and hard-code those numbers as
+  the corpus test's expectations. That script is not wasted; it is the only independent statement of
+  the format you will get.
+- Prefer an expectation with **two independent derivations**. A footer count of 181 from a byte
+  signature and 181 from counting the records that demand a footer is worth pinning; either alone
+  is a single point of failure shared with the parser.
+- Where the data cannot be committed (shipped game assets, licensed corpora), gate the test on an
+  environment variable naming the install and skip with a printed notice elsewhere. A skipped
+  corpus test is honest. A green suite that never touched a real byte is not.
+
+Synthetic fixtures keep their job: they are the only way to demonstrate a *rejection* path firing,
+because damaged input is exactly what a real corpus does not contain. Build them to break one rule
+each. Just do not let them stand in for evidence that the happy path is right.

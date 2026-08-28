@@ -385,3 +385,58 @@ matters.
 > against artifact WILL fire, and that is the gate working. Move the artifact row. Do not relabel
 > the row `confirmed` to satisfy a check that defines `confirmed` in terms of an evidence file the
 > new witness does not live in — that is forging a witness kind to pass your own gate.
+
+## Check who named the thing your citation cites
+
+A citation kind that says *"this body calls `fwrite`"* sounds like it rests on the C runtime. It
+rests on whoever decided that function is `fwrite`. If that was you, the kind is circular — and the
+circularity is one hop long and completely invisible in the citation string.
+
+Measured. A project implemented a `save_record` witness kind for naming `Save`/`Load` bodies: assert
+the body calls a stdio stream primitive, matched by the callee's name. The name filter that excludes
+the project's own AI-tagged markup answered `FUN_004c4f2d` — because `CRT::_fwrite` was a name **that
+project had applied itself**, 90 program versions earlier, from its own reading of the argument
+shape. The kind's entire purpose was to be independent of project markup, and every row using it
+would have rested on project markup, permanently.
+
+Two things caught it, and both are worth copying:
+
+- **The checker asked through the AI-excluding name accessor, not through `getName()`.** A
+  string comparison against `callee.getName()` would have passed cleanly. The filter is only
+  protective if the checker actually routes through it.
+- **The batch was pre-flighted before the apply.** The catalogue had a mode that runs every
+  checker against candidate rows that are not yet in the program, precisely so a bad citation costs
+  a re-edit instead of a program rollback. It refused four rows and named the reason.
+
+**The repair is to ground the claim in something the FILE states**, not something you decided: a PE
+import, an export mangling, a relocation, a byte pattern. Here the fix was a call-graph walk —
+measured at exactly **2 hops** from the write primitive to `KERNEL32!WriteFile` and from the read
+primitive to `KERNEL32!ReadFile` — so the citation became `save_record:<callsite>:<import>` and no
+project-chosen name appears at any link. The walk is bounded by a pinned constant, because an
+unbounded one reaches everything.
+
+> Generalise it: for every witness kind, write down the chain from the citation to something in the
+> file, and name the tier of each link. A chain that passes through your own symbol table at any
+> point is not a witness, however many links it has.
+
+## The tier of a row and the availability of evidence are different questions
+
+A findings file's confidence column describes how sure the analyst was. It says nothing about
+whether a machine-checkable witness exists for the claim — and the second is what a later round
+needs.
+
+Measured: an investigation proposed ~40 function names and marked them all *strong*. Priced against
+the program before the applier was written: **42 candidates, 27 with any citable witness at all, and
+of those 27 a further 12 whose only witness was "this body calls a generic helper"** — a fact true of
+hundreds of bodies that discriminates nothing. Fifteen names were applied; the reasoning behind the
+other twenty-seven was probably fine, and it is not evidence.
+
+- **Run the pricing as a separate read-only artifact, FIRST**, and keep its output. It decides the
+  round's scope, and the next session starts from it instead of re-deriving it.
+- **The test for a witness is counterfactual: what would it look like if the proposed name were
+  WRONG?** If it would look identical, it is not a witness for that name.
+- **Two witness KINDS are not two witnesses unless the second discriminates.** Four sibling
+  functions each citing "an identically-named export calls me" plus "I install a vtable" is strong
+  only because each installs a *different* vtable. Had they shared one, the count would satisfy the
+  two-kind bar while establishing nothing about which sibling this is. A kind count cannot check
+  that; the author owes it.
