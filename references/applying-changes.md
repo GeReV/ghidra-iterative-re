@@ -393,3 +393,74 @@ tolerate a name it applied in an earlier session (*present and correct → skip;
 Written that way, the incident above would have been a re-run rather than a diagnosis. Written the
 other way, a raise leaves an operation that **cannot be completed except by hand** — which is how a
 careful project ends up hand-editing a ledger.
+
+### An applier whose population rule is the condition its own apply DESTROYS cannot converge
+
+The previous section says every mutating applier needs a state meaning *"already exactly what I
+would write"*. Here is the way that state can be present, correct-looking, and **unreachable by
+construction** — with nothing in the code to show it.
+
+**Measured.** An applier promoted a ground-truth symbol to primary at every address whose primary
+was a placeholder. Its population rule was, in full, *"an address carrying an authoritative symbol
+whose primary is placeholder-shaped."* It applied cleanly over four addresses, every guard passed,
+the invariant bracket held, the post-cascade re-assert held. A bare re-run then raised
+`VACUITY: 0 shadowed addresses` **on its own successful output** — because promoting the real name
+is exactly what stops an address being shadowed. The apply had consumed its own population.
+
+The three-state machine was there. `already` could never be entered: an address in that state no
+longer satisfies the membership predicate, so it is not a candidate to be classified.
+
+- **Reading the applier does not reveal this.** The branch is syntactically reachable and
+  semantically dead, and every review of the code says it handles the re-run case. What reveals it
+  is *running the applier a second time* — which is the argument for a bare re-run being a standing
+  step after every apply rather than a nicety.
+- **The fix is the rule this file already states, pointed at a new symptom:** derive the population
+  from a **repo** fact. Here, the union of the program-derived set and the human-approved census.
+  That rule was written for partial-failure resume; it is the same fix, and noticing that saved
+  designing a second one.
+- **The vacuity guard has to move with the rule.** *"Zero candidates is a rule fault"* is true only
+  before the round runs. The check that survives an apply is *"zero to write AND zero already"* —
+  otherwise the guard that protects you from a broken rule becomes the thing that fails on success.
+
+Ask it of any applier whose predicate mentions the state it writes: **if this runs to completion,
+does its own selection still find these rows?** A predicate over *what is missing* answers no.
+
+### A print is not a write
+
+**Measured.** A mutating applier ended with
+`print("LEDGER: append these rows to <ledger>")` and left the append to a human. The apply landed
+two agent-tagged symbols the ledger did not carry — precisely the both-directions provenance
+invariant the project's gates exist to catch. Nothing in the applier failed; it reported success,
+and the discrepancy existed for exactly as long as it took someone to read the output and act on
+it. Had the output been long, or the session ended, the gate would have caught it later and the
+round would have looked like collateral damage rather than an unfinished step.
+
+**An applier that instructs a human to finish it has not finished.** The ledger append belongs
+inside the same run as the mutation. Two details make that safe:
+
+- **Write it convergently** — skip a row already present for this key — so a re-run cannot
+  accumulate duplicates.
+- **Expect the fix to expose a second defect in the apply itself.** Making the ledger re-runnable
+  forces the *program* side to be re-runnable too, and there the trap is that
+  `createLabel`/`setName` with a value already present is a **silent no-op**. A delta bracket of
+  the form `symbols == before + N` then raises on a program that is already correct. Count what
+  the run actually writes, not what its census contains.
+
+### Creating a function makes its whole body visible to every function-walking sweep at once
+
+**Measured.** One function created at previously-unclaimed bytes changed **four** committed
+artifacts. Two were expected (the symbol inventory, and the string inventory's "referenced from no
+function" cell). One was a bonus corroboration. The fourth was a survey of virtual-dispatch sites,
+which gained **three** rows — dispatch sites that had always been in those bytes and were invisible
+only because the bytes belonged to no function.
+
+**Budget the artifact churn of a function-creating apply against the BODY, not against the one row
+you meant to add.** Every sweep in the project that iterates defined functions now sees an
+additional body's worth of instructions, and each will report whatever it is built to find there.
+
+The upside is real and worth expecting rather than being surprised by: two of those four changes
+were *corroborations arriving free* — an independent sweep reported the new body has the structural
+shape its claimed role requires, which is a witness nobody had to design. And where the sweep names
+functions, check the change shows your name **filtered out**: seeing the agent-name filter visibly
+suppress your own fresh name in a regenerated artifact is the anti-circularity rule being exercised
+rather than merely present.
