@@ -1542,3 +1542,47 @@ possible way to end a write-up and the easiest place for a decayed claim to surv
 - **Writing the lesson down does not change the next round's behaviour.** This project had
   documented the identical staleness one round earlier, in the same session. What catches it is a
   *step* in the write-up, not a principle in a file.
+
+### Scope a branch at the next branch, not at a fixed instruction count
+
+**Measured.** A probe needed to know which slot each of three category bits writes to. The body
+is three consecutive blocks of the form `TEST reg, <bit>; JZ next; MOV [obj + slot], val`. The
+probe looked for the first qualifying store within a fixed window of instructions after each
+test — and the window from the second test reached into the *third* block, attributing that
+block's store to the second bit. It reported one bit as owning two slots, and the structural
+check ("each bit owns a known set") is the only thing that caught it.
+
+A branch ends exactly where the next branch begins. Look for that boundary rather than guessing
+a distance: **stop the scan at the next instruction of the same discriminating shape.** Any fixed
+window is either too short for one arm or too long for another, and the failure is silent because
+a too-long window still finds *a* plausible answer.
+
+Two companions from the same probe, both worth stealing:
+
+- **Expect a SET, not a value, wherever the code may legitimately write more than one slot.** The
+  arm category owned two slots (`if (Arm0 == v) Arm0 = v; else Arm1 = v;`). An expectation
+  written as a single offset reported a false conflict; written as a set it became a *stronger*
+  claim — the bit must reach **both**.
+- **Do not extract a scaled-index multiplier by splitting the operand text on `*`.** The scale is
+  not among the operand objects, so it must come from the text — but a naive split returns the
+  displacement. Anchor a narrow regex on the base you already know: `\*\s*0x([0-9a-f]+)`.
+
+### Build the cheap probe to refute a guess even when you expect it to fail
+
+**Measured, and the refutation was worth more than the guess would have been.** Two adjacent
+400-byte blocks in one class, the first already established as an array of 16-byte records. The
+obvious hypothesis was that the second was another one. A short probe refuted it in one run —
+the region shows a distinct offset at every 4-byte step, i.e. individual fields.
+
+But the probe also printed **which functions touch the region**, and four of them were an
+`Add`/`Get`/`Remove`/`Reset` quartet naming the block explicitly. That identified the structure
+immediately, and nothing in the project's notes had pointed at it. The round that followed
+settled the whole thing on six witnesses.
+
+- **A probe that reports only whether the guess held is worth much less than one that reports
+  what it saw.** Print the population, the names, the distribution — the material that lets a
+  reader form the *next* hypothesis. The verdict line is the least valuable thing in the output.
+- **Function names are evidence.** Where a binary retains them, "who touches this region" is
+  often a sharper instrument than any structural inference over the bytes.
+- And keep the calibration arm: the same probe's first two versions could not see the *known*
+  array either, so a bare "nothing touches +0x1e0" would have been a fact about the probe.

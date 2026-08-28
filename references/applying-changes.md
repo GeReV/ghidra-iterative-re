@@ -524,3 +524,21 @@ placeholder and was **edited in place**, so only the array was new. That is know
 running — check whether each type you are about to write already exists — and it converts the
 bracket from something you re-pin after the fact into something that confirms your model of what
 the apply does.
+
+### An option's label and its description must make the same promise
+
+**Measured, and the failure is in the asking rather than the answering.** A census option was
+presented to a human as *"add a shared typedef too"* while its description offered only *"record
+in the artifact that these elements share a domain"* — a type versus a note, with the more
+attractive wording on the label. The human chose quickly, then came back to ask what the typedef
+had been. That is how the mismatch surfaced at all.
+
+The whole point of approving a census **to the row** is that the approval is informed. A label
+that promises more than its description delivers defeats that, and no amount of accuracy further
+down repairs it: **the label is what gets read.**
+
+- **Write the label at the same specificity as the description.** If the label names a mechanism
+  ("typedef", "retype", "rename"), the description must propose that mechanism.
+- **Treat a fast answer as a reason to re-read your own option, not as evidence it was clear.**
+- When the discrepancy is found, put the choice again and say plainly that the first framing was
+  wrong — do not quietly deliver the more attractive reading on the grounds that it was chosen.
