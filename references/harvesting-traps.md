@@ -1486,3 +1486,59 @@ confidence rather than no confidence.
   **how you adjudicate a project against itself**.
 - The round is still worth writing up, **at the original lead's location** rather than as a fresh
   finding — otherwise the next reader sees two independent-looking discoveries of one fact.
+
+### Hand-rolled dataflow over a branching body fails in four ways, and they look like four bugs
+
+**Measured across four iterations of one probe**, each fix revealing the next. The task was
+ordinary: work out which of three accumulators feeds each field of a struct written by a large
+function with three exit paths. All four failures are the *same* underlying mistake — treating a
+branching body as if it ran straight through — and none of them announces itself:
+
+- **Duck-typed operand values.** `getOpObjects` returns `Register` objects, and `Register` has
+  `getOffset()`. An extractor accepting anything with `getValue`/`getUnsignedValue`/`getOffset`
+  silently reads register encodings as instruction constants. Measured: a block-copy stride came
+  out **8** against a true 16, and a store-offset set as `{12, 24}` against `{0,4,8,12}`. Filter
+  to the scalar type explicitly.
+- **Address order is not execution order.** A linear register-binding walk passes through the
+  branch that is the *alternative* to the one that established a binding, and clobbers it — so
+  the values read at a store belong to a path that was never taken to reach it.
+- **A stack displacement only names a slot at a known stack pointer.** Arguments pushed between
+  a value's production and its use shift the frame, so the same textual displacement denotes two
+  different slots in one function. Adding frame tracking fixed one path and broke another.
+- **Decompiler variable names are reused across exit paths.** A whole-function
+  `variable → source` map keeps only the last assignment and silently blends paths.
+
+**Every one was caught by a structural check and none by inspection.** The checks that did it
+were cheap and worth copying: *three mechanically different witnesses of the same size must
+agree*; *the four fields must divide 1 + 1 + 2 over three categories*; *the separate exit paths
+must agree with each other*. Note what those have in common — they constrain the SHAPE of the
+answer, independently of the mechanism producing it, so a broken instrument reads as a
+contradiction rather than as a surprising result.
+
+The corollary is the reassuring one: **the answer was identical on every run where the
+instrument was sound.** When a structural check fires, suspect the instrument first; when it
+passes across independent derivations, the result is worth more than any single clean run.
+
+**And the resolution was to stop.** The decompiler already performs this analysis and resolves
+all four problems by construction. "Check for a built-in before writing your own" applied from
+the first line and was reached only after four iterations — the cost of hand-rolling is rarely
+the first version, it is the three that follow.
+
+### A NOT-TAKEN inherited from an older round is a claim, and inherits its staleness
+
+**Measured, and one round after the same project had written up the identical failure.** A round
+closed with a NOT-TAKEN copied verbatim from a round 70-odd earlier: *"this needs table X laid
+out — still open, and tool Y still not consulted."* Three clauses, all false. The table had been
+laid out fifty rounds before; the address quoted as the table's base was a **field inside its
+records**; and tool Y described a different structure entirely.
+
+Nothing about the sentence looked stale, because a NOT-TAKEN is written in the present tense and
+carries the authority of the round that first recorded it. Copying one forward is the cheapest
+possible way to end a write-up and the easiest place for a decayed claim to survive.
+
+- **Re-check each clause of an inherited NOT-TAKEN against the program and the artifacts before
+  repeating it** — the same pricing you would do before scoping a round from it, because that is
+  exactly what the next reader will use it for.
+- **Writing the lesson down does not change the next round's behaviour.** This project had
+  documented the identical staleness one round earlier, in the same session. What catches it is a
+  *step* in the write-up, not a principle in a file.
