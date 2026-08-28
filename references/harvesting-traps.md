@@ -1642,3 +1642,63 @@ and by whether a reference has been applied to the operand. `getOpObjects(i)`, `
 > deliberately: a check phrased as "assert the thing I expect is present" survives a parser bug,
 > and one phrased as "assert nothing bad was found" is silently satisfied by a parser that finds
 > nothing at all.
+
+## "Blocked" is a claim about the binary — price it against the binary, not against your notes
+
+A NOT-TAKEN entry that reads *"blocked, the evidence isn't recoverable"* is the entry that stops a
+later round from even looking. It is therefore the one that most needs to be right, and it is
+routinely the one written with the least work — because concluding that something is impossible
+feels like it needs no measurement.
+
+Measured. A round recorded a whole family of five record layouts as un-appliable, correctly
+observing that the write-up of the investigation which had recovered them contained corrections but
+no layout tables. Two of the five were genuinely gone. The third was not: **two function bodies
+between them witnessed all twelve of its fields**, including one — a buffer capacity — that appeared
+in no note anywhere. The cost of finding that out was two decompiles; the cost of not finding it out
+was a backlog entry telling every future session not to bother.
+
+> **"The evidence is not in the repo" and "the evidence cannot be obtained" are different
+> statements.** Writing the first and recording the second is the specific error, and it is easy to
+> make because the two produce identical-looking backlog prose.
+
+The rule: **a "blocked" verdict owes one body read** — not a full recovery, just enough to
+distinguish *nobody wrote this down* from *this is not in the binary*. This is the read-the-body
+rule stated as a negative: read a body before concluding a thing cannot be recovered.
+
+## For interchangeable fields, ask what a PERMUTATION would break
+
+Size checks, bounds checks and tiling checks all validate a layout's SHAPE. None of them can see a
+layout whose shape is right and whose field ORDER is wrong — and that failure is available whenever
+a struct contains several fields of the same width holding the same kind of thing.
+
+Measured: a 0x24-byte archive record whose five middle fields are all pointers to parsed chunk
+buffers. Transposing any two of them yields a struct that tiles perfectly, passes every size and
+bounds assertion, decompiles without complaint, and is wrong. Nothing structural distinguishes
+them. The only evidence for the order is the code that assigns each one — here, following each
+chunk's four-character container id to the field it is stored into.
+
+- **For every group of structurally identical fields, ask what a permutation of them would break.**
+  If the answer is "nothing", the layout is under-determined and the ordering check is not
+  ceremony — it is the only evidence the order has. Its poison arm should transpose exactly two.
+- The same question applies to array-of-struct field plans, to parallel arrays indexed by the same
+  key, and to any `{a, b}` pair of the same type where the names are the whole distinction.
+
+## Pair instructions on dataflow, never on proximity
+
+"The next X after Y" is a guess about code layout wearing the clothes of an analysis. It fails
+silently the moment anything else emits an X in between, and the failure looks like a finding.
+
+Measured: a check mapping each container chunk id to the struct field it is stored into paired the
+tag's `PUSH` with the next member store in address order. Every tag resolved to the same field,
+because the constructor ZEROES all five fields immediately after the first tag reference. Arming
+instead on the call that actually produces the stored value — the allocator — and taking the store
+of *its* result resolved all five correctly.
+
+Related shapes from the same project: scoping a branch at a fixed instruction count runs one
+`TEST`/`JZ`/`MOV` block into the next; bounding a body scan at a guessed instruction count truncates
+a 29-instruction function at 24 and loses its third call (bound at the `RET`:
+`getFlowType().isTerminal()`).
+
+> **When you associate two instructions, name the dataflow that links them.** If you cannot, the
+> association is positional, and positional associations need a stated reason why nothing can come
+> between.
