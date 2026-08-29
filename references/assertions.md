@@ -903,3 +903,47 @@ be measured before the parser exists** — otherwise they drift into agreement w
 Synthetic fixtures keep their job: they are the only way to demonstrate a *rejection* path firing,
 because damaged input is exactly what a real corpus does not contain. Build them to break one rule
 each. Just do not let them stand in for evidence that the happy path is right.
+
+## A check that opens with a `continue` cannot police what it skips — write down the skipped population
+
+The blind spot is created by one line and is invisible thereafter, because everything the check
+*does* see is verified and looks healthy. Measured on a 1999 MSVC/x86 project:
+
+A gate over the PE export table asserted *"every parsed member symbol carries a declaring class"*,
+and opened with
+
+```python
+if parse_mangled(row["mangled_name"])["kind"] != "member":
+    continue
+```
+
+That `continue` skips every **special** name — constructors, destructors, `operator=`, `??_7`
+vftables — which on this binary is **111 of 1970 rows**. Behind it, the project's own demangler had
+been returning `parse_status="ok"` while leaving `member` empty for **all** of them. The gate ran
+green for a whole phase; the committed artifact shipped `CRobotAssemblyBay::` with nothing after the
+colons; and two independent investigators eventually hit the blank and demangled by hand rather than
+suspect the tool. **The population the check could not see is where the defect had accumulated,
+precisely because everything visible was being verified.**
+
+The rule, which costs one comment at the time and is unrecoverable later:
+
+- **When a check begins by excluding a kind, state in the code what the exclusion drops and HOW MANY
+  ROWS it is** — as a fraction of the population, never a bare count. "skips non-member kinds"
+  conceals it; "skips the 111 of 1970 special names" does not.
+- **If the excluded set is a whole KIND rather than a handful of known rows, it needs its own check,
+  not an exemption.** The exclusion is usually there because the kind needs *different* handling,
+  which is the same reason it needs separate verification.
+- **Give the new check a companion that pins its own denominator.** A check of the form "for each row
+  where a function exists at this address…" silently becomes vacuous if every row starts taking the
+  `fn is None` path. The companion here asserts that the rows *without* a function are exactly the
+  `??_7` vftables (data symbols by construction), so the first check's coverage cannot fall to zero
+  unnoticed. Demonstrate it alone: re-point one constructor at a data address and only the companion
+  may fire.
+
+**And grade the repair against an implementation you did not write.** The expected values here were
+never written down in the project — they were read out of Ghidra's own demangler, a separate
+implementation of the same Microsoft spec, joined **by address**, agreeing on 96 of 97. The single
+divergence (`??B`, a user-defined conversion whose target type is in the *signature*, not in the
+special code) was documented *before* the grading run and pinned to that one address, so a second
+divergence is a failure rather than a quietly widening allowance. A decoder graded against its own
+table has measured nothing.
