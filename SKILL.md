@@ -76,6 +76,7 @@ you open it.
 | open a new game binary: free names, library-vs-game separation, engine and era | `references/game-recon.md` |
 | get a check the program cannot influence, or emit a layout a 64-bit host will silently relay | `references/oracles-and-abi.md` |
 | recover classes, vtables, parentage, or dispatch through a table | `references/cpp-abi.md` |
+| read the exports of a binary you have NOT imported — a companion DLL, a demo build — run this skill's own `scripts/msvc_demangle` (`--pe FILE --tsv`) | `references/cpp-abi.md` |
 | write a script, or reach for any Ghidra API | `references/api.md` |
 | work a non-PC or pre-modern target | `references/platforms-eras.md` |
 | cite a claim, or check whether an API is version-bound | `references/sources.md` |

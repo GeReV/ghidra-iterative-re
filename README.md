@@ -108,6 +108,18 @@ So `656 rep-string instructions` or `12 of 14 anchors` are there to give you a s
 scale and of what a real measurement looks like. They are not thresholds to check your
 own binary against.
 
+## What ships here
+
+Mostly prose: `SKILL.md` plus the `references/` files it routes to. One exception —
+`scripts/msvc_demangle`, an executable, because the gap it fills cannot be closed by
+advice. The demangler you would normally use lives inside the disassembler, so a binary
+you have not imported cannot have its symbols read at all; this decodes MSVC-mangled names
+(and walks a PE export table with `--pe`) with no dependencies and nothing to import.
+
+Its `--selftest` runs committed vectors anywhere, and `--oracle DIR` corroborates against a
+project that has ground truth. `references/cpp-abi.md` explains why both tiers exist and
+what each one caught that the other could not.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

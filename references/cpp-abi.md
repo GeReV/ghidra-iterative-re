@@ -182,6 +182,52 @@ Ghidra 12.1 added Microsoft demangler **output options** controlling user-define
 (`_anon_ABCD01234` vs the generic form). Both affect whether demangled and non-demangled
 symbols land in the same namespace, so they affect name-based joins.
 
+## When the binary is not open: `scripts/msvc_demangle`
+
+The demangler you normally reach for lives inside the disassembler, so a binary you have
+not imported cannot have its symbols read at all. That bites exactly where an export table
+is most valuable — a companion DLL, a plugin, a demo build, a patched executable — and
+`c++filt` is no help, since it decodes the Itanium ABI and MSVC's scheme is unrelated.
+
+**This skill ships one executable**, `scripts/msvc_demangle`, for that case. It decodes a
+name into class, member, access, static/virtual, calling convention, return type and
+parameters; `--pe FILE` walks a PE export table directly; `--tsv` emits rows to join
+against other evidence. It is plain Python with no dependencies, so it runs anywhere the
+skill is installed.
+
+Measured on a 236 KB renderer DLL that had never been imported: **112 mangled exports, 4
+`??_7` vftable anchors and 88 fully typed methods**, against 14 anchors in the whole of the
+main executable that project had spent months on. The DLL also carried a CodeView debug
+directory naming its build-time `.pdb` path — i.e. the source tree layout — which is free
+and needs no import either.
+
+### Its self-test is two tiers, and each caught what the other could not
+
+This matters beyond this one tool, because **a decoder's output is the kind of result that
+looks right while being wrong** — see *A decoder bug is invisible from its own output*
+below. The two tiers are:
+
+- **vectors** — one name per code path, committed with the tool, always run. This *pins*
+  the decoder against regressions. It cannot *validate* it: a vector written from the same
+  misreading as the code agrees with the code.
+- **`--oracle DIR`** — a project holding `symbols/exports.csv` (mangled names with their
+  expected class, member and static/virtual flags) and optionally a column of a real
+  demangler's return types. This *corroborates*, because the expected values came from
+  somewhere else entirely.
+
+Both have caught a bug the other was blind to. The oracle found MSVC's **second
+back-reference table** — the one for composite argument types, unrelated to the name table
+— missing, along with pointer-to-member-function. The vectors found that **every
+constructor argument was being silently dropped**: a constructor has no return type, a bare
+`@` stands where one would be, and consuming that `@` as an empty parameter list produces
+`C::C()` for `??0C@@QAE@ABV0@@Z`. An oracle comparing only names, flags and return types
+cannot see that, and this one did not.
+
+**And write the operator table from a reference, not from memory.** Two entries were wrong
+on the first pass — `?P` is `operator>=`, not `operator=`; `?V` is `operator&&`, not
+`operator|` — and neither ground truth exercised either code, so only re-deriving the table
+against the published scheme caught them. A transcribed table is a hypothesis.
+
 ## The demangler is a TYPE witness, not just a name witness
 
 A mangled symbol encodes the **full signature** — return type, parameter types, `const`,

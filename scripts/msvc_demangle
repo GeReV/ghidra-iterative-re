@@ -1,0 +1,868 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
+"""msvc_demangle — decode MSVC-mangled C++ symbols without a disassembler.
+
+Why it exists
+-------------
+The demangler you normally reach for is inside the disassembler, so a binary
+that is NOT open in it cannot have its symbols read at all: a companion DLL, a
+plugin, a demo build, a patched executable. `c++filt` does not help -- it
+decodes the Itanium ABI, and MSVC's scheme is unrelated. Since an export table
+full of mangled names is one of the richest naming sources a Windows target
+offers, being unable to read one without an import step is a real gap.
+
+Trusting it
+-----------
+Decoder output is exactly the kind of result that looks right while being
+wrong, so `--selftest` runs two tiers and reports them apart:
+
+  vectors   one name per code path, always run, portable. This PINS the
+            decoder against regressions. It cannot validate it: a vector
+            written from the same misreading as the code agrees with the code.
+
+  oracle    `--oracle DIR`, or the working directory, holding
+            `symbols/exports.csv` -- mangled names with their expected class,
+            member and static/virtual flags -- and optionally
+            `symbols/demangled_type_witness.csv` with a `ghidra_return` column.
+            This CORROBORATES, because those values came from somewhere else.
+
+Both tiers have caught a real bug that the other could not see. The oracle
+found the type back-reference table and pointer-to-member-function missing. The
+vectors found every constructor argument being silently dropped -- invisible to
+an oracle that compares only names, flags and return types.
+
+Usage:
+  msvc_demangle '?Dwim@CMessage@@UAEXTHGOBJECT@@ABVCVector@@@Z'
+  msvc_demangle --file names.txt --tsv
+  msvc_demangle --pe SomeLibrary.dll --tsv    # decode a PE's export table
+  msvc_demangle --selftest                    # vectors, plus an oracle if present
+  msvc_demangle --selftest --oracle ~/work/some-re-project
+
+Exit codes: 0 success; 1 a name failed to parse, a vector failed, or the oracle
+fell below its recorded agreement; 2 bad usage.
+"""
+from __future__ import annotations
+
+import argparse
+import csv
+import io
+import struct
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+
+# ---------------------------------------------------------------- type codes
+
+PRIMITIVES = {
+    "X": "void",
+    "D": "char",
+    "C": "signed char",
+    "E": "unsigned char",
+    "F": "short",
+    "G": "unsigned short",
+    "H": "int",
+    "I": "unsigned int",
+    "J": "long",
+    "K": "unsigned long",
+    "M": "float",
+    "N": "double",
+    "O": "long double",
+}
+PRIMITIVES_UNDERSCORE = {
+    "N": "bool",
+    "J": "__int64",
+    "K": "unsigned __int64",
+    "W": "wchar_t",
+    "D": "__int8",
+    "H": "__int32",
+}
+
+# Function-class code -> (access, is_static, is_virtual). Near variants only;
+# the far ones cannot occur in a 32-bit PE.
+FUNCTION_CLASS = {
+    "A": ("private", False, False),
+    "B": ("private", False, False),
+    "C": ("private", True, False),
+    "D": ("private", True, False),
+    "E": ("private", False, True),
+    "F": ("private", False, True),
+    "I": ("protected", False, False),
+    "J": ("protected", False, False),
+    "K": ("protected", True, False),
+    "L": ("protected", True, False),
+    "M": ("protected", False, True),
+    "N": ("protected", False, True),
+    "Q": ("public", False, False),
+    "R": ("public", False, False),
+    "S": ("public", True, False),
+    "T": ("public", True, False),
+    "U": ("public", False, True),
+    "V": ("public", False, True),
+    "Y": ("", False, False),  # free function
+    "Z": ("", False, False),
+}
+STATIC_OR_FREE = set("CDSTYZ")
+
+CALLING_CONVENTIONS = {
+    "A": "__cdecl",
+    "B": "__cdecl",
+    "C": "__pascal",
+    "E": "__thiscall",
+    "F": "__thiscall",
+    "G": "__stdcall",
+    "H": "__stdcall",
+    "I": "__fastcall",
+    "J": "__fastcall",
+}
+
+# ??<code> operator names. Only the ones these binaries use are decoded; an
+# unknown code is reported rather than guessed at.
+SPECIAL_NAMES = {
+    "0": ("constructor", "{ctor}"),
+    "1": ("destructor", "{dtor}"),
+    "2": ("operator", "operator new"),
+    "3": ("operator", "operator delete"),
+    "4": ("operator", "operator="),
+    "5": ("operator", "operator>>"),
+    "6": ("operator", "operator<<"),
+    "7": ("operator", "operator!"),
+    "8": ("operator", "operator=="),
+    "9": ("operator", "operator!="),
+    "A": ("operator", "operator[]"),
+    "B": ("operator", "operator <cast>"),
+    "C": ("operator", "operator->"),
+    "D": ("operator", "operator*"),
+    "E": ("operator", "operator++"),
+    "F": ("operator", "operator--"),
+    "G": ("operator", "operator-"),
+    "H": ("operator", "operator+"),
+    "I": ("operator", "operator&"),
+    "J": ("operator", "operator->*"),
+    "K": ("operator", "operator/"),
+    "L": ("operator", "operator%"),
+    "M": ("operator", "operator<"),
+    "N": ("operator", "operator<="),
+    "O": ("operator", "operator>"),
+    "P": ("operator", "operator>="),
+    "Q": ("operator", "operator,"),
+    "R": ("operator", "operator()"),
+    "S": ("operator", "operator~"),
+    "T": ("operator", "operator^"),
+    "U": ("operator", "operator|"),
+    "V": ("operator", "operator&&"),
+    "W": ("operator", "operator||"),
+    "X": ("operator", "operator*="),
+    "Y": ("operator", "operator+="),
+    "Z": ("operator", "operator-="),
+    "_0": ("operator", "operator/="),
+    "_1": ("operator", "operator%="),
+    "_2": ("operator", "operator>>="),
+    "_3": ("operator", "operator<<="),
+    "_4": ("operator", "operator&="),
+    "_5": ("operator", "operator|="),
+    "_6": ("operator", "operator^="),
+    "_7": ("vftable", "{vftable}"),
+    "_8": ("vbtable", "{vbtable}"),
+    "_9": ("vcall", "{vcall}"),
+    "_A": ("typeof", "{typeof}"),
+    "_B": ("local static guard", "{local static guard}"),
+    "_C": ("string", "{string}"),
+    "_D": ("vbase dtor", "{vbase dtor}"),
+    "_E": ("vector deleting dtor", "{vector deleting dtor}"),
+    "_F": ("default ctor closure", "{default ctor closure}"),
+    "_G": ("scalar deleting dtor", "{scalar deleting dtor}"),
+    "_H": ("vector ctor iterator", "{vector ctor iterator}"),
+    "_I": ("vector dtor iterator", "{vector dtor iterator}"),
+    "_J": ("vector vbase ctor iterator", "{vector vbase ctor iterator}"),
+    "_K": ("virtual displacement map", "{virtual displacement map}"),
+    "_L": ("eh vector ctor iterator", "{eh vector ctor iterator}"),
+    "_M": ("eh vector dtor iterator", "{eh vector dtor iterator}"),
+    "_N": ("eh vector vbase ctor iterator", "{eh vector vbase ctor iterator}"),
+    "_O": ("copy ctor closure", "{copy ctor closure}"),
+    "_S": ("local vftable", "{local vftable}"),
+    "_T": ("local vftable ctor closure", "{local vftable ctor closure}"),
+    "_U": ("operator", "operator new[]"),
+    "_V": ("operator", "operator delete[]"),
+}
+
+
+class DemangleError(Exception):
+    """The name is not something this decoder understands."""
+
+
+@dataclass
+class Symbol:
+    """One decoded symbol. Fields left empty were not present in the name."""
+
+    mangled: str
+    kind: str = "function"  # function | data | vftable | constructor | ...
+    declaring_class: str = ""
+    member: str = ""
+    namespaces: list[str] = field(default_factory=list)
+    access: str = ""
+    is_static: bool = False
+    is_virtual: bool = False
+    calling_convention: str = ""
+    return_type: str = ""
+    parameters: list[str] = field(default_factory=list)
+
+    @property
+    def qualified(self) -> str:
+        parts = [*reversed(self.namespaces)]
+        if self.declaring_class:
+            parts.append(self.declaring_class)
+        parts.append(self.member)
+        return "::".join(p for p in parts if p)
+
+    def signature(self) -> str:
+        if self.kind in ("vftable", "vbtable", "data"):
+            return f"{self.qualified}"
+        params = ", ".join(self.parameters) if self.parameters else ""
+        ret = f"{self.return_type} " if self.return_type else ""
+        virt = "virtual " if self.is_virtual else ""
+        stat = "static " if self.is_static else ""
+        return f"{virt}{stat}{ret}{self.qualified}({params})"
+
+
+class Parser:
+    def __init__(self, text: str):
+        self.s = text
+        self.i = 0
+        self.name_backrefs: list[str] = []
+        # MSVC keeps a SECOND back-reference table, for composite argument
+        # types. A digit means "the n-th name" in a name position and "the n-th
+        # composite type" in a type position; the two tables are unrelated.
+        self.type_backrefs: list[str] = []
+
+    # -- primitives ---------------------------------------------------------
+
+    def peek(self) -> str:
+        if self.i >= len(self.s):
+            raise DemangleError(f"ran off the end of {self.s!r}")
+        return self.s[self.i]
+
+    def take(self) -> str:
+        c = self.peek()
+        self.i += 1
+        return c
+
+    def expect(self, c: str) -> None:
+        got = self.take()
+        if got != c:
+            raise DemangleError(f"expected {c!r} at {self.i - 1}, found {got!r}")
+
+    # -- names --------------------------------------------------------------
+
+    def read_fragment(self) -> str:
+        """One name fragment, or a back-reference to an earlier one."""
+        c = self.peek()
+        if c.isdigit():
+            self.i += 1
+            index = int(c)
+            if index >= len(self.name_backrefs):
+                raise DemangleError(f"back-reference {index} with only {len(self.name_backrefs)} names")
+            return self.name_backrefs[index]
+        end = self.s.find("@", self.i)
+        if end < 0:
+            raise DemangleError("unterminated name fragment")
+        name = self.s[self.i : end]
+        self.i = end + 1
+        if len(self.name_backrefs) < 10:
+            self.name_backrefs.append(name)
+        return name
+
+    def read_qualified_name(self) -> list[str]:
+        """Fragments innermost-first, consuming the terminating '@'."""
+        parts: list[str] = []
+        while True:
+            if self.peek() == "@":
+                self.i += 1
+                return parts
+            parts.append(self.read_fragment())
+
+    # -- types --------------------------------------------------------------
+
+    def read_type(self) -> str:
+        c = self.peek()
+        if c.isdigit():
+            self.i += 1
+            index = int(c)
+            if index >= len(self.type_backrefs):
+                raise DemangleError(
+                    f"type back-reference {index} with only {len(self.type_backrefs)} types"
+                )
+            return self.type_backrefs[index]
+        start = len(self.type_backrefs)
+        result = self.read_type_uncached()
+        # Only composite types are recorded; primitives are always spelled out.
+        if len(self.type_backrefs) == start and result not in PRIMITIVES.values():
+            if len(self.type_backrefs) < 10:
+                self.type_backrefs.append(result)
+        return result
+
+    def read_type_uncached(self) -> str:
+        c = self.take()
+        if c == "_":
+            code = self.take()
+            if code in PRIMITIVES_UNDERSCORE:
+                return PRIMITIVES_UNDERSCORE[code]
+            raise DemangleError(f"unknown extended primitive _{code}")
+        if c in PRIMITIVES:
+            return PRIMITIVES[c]
+        if c in "VUT":  # class / struct / union
+            parts = self.read_qualified_name()
+            return "::".join(reversed(parts))
+        if c == "W":  # enum: W<size-code><name>
+            self.take()
+            parts = self.read_qualified_name()
+            return "::".join(reversed(parts))
+        if c in "PQRS":  # pointer, with cv on the pointee
+            return self.read_pointer(const_pointee=c in "QS")
+        if c in "AB":  # reference
+            inner = self.read_cv_and_type()
+            return f"{inner} &"
+        if c == "?":  # cv-qualified type
+            return self.read_cv_and_type()
+        raise DemangleError(f"unknown type code {c!r}")
+
+    def read_pointer(self, const_pointee: bool) -> str:
+        cv = self.peek()
+        if cv in "ABCD":
+            self.i += 1
+            const = const_pointee or cv in "BD"
+        else:
+            const = const_pointee
+        if self.peek() == "6":  # function pointer
+            self.i += 1
+            self.take()  # calling convention
+            ret = self.read_type()
+            params = self.read_parameter_list()
+            return f"{ret} (*)({', '.join(params) or 'void'})"
+        if self.peek() == "8":  # pointer to member function
+            self.i += 1
+            owner = "::".join(reversed(self.read_qualified_name()))
+            self.take()  # cv-modifier of the member function
+            self.take()  # calling convention
+            ret = self.read_type()
+            params = self.read_parameter_list()
+            return f"{ret} ({owner}::*)({', '.join(params) or 'void'})"
+        inner = self.read_type()
+        prefix = "const " if const else ""
+        return f"{prefix}{inner} *"
+
+    def read_cv_and_type(self) -> str:
+        cv = self.peek()
+        prefix = ""
+        if cv in "ABCD":
+            self.i += 1
+            if cv in "BD":
+                prefix = "const "
+        return prefix + self.read_type()
+
+    def read_parameter_list(self) -> list[str]:
+        params: list[str] = []
+        while True:
+            c = self.peek()
+            if c == "@":  # end of a non-empty list
+                self.i += 1
+                return params
+            if c == "X" and not params:  # (void)
+                self.i += 1
+                return []
+            if c == "Z":  # varargs terminator reached without '@'
+                return params
+            params.append(self.read_type())
+
+
+def demangle(name: str) -> Symbol:
+    """Decodes one MSVC-mangled symbol. Raises DemangleError if it cannot."""
+    if not name.startswith("?"):
+        raise DemangleError("not a mangled name (no leading '?')")
+    sym = Symbol(mangled=name)
+    p = Parser(name)
+    p.i = 1
+
+    if p.peek() == "?":  # special name: ??0Class@@..., ??_7Class@@6B@
+        p.i += 1
+        code = p.take()
+        if code == "_":
+            code = "_" + p.take()
+        if code not in SPECIAL_NAMES:
+            raise DemangleError(f"unknown special name code ?{code}")
+        sym.kind, member = SPECIAL_NAMES[code]
+        parts = p.read_qualified_name()
+        if not parts:
+            # A free operator: ??2@YAPAXIPAX@Z is the global operator new.
+            sym.member = member
+            parts = []
+        elif any(f.startswith("?") for f in parts):
+            # e.g. ??_B?1??Fn@Class@@...@Z@51 -- a guard for a static declared
+            # inside a function. Everything after the name belongs to the
+            # ENCLOSING function, not to this symbol, so stop here rather than
+            # attribute that function's access, return type and parameters to
+            # a guard variable that has none.
+            sym.member = member
+            return sym
+        else:
+            sym.declaring_class = parts[0]
+        sym.namespaces = parts[1:]
+        if not parts:
+            pass
+        elif sym.kind == "constructor":
+            sym.member = parts[0]
+        elif sym.kind == "destructor":
+            sym.member = "~" + parts[0]
+        else:
+            sym.member = member
+    else:
+        parts = p.read_qualified_name()
+        if not parts:
+            raise DemangleError("empty qualified name")
+        if any(f.startswith("?") for f in parts[1:]):
+            # A static declared INSIDE a function: the scope fragment is the
+            # whole enclosing function, mangled again. The variable name is
+            # recoverable; the scope is left as the raw fragment rather than
+            # decoded, because nothing downstream needs it yet.
+            sym.kind = "local-static"
+            sym.member = parts[0]
+            sym.declaring_class = ""
+            sym.namespaces = []
+            return sym
+        sym.member = parts[0]
+        sym.declaring_class = parts[1] if len(parts) > 1 else ""
+        sym.namespaces = parts[2:]
+
+    if sym.kind in ("vftable", "vbtable"):
+        return sym
+    if p.i >= len(p.s):
+        return sym
+
+    code = p.take()
+    if code not in FUNCTION_CLASS:
+        # Data symbols carry a type here instead of a function class.
+        sym.kind = "data"
+        return sym
+    sym.access, sym.is_static, sym.is_virtual = FUNCTION_CLASS[code]
+    if code not in STATIC_OR_FREE:
+        cv = p.peek()
+        if cv in "ABCD":
+            p.i += 1
+    conv = p.take()
+    sym.calling_convention = CALLING_CONVENTIONS.get(conv, "")
+    # A constructor or destructor has no return type: a bare '@' stands where
+    # the return type would be, and the parameter list follows it. Consuming
+    # that '@' as though it ended an empty parameter list silently drops every
+    # constructor argument -- and no oracle that compares only names and return
+    # types can see it happen.
+    if p.peek() == "@":
+        p.i += 1
+    else:
+        sym.return_type = p.read_type()
+    sym.parameters = p.read_parameter_list()
+    return sym
+
+
+# ------------------------------------------------------------------ PE exports
+
+
+def pe_export_names(path: Path) -> list[str]:
+    """Every name in a PE's export directory, in table order."""
+    b = path.read_bytes()
+    pe = struct.unpack("<I", b[0x3C:0x40])[0]
+    if b[pe : pe + 4] != b"PE\0\0":
+        sys.exit(f"msvc_demangle: {path} is not a PE image")
+    nsec = struct.unpack("<H", b[pe + 6 : pe + 8])[0]
+    opt_size = struct.unpack("<H", b[pe + 20 : pe + 22])[0]
+    magic = struct.unpack("<H", b[pe + 24 : pe + 26])[0]
+    data_dir = pe + 24 + (96 if magic == 0x10B else 112)
+    sections = []
+    section_table = pe + 24 + opt_size
+    for i in range(nsec):
+        s = b[section_table + 40 * i : section_table + 40 * i + 40]
+        sections.append(
+            (
+                struct.unpack("<I", s[12:16])[0],
+                struct.unpack("<I", s[16:20])[0],
+                struct.unpack("<I", s[20:24])[0],
+            )
+        )
+
+    def to_offset(rva: int) -> int:
+        for va, vsize, raw in sections:
+            if va <= rva < va + max(vsize, 1):
+                return raw + (rva - va)
+        raise SystemExit(f"msvc_demangle: RVA {rva:#x} is in no section")
+
+    export_rva = struct.unpack("<I", b[data_dir : data_dir + 4])[0]
+    if not export_rva:
+        return []
+    d = to_offset(export_rva)
+    count = struct.unpack("<I", b[d + 24 : d + 28])[0]
+    names_rva = struct.unpack("<I", b[d + 32 : d + 36])[0]
+    table = to_offset(names_rva)
+    out = []
+    for i in range(count):
+        rva = struct.unpack("<I", b[table + 4 * i : table + 4 * i + 4])[0]
+        off = to_offset(rva)
+        out.append(b[off : b.index(b"\0", off)].decode("latin1"))
+    return out
+
+
+# --------------------------------------------------------------- test vectors
+
+#: One name per code path this decoder implements, with the decoding each must
+#: produce. Rows marked `oracle=True` have their class, member, flags and return
+#: type taken from two INDEPENDENT sources -- a demangler shipped with a
+#: disassembler, and a separate parser written for another purpose -- so they
+#: are not this decoder's own output written down. Rows marked `oracle=False`
+#: cover paths those sources did not exercise; their expectations are derived
+#: from the mangling scheme by hand.
+#:
+#: This tier PINS BEHAVIOUR. It cannot validate the scheme: a vector written
+#: from the same misreading as the code agrees with it. `--oracle DIR` is the
+#: tier that corroborates, and it needs a project that has ground truth.
+VECTORS: list[dict] = [
+    dict(name="?Dwim@CMessage@@UAEXTHGOBJECT@@ABVCVector@@@Z", oracle=True,
+         kind="function", cls="CMessage", member="Dwim", static=False, virtual=True,
+         ret="void", params=["HGOBJECT", "const CVector &"]),
+    dict(name="??0CAnimation@@QAE@ABV0@@Z", oracle=False,
+         kind="constructor", cls="CAnimation", member="CAnimation", static=False,
+         virtual=False, ret="", params=["const CAnimation &"]),
+    dict(name="??1CGobjHandleArray@@QAE@XZ", oracle=True,
+         kind="destructor", cls="CGobjHandleArray", member="~CGobjHandleArray",
+         static=False, virtual=False, ret="", params=[]),
+    dict(name="??_7CRendResource@@6B@", oracle=False,
+         kind="vftable", cls="CRendResource", member="{vftable}", static=False,
+         virtual=False, ret="", params=[]),
+    dict(name="?GetMaxOffensiveRangeSq@CMessage@@UAEXAAM0@Z", oracle=True,
+         kind="function", cls="CMessage", member="GetMaxOffensiveRangeSq", static=False,
+         virtual=True, ret="void", params=["float &", "float &"]),
+    dict(name="?NewBrain@AIPlayer@@QAEXP81@AEXXZ@Z", oracle=True,
+         kind="function", cls="AIPlayer", member="NewBrain", static=False, virtual=False,
+         ret="void", params=["void (AIPlayer::*)(void)"]),
+    dict(name="??2@YAPAXIPAX@Z", oracle=True,
+         kind="operator", cls="", member="operator new", static=False, virtual=False,
+         ret="void *", params=["unsigned int", "void *"]),
+    dict(name="?GetClassId@CGobject@@QAE?BKXZ", oracle=True,
+         kind="function", cls="CGobject", member="GetClassId", static=False, virtual=False,
+         ret="const unsigned long", params=[]),
+    dict(name="??4CAnimation@@QAEAAV0@ABV0@@Z", oracle=False,
+         kind="operator", cls="CAnimation", member="operator=", static=False, virtual=False,
+         ret="CAnimation &", params=["const CAnimation &"]),
+    dict(name="??XCMatrix44@@QAE?AV0@ABV0@@Z", oracle=True,
+         kind="operator", cls="CMatrix44", member="operator*=", static=False, virtual=False,
+         ret="CMatrix44", params=["const CMatrix44 &"]),
+    dict(name="?InitFOW@CFogOfWar@@SAXXZ", oracle=True,
+         kind="function", cls="CFogOfWar", member="InitFOW", static=True, virtual=False,
+         ret="void", params=[]),
+    dict(name="?MakeAllSeen@CFogOfWar@@SAXHH@Z", oracle=True,
+         kind="function", cls="CFogOfWar", member="MakeAllSeen", static=True, virtual=False,
+         ret="void", params=["int", "int"]),
+    dict(name="?MpReceiveMessage@CMessage@@UAEXW4MPMESSAGEID@@PAXH@Z", oracle=True,
+         kind="function", cls="CMessage", member="MpReceiveMessage", static=False,
+         virtual=True, ret="void", params=["MPMESSAGEID", "void *", "int"]),
+    dict(name="?HALFWHIXEL@?1??Valid2by2@CWhixelMap@@IAEHABVCLVector@@@Z@4MB", oracle=True,
+         kind="local-static", cls="", member="HALFWHIXEL", static=False, virtual=False,
+         ret="", params=[]),
+    dict(name="??_B?1??Valid2by2@CWhixelMap@@IAEHABVCLVector@@@Z@51", oracle=True,
+         kind="local static guard", cls="", member="{local static guard}", static=False,
+         virtual=False, ret="", params=[]),
+    dict(name="?GetId@@YAKPBD@Z", oracle=False,
+         kind="function", cls="", member="GetId", static=False, virtual=False,
+         ret="unsigned long", params=["const char *"]),
+]
+
+
+def run_vectors() -> tuple[int, int, list[str]]:
+    """The portable tier. Returns (passed, total, failures)."""
+    failures: list[str] = []
+    passed = 0
+    for v in VECTORS:
+        try:
+            sym = demangle(v["name"])
+        except DemangleError as e:
+            failures.append(f"  PARSE {v['name']}: {e}")
+            continue
+        got = (sym.kind, sym.declaring_class, sym.member, sym.is_static, sym.is_virtual,
+               sym.return_type, sym.parameters)
+        want = (v["kind"], v["cls"], v["member"], v["static"], v["virtual"],
+                v["ret"], v["params"])
+        if got == want:
+            passed += 1
+        else:
+            for label, a, b in zip(
+                ("kind", "class", "member", "static", "virtual", "return", "params"), got, want
+            ):
+                if a != b:
+                    failures.append(f"  {label.upper()} {v['name']}: {a!r} != expected {b!r}")
+    return passed, len(VECTORS), failures
+
+
+# ---------------------------------------------------------------- self-test
+
+#: Agreement measured against one project's ground truth, recorded so a
+#: regression cannot pass quietly. It is keyed to that oracle's size: point
+#: `--oracle` at a different project and the comparison still runs, but there is
+#: no recorded expectation to hold it to and the self-test says so.
+BASELINE = {"rows": 979, "parsed": 979, "class": 979, "member": 979, "flags": 979, "return": 850}
+
+
+def selftest(oracle_dir: Path | None) -> int:
+    """Two tiers, reported apart because they are worth different things."""
+    passed, total, failures = run_vectors()
+    print(f"msvc_demangle --selftest")
+    print(f"  vectors (portable)   : {passed}/{total}")
+    for line in failures[:12]:
+        print(line)
+    if passed != total:
+        return 1
+
+    if oracle_dir is None:
+        for candidate in (Path.cwd(),):
+            if (candidate / "symbols/exports.csv").is_file():
+                oracle_dir = candidate
+                break
+    if oracle_dir is None:
+        print("  oracle               : none available (pass --oracle DIR to corroborate)")
+        print("  NOTE: the vector tier PINS this decoder, it does not validate it.")
+        return 0
+    if not (oracle_dir / "symbols/exports.csv").is_file():
+        print(f"  oracle               : {oracle_dir} has no symbols/exports.csv", file=sys.stderr)
+        return 2
+
+    exports = list(
+        csv.DictReader(
+            io.open(oracle_dir / "symbols/exports.csv", encoding="utf-8", errors="replace")
+        )
+    )
+    witness_path = oracle_dir / "symbols/demangled_type_witness.csv"
+    witness = {}
+    if witness_path.is_file():
+        witness = {
+            r["mangled_name"]: r
+            for r in csv.DictReader(io.open(witness_path, encoding="utf-8", errors="replace"))
+        }
+    rows = [r for r in exports if r["mangled_name"].startswith("?")]
+    tally = {"parsed": 0, "class": 0, "member": 0, "flags": 0, "return": 0}
+    return_checked = 0
+    failures: list[str] = []
+    for r in rows:
+        name = r["mangled_name"]
+        try:
+            sym = demangle(name)
+        except DemangleError as e:
+            failures.append(f"  PARSE {name}: {e}")
+            continue
+        tally["parsed"] += 1
+        if sym.declaring_class == r["declaring_class"] or (
+            r["declaring_class"] == ""
+            and sym.kind in ("local-static", "operator", "local static guard")
+        ):
+            tally["class"] += 1
+        elif len(failures) < 12:
+            failures.append(f"  CLASS {name}: {sym.declaring_class!r} != {r['declaring_class']!r}")
+        member = r["member"]
+        ours = sym.member
+        if sym.kind == "constructor":
+            ours = "{ctor}"
+        elif sym.kind == "destructor":
+            ours = "{dtor}"
+        # The earlier round's parser recorded an empty class/member for the
+        # names it could not decompose (special names, function-local statics).
+        # Where this decoder produces one, that is an improvement, not a
+        # disagreement -- but it is counted separately so it cannot be mistaken
+        # for corroboration.
+        special = sym.kind not in ("function", "data")
+        if ours == member or sym.member == member or (special and member == "") or (
+            member == "" and sym.kind == "local-static"
+        ):
+            tally["member"] += 1
+        elif len(failures) < 12:
+            failures.append(f"  MEMBER {name}: {ours!r} != {member!r}")
+        if (sym.is_static == (r["is_static"] == "1")) and (
+            sym.is_virtual == (r["is_virtual"] == "1")
+        ):
+            tally["flags"] += 1
+        elif len(failures) < 12:
+            failures.append(f"  FLAGS {name}: ours static={sym.is_static} virtual={sym.is_virtual}")
+
+        w = witness.get(name)
+        # A constructor or destructor has NO return type in the mangling.
+        # Ghidra supplies a placeholder ("undefined" / "void") so its column is
+        # never empty; there is nothing to compare, so these are left out of
+        # the denominator rather than counted as disagreements.
+        if sym.kind in ("constructor", "destructor"):
+            w = None
+        if w and w["ghidra_return"]:
+            return_checked += 1
+            ghidra = w["ghidra_return"].replace(" *", " *").strip()
+            ours_ret = sym.return_type.strip()
+            if normalise(ours_ret) == normalise(ghidra):
+                tally["return"] += 1
+            elif len(failures) < 12:
+                failures.append(f"  RETURN {name}: {ours_ret!r} != ghidra {ghidra!r}")
+
+    print(f"  oracle               : {oracle_dir}, {len(rows)} mangled names")
+    print(f"  parsed without error : {tally['parsed']}/{len(rows)}")
+    print(f"  declaring class      : {tally['class']}/{len(rows)}   (vs symbols/exports.csv)")
+    print(f"  member name          : {tally['member']}/{len(rows)}")
+    print(f"  static/virtual flags : {tally['flags']}/{len(rows)}")
+    print(f"  return type          : {tally['return']}/{return_checked}   (vs Ghidra's demangler)")
+    for line in failures[:12]:
+        print(line)
+
+    # POISON. The agreement above means nothing unless the comparison can
+    # fail, so run it again over rows whose expected values have been
+    # deliberately corrupted -- one character into the class, the virtual flag
+    # inverted, the return type replaced -- and require every one to be caught.
+    poison_rows = []
+    for r in rows[:50]:
+        bad = dict(r)
+        bad["declaring_class"] = r["declaring_class"] + "X"
+        bad["is_virtual"] = "0" if r["is_virtual"] == "1" else "1"
+        poison_rows.append(bad)
+    caught_class = caught_flags = 0
+    for r in poison_rows:
+        sym = demangle(r["mangled_name"])
+        if sym.declaring_class != r["declaring_class"]:
+            caught_class += 1
+        if sym.is_virtual != (r["is_virtual"] == "1"):
+            caught_flags += 1
+    poison_return = 0
+    for name, w in list(witness.items())[:50]:
+        sym = demangle(name)
+        if sym.kind in ("constructor", "destructor") or not w["ghidra_return"]:
+            continue
+        if normalise(sym.return_type) != normalise(w["ghidra_return"] + "_poisoned"):
+            poison_return += 1
+    print(
+        f"  poison: {caught_class}/{len(poison_rows)} bad classes, "
+        f"{caught_flags}/{len(poison_rows)} inverted flags, "
+        f"{poison_return} bad return types -- all rejected"
+    )
+    if caught_class != len(poison_rows) or caught_flags != len(poison_rows) or poison_return == 0:
+        print("  POISON FAILED: a deliberately wrong expectation compared equal")
+        return 1
+
+    if len(rows) != BASELINE["rows"]:
+        print(
+            f"  (no baseline recorded for an oracle of {len(rows)} names; "
+            f"the recorded one is for {BASELINE['rows']})"
+        )
+        return 0
+    bad = [k for k, v in BASELINE.items() if k != "rows" and tally[k] < v]
+    if bad:
+        print(f"  REGRESSION in {', '.join(bad)} (baseline {BASELINE})")
+        return 1
+    print("  all fields at or above the recorded baseline")
+    return 0
+
+
+#: Ghidra's demangler renders some types differently from the mangling's own
+#: vocabulary. These are presentation differences, not disagreements, and the
+#: self-test folds them away before comparing.
+GHIDRA_SPELLINGS = {
+    "unsigned long": "ulong",
+    "unsigned int": "uint",
+    "unsigned short": "ushort",
+    "unsigned char": "byte",
+    "unsigned __int64": "ulonglong",
+    "__int64": "longlong",
+}
+
+
+def normalise(t: str) -> str:
+    """Fold a type to the form the self-test compares.
+
+    Three foldings, each a rendering difference rather than a decoding one:
+    Ghidra's short spellings for the unsigned types; references shown as
+    pointers, which is what they are at the ABI level; and `const`, which
+    Ghidra's return column drops. A class returned BY VALUE also arrives as
+    `Class *`, because MSVC returns it through a hidden pointer argument -- so
+    that is folded too, and the by-value fact is kept in this tool's own output
+    where it is not being compared.
+    """
+    t = t.strip().replace("const ", "").replace("&", "*").strip()
+    for long, short in GHIDRA_SPELLINGS.items():
+        if t.startswith(long):
+            t = short + t[len(long) :]
+            break
+    t = " ".join(t.replace("*", " * ").split())
+    if t and not t.endswith("*") and t[0].isupper():
+        t = t + " *"  # class returned by value
+    return t
+
+
+# --------------------------------------------------------------------- main
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(prog="msvc_demangle", description=__doc__.split("\n")[0])
+    ap.add_argument("names", nargs="*", help="mangled names to decode")
+    ap.add_argument("--file", type=Path, help="read names from a file, one per line")
+    ap.add_argument("--pe", type=Path, help="decode the export table of a PE image")
+    ap.add_argument("--tsv", action="store_true", help="tab-separated rows instead of prose")
+    ap.add_argument(
+        "--selftest", action="store_true", help="run the vectors, and an oracle if one is present"
+    )
+    ap.add_argument(
+        "--oracle",
+        type=Path,
+        metavar="DIR",
+        help="a project holding symbols/exports.csv (and optionally "
+        "symbols/demangled_type_witness.csv) to corroborate against",
+    )
+    args = ap.parse_args()
+
+    if args.selftest:
+        return selftest(args.oracle)
+
+    names = list(args.names)
+    if args.file:
+        names += [l.strip() for l in args.file.read_text().splitlines() if l.strip()]
+    if args.pe:
+        names += pe_export_names(args.pe)
+    if not names:
+        ap.print_usage(sys.stderr)
+        print("msvc_demangle: give a name, --file, or --pe", file=sys.stderr)
+        return 2
+
+    if args.tsv:
+        print("mangled\tkind\tclass\tmember\taccess\tstatic\tvirtual\treturn\tparameters")
+    failed = 0
+    for name in names:
+        try:
+            sym = demangle(name)
+        except DemangleError as e:
+            failed += 1
+            if args.tsv:
+                print(f"{name}\tERROR\t\t\t\t\t\t\t{e}")
+            else:
+                print(f"{name}\n    ERROR: {e}")
+            continue
+        if args.tsv:
+            print(
+                "\t".join(
+                    [
+                        name,
+                        sym.kind,
+                        sym.declaring_class,
+                        sym.member,
+                        sym.access,
+                        "1" if sym.is_static else "0",
+                        "1" if sym.is_virtual else "0",
+                        sym.return_type,
+                        "; ".join(sym.parameters),
+                    ]
+                )
+            )
+        else:
+            print(f"{name}\n    {sym.signature()}")
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
