@@ -191,8 +191,8 @@ is most valuable — a companion DLL, a plugin, a demo build, a patched executab
 
 **This skill ships one executable**, `scripts/msvc_demangle`, for that case. It decodes a
 name into class, member, access, static/virtual, calling convention, return type and
-parameters; `--pe FILE` walks a PE export table directly; `--tsv` emits rows to join
-against other evidence. It is plain Python with no dependencies, so it runs anywhere the
+parameters; `--pe FILE` walks a PE export table directly, `--pe-imports FILE` the import
+table; `--tsv` emits rows to join against other evidence. It is plain Python with no dependencies, so it runs anywhere the
 skill is installed.
 
 Measured on a 236 KB renderer DLL that had never been imported: **112 mangled exports, 4
@@ -200,6 +200,20 @@ Measured on a 236 KB renderer DLL that had never been imported: **112 mangled ex
 main executable that project had spent months on. The DLL also carried a CodeView debug
 directory naming its build-time `.pdb` path — i.e. the source tree layout — which is free
 and needs no import either.
+
+### Read the IMPORT table too, not just the exports
+
+An export table says what a binary offers; an **import** table says what it actually uses
+of someone else's — a far smaller and more pointed set. Measured on a renderer DLL that
+links against its host executable: the export table gave 112 names, and the *import* table
+gave the complete host-to-plugin contract in **48 symbols**, including a `??_7` vftable
+(so the plugin's classes derive from a base in the host), the host's name-hash function,
+and sixteen globals the plugin reads directly. That is a reimplementation boundary you can
+hold in your head, and it was free.
+
+The reciprocal is worth remembering: when a companion binary imports mangled names from
+the main one, **those imports are a priority list** for the main binary's exports. You now
+know which of its several hundred exported symbols another shipped component depends on.
 
 ### Its self-test is two tiers, and each caught what the other could not
 

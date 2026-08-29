@@ -468,46 +468,104 @@ def demangle(name: str) -> Symbol:
 # ------------------------------------------------------------------ PE exports
 
 
-def pe_export_names(path: Path) -> list[str]:
-    """Every name in a PE's export directory, in table order."""
-    b = path.read_bytes()
-    pe = struct.unpack("<I", b[0x3C:0x40])[0]
-    if b[pe : pe + 4] != b"PE\0\0":
-        sys.exit(f"msvc_demangle: {path} is not a PE image")
-    nsec = struct.unpack("<H", b[pe + 6 : pe + 8])[0]
-    opt_size = struct.unpack("<H", b[pe + 20 : pe + 22])[0]
-    magic = struct.unpack("<H", b[pe + 24 : pe + 26])[0]
-    data_dir = pe + 24 + (96 if magic == 0x10B else 112)
-    sections = []
-    section_table = pe + 24 + opt_size
-    for i in range(nsec):
-        s = b[section_table + 40 * i : section_table + 40 * i + 40]
-        sections.append(
-            (
-                struct.unpack("<I", s[12:16])[0],
-                struct.unpack("<I", s[16:20])[0],
-                struct.unpack("<I", s[20:24])[0],
-            )
-        )
+class PeImage:
+    """Just enough PE to reach the export and import directories."""
 
-    def to_offset(rva: int) -> int:
-        for va, vsize, raw in sections:
+    def __init__(self, path: Path):
+        self.b = path.read_bytes()
+        b = self.b
+        self.pe = struct.unpack("<I", b[0x3C:0x40])[0]
+        if b[self.pe : self.pe + 4] != b"PE\0\0":
+            sys.exit(f"msvc_demangle: {path} is not a PE image")
+        nsec = struct.unpack("<H", b[self.pe + 6 : self.pe + 8])[0]
+        opt_size = struct.unpack("<H", b[self.pe + 20 : self.pe + 22])[0]
+        magic = struct.unpack("<H", b[self.pe + 24 : self.pe + 26])[0]
+        self.data_dir = self.pe + 24 + (96 if magic == 0x10B else 112)
+        self.image_base = struct.unpack("<I", b[self.pe + 52 : self.pe + 56])[0]
+        self.sections = []
+        table = self.pe + 24 + opt_size
+        for i in range(nsec):
+            s = b[table + 40 * i : table + 40 * i + 40]
+            self.sections.append(
+                (
+                    struct.unpack("<I", s[12:16])[0],
+                    struct.unpack("<I", s[8:12])[0],
+                    struct.unpack("<I", s[20:24])[0],
+                )
+            )
+
+    def offset(self, rva: int) -> int:
+        for va, vsize, raw in self.sections:
             if va <= rva < va + max(vsize, 1):
                 return raw + (rva - va)
         raise SystemExit(f"msvc_demangle: RVA {rva:#x} is in no section")
 
-    export_rva = struct.unpack("<I", b[data_dir : data_dir + 4])[0]
-    if not export_rva:
+    def cstr(self, offset: int) -> str:
+        return self.b[offset : self.b.index(b"\0", offset)].decode("latin1")
+
+    def directory(self, index: int) -> int:
+        at = self.data_dir + 8 * index
+        return struct.unpack("<I", self.b[at : at + 4])[0]
+
+
+def pe_export_names(path: Path) -> list[tuple[str, int, int]]:
+    """Every exported name, with its ordinal and virtual address."""
+    pe = PeImage(path)
+    rva = pe.directory(0)
+    if not rva:
         return []
-    d = to_offset(export_rva)
+    d = pe.offset(rva)
+    b = pe.b
     count = struct.unpack("<I", b[d + 24 : d + 28])[0]
-    names_rva = struct.unpack("<I", b[d + 32 : d + 36])[0]
-    table = to_offset(names_rva)
+    ordinal_base = struct.unpack("<I", b[d + 16 : d + 20])[0]
+    names = pe.offset(struct.unpack("<I", b[d + 32 : d + 36])[0])
+    ordinals = pe.offset(struct.unpack("<I", b[d + 36 : d + 40])[0])
+    functions = pe.offset(struct.unpack("<I", b[d + 28 : d + 32])[0])
     out = []
     for i in range(count):
-        rva = struct.unpack("<I", b[table + 4 * i : table + 4 * i + 4])[0]
-        off = to_offset(rva)
-        out.append(b[off : b.index(b"\0", off)].decode("latin1"))
+        name = pe.cstr(pe.offset(struct.unpack("<I", b[names + 4 * i : names + 4 * i + 4])[0]))
+        index = struct.unpack("<H", b[ordinals + 2 * i : ordinals + 2 * i + 2])[0]
+        va = pe.image_base + struct.unpack(
+            "<I", b[functions + 4 * index : functions + 4 * index + 4]
+        )[0]
+        out.append((name, index + ordinal_base, va))
+    return out
+
+
+def pe_import_names(path: Path) -> list[tuple[str, str]]:
+    """Every imported name, as (library, symbol).
+
+    An import table is the other half of an export table, and just as good a
+    naming source: it says which of another binary's symbols this one actually
+    uses, which is a far smaller and more pointed set than everything that
+    binary exports.
+    """
+    pe = PeImage(path)
+    rva = pe.directory(1)
+    if not rva:
+        return []
+    b = pe.b
+    entry = pe.offset(rva)
+    out = []
+    while True:
+        chunk = b[entry : entry + 20]
+        if len(chunk) < 20 or chunk == b"\0" * 20:
+            break
+        lookup, _, _, name_rva, address = struct.unpack("<IIIII", chunk)
+        if name_rva == 0:
+            break
+        library = pe.cstr(pe.offset(name_rva))
+        thunk = pe.offset(lookup or address)
+        while True:
+            value = struct.unpack("<I", b[thunk : thunk + 4])[0]
+            thunk += 4
+            if value == 0:
+                break
+            if value & 0x8000_0000:
+                out.append((library, f"#{value & 0xFFFF}"))
+            else:
+                out.append((library, pe.cstr(pe.offset(value) + 2)))
+        entry += 20
     return out
 
 
@@ -799,11 +857,49 @@ def normalise(t: str) -> str:
 # --------------------------------------------------------------------- main
 
 
+def report_imports(path: Path, tsv: bool) -> int:
+    """Prints what a PE takes from each library it links against."""
+    imports = pe_import_names(path)
+    if tsv:
+        print("library\tmangled\tkind\tclass\tmember\treturn\tparameters")
+    by_library: dict[str, list[str]] = {}
+    for library, symbol in imports:
+        by_library.setdefault(library, []).append(symbol)
+    for library, symbols in sorted(by_library.items()):
+        if not tsv:
+            print(f"\n{library}  [{len(symbols)}]")
+        for symbol in symbols:
+            decoded = None
+            if symbol.startswith("?"):
+                try:
+                    decoded = demangle(symbol)
+                except DemangleError:
+                    decoded = None
+            if tsv:
+                if decoded:
+                    print(
+                        f"{library}\t{symbol}\t{decoded.kind}\t{decoded.declaring_class}\t"
+                        f"{decoded.member}\t{decoded.return_type}\t"
+                        f"{'; '.join(decoded.parameters)}"
+                    )
+                else:
+                    print(f"{library}\t{symbol}\t\t\t\t\t")
+            else:
+                print(f"    {decoded.signature() if decoded else symbol}")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(prog="msvc_demangle", description=__doc__.split("\n")[0])
     ap.add_argument("names", nargs="*", help="mangled names to decode")
     ap.add_argument("--file", type=Path, help="read names from a file, one per line")
     ap.add_argument("--pe", type=Path, help="decode the export table of a PE image")
+    ap.add_argument(
+        "--pe-imports",
+        type=Path,
+        metavar="FILE",
+        help="decode the import table of a PE image, grouped by library",
+    )
     ap.add_argument("--tsv", action="store_true", help="tab-separated rows instead of prose")
     ap.add_argument(
         "--selftest", action="store_true", help="run the vectors, and an oracle if one is present"
@@ -824,7 +920,9 @@ def main() -> int:
     if args.file:
         names += [l.strip() for l in args.file.read_text().splitlines() if l.strip()]
     if args.pe:
-        names += pe_export_names(args.pe)
+        names += [n for n, _ordinal, _va in pe_export_names(args.pe)]
+    if args.pe_imports:
+        return report_imports(args.pe_imports, args.tsv)
     if not names:
         ap.print_usage(sys.stderr)
         print("msvc_demangle: give a name, --file, or --pe", file=sys.stderr)
