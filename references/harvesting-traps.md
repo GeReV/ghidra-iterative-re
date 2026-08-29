@@ -1702,3 +1702,45 @@ a 29-instruction function at 24 and loses its third call (bound at the `RET`:
 > **When you associate two instructions, name the dataflow that links them.** If you cannot, the
 > association is positional, and positional associations need a stated reason why nothing can come
 > between.
+
+## `this[-1].last_member` is the array cookie, not a use of the last member
+
+A sweep that finds member uses by grepping decompiled C for a placeholder field name
+(`this->m_0x2cc`, `this->field_0x54`) will attribute a **false witness to every class's LAST
+member**, and it will look like one of the most authoritative witnesses in the harvest.
+
+The mechanism is MSVC's array cookie. A `vector_deleting_dtor` recovers the allocation base as
+`(char *)this - 4`, and the decompiler — knowing only the applied struct — spells that as the last
+member of the *previous* array element:
+
+```c
+dVar1 = this[-1].m_0x3a0;                       /* sizeof(CVehicle) == 0x3a4 */
+arena_free((int)&this[-1].m_0x3a0);
+return (CVehicle *)&this[-1].m_0x3a0;
+```
+
+Nothing here touches `+0x3a0`. `&this[-1].m_0x3a0` is `this - 0x3a4 + 0x3a0`, i.e. `this - 4`.
+The same artifact appears with an added constant when the last member is not flush with the end
+(`this[-1].m_0x14c + 0x3c`, `sizeof == 0x18c`), and it also turns up in a copy `operator=`
+(`param_1 = (T *)((int)&param_1[-1].m_0x3a0 + 3)`).
+
+**Why it is dangerous rather than merely wrong.** The destructor is a body a naming round *wants*
+to believe: it is the class's own method, it is short, and a field it touches looks like a real
+member with a lifetime. So the false witness lands on the offset with the fewest genuine witnesses
+— the tail of the object — and it lands there wearing the strongest-looking evidence in the file.
+
+**The test is textual and cheap: reject any match whose prefix contains a negative index**
+(`\[-\d+\]`). **Mark the rows, do not drop them** — a dropped row is invisible and the next reader
+re-derives the same false witness; a marked one shows why the count moved.
+
+Measured on one 1999 MSVC/x86 binary, over 1350 member-use rows across four classes: **7 rows, at
+exactly 2 offsets, and both were their class's last member.** Small, bounded, and it had already
+been reported as a finding by a reader who did not know it was an artifact.
+
+> Two general points survive the specific idiom. **A count of "how heavily used is this field" that
+> comes from grepping lines double-counts a copy** — `this->m_0xN = param_1->m_0xN;` mentions the
+> offset twice, and on the same corpus **627 of 1350 rows (46%)** came from such lines; a set over
+> function addresses is the honest denominator. And more generally: **a sweep over decompiled TEXT
+> inherits every fiction the decompiler needs in order to render an expression in C.** The array
+> cookie is not in the binary; it is in the rendering. Parse operand objects where you can, and
+> where you genuinely must read text, enumerate its fictions first.
