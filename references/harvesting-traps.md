@@ -1737,6 +1737,40 @@ Measured on one 1999 MSVC/x86 binary, over 1350 member-use rows across four clas
 exactly 2 offsets, and both were their class's last member.** Small, bounded, and it had already
 been reported as a finding by a reader who did not know it was an artifact.
 
+### The same fiction hides an array — and this direction is the expensive one
+
+The array cookie *adds* a false witness. The other rendering artifact *removes* true ones, which is
+worse, because a missing witness reads as a measured zero and gets written off.
+
+When a computed address is based on a component, the decompiler renders the access relative to
+**that** component with a displacement:
+
+```c
+*(HGOBJECT *)(this->m_0x14c + iVar4 * 4 + -0x30) = param_1;   /* SetHomeUnit */
+```
+
+That is not a use of `+0x14c`. It is element `iVar4` of an `HGOBJECT[4]` at `+0x11c`
+(`0x14c - 0x30`), and the disassembly says so plainly — `MOV [ECX+EDX*0x4+0x118],EAX`. So the
+damage runs both ways: the charged component is **inflated** with rows that are not its, and the
+array's own offsets read as *"nothing but the constructor touches them"* and are refused under a
+zero-init guard.
+
+**Measured on the same corpus: 5 of 1350 rows, 2 offsets, 1 of 4 classes** — and on that project it
+was the difference between three refusals and a recovered four-element array plus two more
+resolved blocks. A round brief written from the un-resolved index had *predicted* those three
+offsets as refusals; a reader who went to the disassembly refuted it.
+
+**Resolve, do not merely flag.** The displacement is a literal in the text, so
+`base + disp` is computable and the row can be charged to the offset it actually reaches, with the
+original charge recorded. That converts the defect into the instrument's best feature: a text-level
+scan that *finds arrays*. A resolved row still earns a disassembly check before it is believed —
+the rendering is evidence an array is there, not proof of its extent.
+
+> The general rule this yields is worth more than either idiom: **when a text-level scan reports
+> that an offset has no witness, that is a claim about the scan.** Before recording it as a
+> measured zero, ask what the class's own exported setters do in *disassembly* — a store through a
+> scaled index is invisible to every grep and obvious in one instruction.
+
 > Two general points survive the specific idiom. **A count of "how heavily used is this field" that
 > comes from grepping lines double-counts a copy** — `this->m_0xN = param_1->m_0xN;` mentions the
 > offset twice, and on the same corpus **627 of 1350 rows (46%)** came from such lines; a set over
