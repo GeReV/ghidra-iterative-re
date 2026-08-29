@@ -1766,6 +1766,32 @@ original charge recorded. That converts the defect into the instrument's best fe
 scan that *finds arrays*. A resolved row still earns a disassembly check before it is believed —
 the rendering is evidence an array is there, not proof of its extent.
 
+### And an ARRAY-typed component is invisible to a member-token grep entirely
+
+A third shape, found in the same round by a third reader. A component typed as an array is not
+assignable in C, so where a copy constructor renders every scalar member as its own token —
+
+```c
+this->Render.m_0x34 = param_1->Render.m_0x34;
+this->Render.m_0x3c = param_1->Render.m_0x3c;
+```
+
+— the array member between them is copied as a block, or not rendered at all. The scan sees the
+neighbours and not the field, and the result is the cleanest-looking zero in the harvest: the
+offset has *no* row, in a struct where every neighbour has eight.
+
+Measured: one offset, `+0x38` of a 76-byte embedded class, declared `byte[4]`. Its neighbours
+`+0x34` and `+0x3c` each had 8 referencing bodies; it had none. The reader who resolved it found it
+copied by three copy constructors and read **four times per frame** by the companion DLL, as the
+argument of two exported virtuals. It was the round's most-used field and the instrument's flattest
+zero.
+
+Note the self-inflicted part: the component was typed as an array **by an earlier round of the same
+project**, which declared the 4 bytes it could not attribute rather than dropping them. That was
+right. But a defensive type applied to an unknown region then made the region invisible to the next
+instrument that went looking — so **check what your own earlier applies did to the shape of the
+thing you are now scanning.**
+
 > The general rule this yields is worth more than either idiom: **when a text-level scan reports
 > that an offset has no witness, that is a claim about the scan.** Before recording it as a
 > measured zero, ask what the class's own exported setters do in *disassembly* — a store through a
