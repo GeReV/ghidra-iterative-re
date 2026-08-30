@@ -1853,3 +1853,48 @@ destroyed by a rebuild. It does **not** stop the name reaching an emitted header
 reader — so a name later measured to be on the *wrong cell* is a defect with a mutating fix, not a
 row that can be left sitting in the demoted tier.
 
+
+## A witness kind can be UNANSWERABLE, and a null then means the opposite of what it reads
+
+`confidence=none` reads as *"nobody has looked yet"*. It can also mean *"this instrument cannot look
+here"*, and the two are indistinguishable in the artifact. Measured: a round inherited the question
+*"does this function's body use register ECX as an object pointer?"* from the previous round's own
+abstention text. Every one of its 27 subjects turned out to be a **one- or two-instruction stub** that
+touches ECX not at all. The question is not unanswered for them — it is **unanswerable**, because
+there is no instruction to read. A producer built on the inherited framing would have returned 27
+honest nulls, and every later round would have read them as an unworked backlog.
+
+**Check that the question is answerable where you intend to point the instrument, before building
+it.** Four function bodies opened by hand settled this in minutes, before any producer existed. This
+is why *read the body first* is a rule and not a preference.
+
+**When the subject cannot testify, look for a witness about its CALLERS or its CONTEXT.** For a
+virtual function the dispatch site binds every implementation of that slot: if any *other*
+implementation of the same slot demonstrably uses the register as an object, the call site must load
+it, and every override reachable there receives it — including a stub that ignores it. The evidence
+is about the call, not the callee, which is exactly why it works where the body does not.
+
+**Corroborate a structural grouping you invented with a byte-level invariant it predicts.** That slot
+witness depends on a guess about which vtables belong to one class family (agreement on a fraction of
+common slots). The callee-cleanup byte count in each `RET` is an independent prediction of that
+grouping — every implementation of one slot *must* pop the same number, because the caller pushes one
+argument list and cannot know which override it reaches. Where the group agreed, the grouping was
+corroborated from the bytes; where it disagreed, the row abstained. **Do not report the witness and
+the grouping as one number.**
+
+## Design a census artifact to SURVIVE the apply it justifies
+
+A census keyed on *"the population still needing work"* deletes itself as the work is done. Measured:
+an artifact keyed on the residual blind bucket would have shrunk from 34 rows to 11 the moment its
+apply landed — **discarding the recorded witness for every function it had just justified**, leaving
+the round's central claim provable only from a commit message.
+
+Key it on **the residual population UNION the round's own ledger**. The ledger supplies *addresses
+only*; every witness column is still measured from the program, so this is not reading your own
+conclusions back as evidence. Add a verdict value for *already applied*, and a check that **refuses if
+a ledgered row would no longer qualify under today's rules** — otherwise the applied rows become a
+free pass and a later change to the rule silently exempts exactly the population it should re-grade.
+
+The measurable payoff: across the apply, **every byte-derived count held identically** and only the
+verdict census moved. **An artifact whose numbers survive its own apply is a regression detector; one
+that must be re-pinned every round is a snapshot.**

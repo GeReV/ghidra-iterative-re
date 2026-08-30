@@ -542,3 +542,48 @@ down repairs it: **the label is what gets read.**
 - **Treat a fast answer as a reason to re-read your own option, not as evidence it was clear.**
 - When the discrepancy is found, put the choice again and say plainly that the first framing was
   wrong — do not quietly deliver the more attractive reading on the grounds that it was chosen.
+
+## An applier needs a FORWARD recovery, not only a rollback
+
+The rule *"an applier whose post-check can raise must ship its recovery"* is usually read as *ship a
+revert*. Half the failures need the other direction. Measured: an applier mutated 23 functions, ran
+its cascade, **passed its first post-check**, and then crashed in the *second* on a variable-name
+clash with the scripting bridge — leaving the program correct, verified, and ahead of its ledger.
+Reverting a correct mutation in order to re-apply it identically is churn, not safety.
+
+So ship a **`finish` mode**: re-run every post-check and append the ledger, mutating nothing. Two
+details make it trustworthy:
+
+- Take its control-group baseline from the **committed artifact**, not from an in-memory capture —
+  the artifact survives the crash, the capture is exactly what was lost.
+- It must still be able to *fail*. `finish` re-asserts the applied state rather than assuming it; a
+  half-applied program must not be ledgered as complete.
+
+The same round supplies the reason the snapshot must exist at all: **write the BEFORE state to the
+artifact before the first mutation**, never to a local. Here it was already on disk when the crash
+happened, so nothing was lost.
+
+## A gate that REGENERATES artifacts can revert a repair between adjudication and commit
+
+Measured, and it cost a commit. A round repaired a defect in a committed artifact, diffed it, and
+adjudicated the change. The stability gate — which regenerates most committed artifacts to prove they
+are reproducible — then ran, **silently overwrote the repaired file with the defective output**, and
+the round committed that. The commit undid its own fix. It surfaced only because the gate was re-run
+*afterwards* and compared against the commit.
+
+**Rule: a green gate run before `git add` says nothing about what was actually staged. Re-run any
+artifact-regenerating gate AFTER committing, and diff against the commit.**
+
+## A harness that EXECs source files must open them with an explicit encoding
+
+The root cause above is worth its own line, because it is invisible and it breaks the one property
+such a harness exists to guarantee. The gate loaded each producer's source with a bare
+`open(path).read()`. The disassembler's own script provider decodes scripts as **UTF-8**; a bare
+`open()` uses the platform's locale default, which on a Windows host is **cp1252**. A single non-ASCII
+character in a producer's source therefore arrived mangled, and the producer — correctly encoding its
+output as UTF-8 — wrote it back **double-encoded**.
+
+Two consequences. **The same script produced different bytes down the two execution paths**, which is
+precisely the byte-identity property the gate was built to test. And an encoding check over the
+artifacts could not see it: double-encoded text is *valid* UTF-8, so a gate asserting
+**decodability** passes on it forever. **Assert what you mean: decodable is not correct.**

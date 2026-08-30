@@ -1069,3 +1069,48 @@ Practical consequence: **state a check's denominator in the round's write-up whe
 only when its verdict does.** In that incident the probe had been printing `grading the 82 with a
 DECIDED NAME` all along, and the number had been 74 the previous day. The information was on screen
 and nobody was watching that column.
+
+## A poison arm can be undemonstrable against the POPULATION, not the harness
+
+*"A poison that reports `did not fire` is a claim about the HARNESS first"* is right, and it has a
+second reading that costs a round if you miss it: sometimes the harness is fine and **the arm is
+unreachable on this particular data**. Three arms failed in one round, each for a different reason,
+and only the third looks like an obvious mistake:
+
+1. **The branch is unreachable on this population.** An arm loosened a rule to accept a wrong witness
+   shape (a register used as a *scaled index* rather than a base pointer) and moved nothing — because
+   every function that ever reached such an operand had already satisfied the rule legitimately
+   earlier in the same body, so the loosened branch was never evaluated. **That is not a safety
+   argument for the rule.** It is a fact about the sample, and it means the arm proves nothing here.
+   Delete it, and record why, or a later round re-proposes it.
+
+2. **The pinned count SATURATES.** The arm targeted *"does at least one witness qualify?"* — a
+   boolean that is already true. Accepting extra bogus witnesses cannot move a value at its ceiling.
+   **Poison a count that can move**: the total over every classification, not the per-subject
+   any/none. Pin both; the boolean is what the verdict uses, the total is what the poison can reach.
+
+3. **An apply emptied the arm's target.** The arm flipped a `repair` verdict; after the apply there
+   were no `repair` verdicts left, so it silently became a no-op. **Re-demonstrate every arm after an
+   apply changes the population** — an arm demonstrated pre-apply is not demonstrated post-apply, and
+   the meta-check ("poison run passed") is the only thing that catches it.
+
+The surviving arm poisoned the rule that actually decides rows, and moved three separate pinned
+counts. That is the shape to aim for: **an arm should break the thing the verdict depends on, not a
+thing adjacent to it.**
+
+## Read the WITNESS a rule printed, not the count it produced
+
+A rule that identifies evidence must print the specific item that satisfied it, and you must read a
+sample. Measured: a rule scoring a healthy-looking **26 of 27** was citing, as proof that a register
+held an object pointer, instructions that *overwrite* that register (`LEA ECX,[ESP+0xc]`, `POP ECX`,
+`IMUL ECX,EAX`) and one where it was a scaled table index. The count looked right; six of the reasons
+behind it were wrong. Nothing but reading the printed instructions could have shown that — no
+assertion was violated, no total was implausible.
+
+The correction has its own trap. The fixed rule landed on **the same rows** as the broken one, so the
+numbers had been right by luck the whole time. **A rule reaching the right answer is not evidence
+that it reaches it for the right reason**, and only the per-item witness distinguishes them.
+
+Over-correction is the mirror image and just as easy: the first fix here rejected the target
+platform's *standard idiom* for the thing being detected, and quietly discarded a third of the real
+evidence. When you tighten a rule, check what it now REFUSES, with the same sampling.
