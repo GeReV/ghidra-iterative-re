@@ -304,6 +304,46 @@ project had recorded as `float` that the binary declares `int`, and a `float` hi
 Both false positives looked entirely plausible in a summary and were obvious in a full
 listing. **Print the promoted population in full.**
 
+### CLASS names from a virtual's declared return type — `return this` is an identification
+
+The same declaration channel names **classes**, not just fields, and it reaches classes that
+own no exported method and appear in no string — exactly the population an ownership-based
+census reports as unnameable.
+
+The shape: a base class's exported virtual declares a *class* in its return or parameter
+types. A derived class overrides that slot with `MOV EAX,ECX; RET n` — `return this`. The
+override is then a compiler-checked statement that **this class is that type**, or derives
+from it.
+
+```
+base slot 20  ?GetSkeleton@CRendResource@@UAEPAVCRendDynamicSkeleton@@PAVCRender@@@Z
+                                              ^ the return type names a class
+one derived vtable overrides slot 20 with     MOV EAX,ECX ; RET 4     ("return this")
+  ->  that vtable IS CRendDynamicSkeleton
+```
+
+Measured on a 1999 MSVC renderer DLL: of the **23** vtables with ≥31 slots, **exactly one**
+overrode that slot, and its body was `return this`. The class had survived three earlier
+rounds as *"an unnamed class"* — found by a store scan, placed on its own branch by slot
+similarity, and never named.
+
+**Why this is worth a rule.** An earlier round on the same binary had *measured* a naming
+ceiling — "roughly 17 of ~40 vtables cannot be named from this file" — and the measurement was
+sound for the route it tested (a class is named by the exported methods appearing **in** its
+table). Stated as a property of the binary, it was wrong: the information was in the export
+table all along, in the **signatures** rather than in the ownership. **A ceiling measured
+against one route is a fact about the route.** Say which route.
+
+Three cautions:
+
+- `return this` bounds the identification from **below**: the class is that type *or derives
+  from it*. Say so, and check whether any other vtable could be a further derivation.
+- Uniqueness is the strength of the claim. *"Exactly one of 23 overrides this slot"* is an
+  identification; "one of the ones I looked at" is a guess. Enumerate the population.
+- The same handle exists in **parameter** types, and in the types of exported data symbols.
+  A sweep is cheap: every exported virtual signature mentioning a class type you cannot yet
+  place is a candidate, and the corroboration is a one-instruction body.
+
 ### This generalises past MSVC
 
 The mechanism is "the ABI encodes types in the symbol", which is true of every scheme that
