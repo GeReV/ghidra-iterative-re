@@ -344,6 +344,28 @@ Three cautions:
   A sweep is cheap: every exported virtual signature mentioning a class type you cannot yet
   place is a candidate, and the corroboration is a one-instruction body.
 
+**A SLOT INDEX IS MEANINGLESS WITHOUT ITS BASE — this is what turns the route into a false-positive
+machine.** Slot 1 is `OnAttach` under one root and `GetAnimator` under another. Sweeping "slot 1"
+across every table in the same binary named *every* table as *both* classes: 22 rows, each one
+carrying a real address, a real body and a real mangled name, and each one wrong. So an anchor
+applies only to tables that **derive from the anchor's declaring class**, and you need a derivation
+test before you have a naming.
+
+Two consequences the measured case forced:
+
+- **The cheap test is "T inherits at least half of B's slots unchanged", and it has no power
+  against a small base.** A 3-slot base gives you a coin flip. Set a floor (≥8 slots worked here),
+  and report what falls below it as **UNCONFIRMED** rather than dropping it — the residue was one
+  table, which is a backlog item, whereas silence would have looked like completeness.
+- **Anchor on the EXPORT where you can, not on the slot.** If the function that allocates and
+  returns the object is itself an exported name, its identity is ground truth and no derivation
+  test is needed at all. That is the strongest form of route B, and it is the one naming that
+  survived the filter here.
+
+**And refuse the multi-allocation body.** A function that stores two vtables does not say which
+object it returns. Refuse it, print both candidates, and let another call site settle it — in the
+measured case a second, single-store function named the same table an hour later.
+
 ### This generalises past MSVC
 
 The mechanism is "the ABI encodes types in the symbol", which is true of every scheme that
