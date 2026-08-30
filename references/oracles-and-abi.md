@@ -266,3 +266,33 @@ completed the format's identity-preservation mechanism.
 
 Overwrite means "the file is authoritative". `max`/`min` means "a cursor that must not go backwards".
 Accumulate means "a running total". Ask what the merge protects against.
+
+## The C compiler is the only instrument in the loop that models ALIGNMENT
+
+Emitting recovered layouts as a header full of `_Static_assert`ed offsets is described above as a
+completeness check. It is also the *only* thing here with an opinion about alignment, and that turns
+out to be a distinct class of defect from a wrong size.
+
+Measured: a round introduced a new ctype spelling — an array of target pointers, `void*[2]` — into a
+layout artifact. The header generator's emission rules did not match it, and it fell through to a
+width-only fallback that maps an 8-byte cell to `uint64_t`. **`uint64_t` is 8-byte-aligned on a
+64-bit host.** The member sat at an offset that is only 4-aligned, so the host compiler inserted
+four bytes of its own and every offset assertion in that class from there on failed.
+
+**The recorded width was correct and the emitted layout was still wrong.** Nothing else could have
+noticed: the tiling check verifies the layout against its own arithmetic, and the artifact-level
+re-checks compare the artifact to itself. Only the C object model reasons about where a type is
+*allowed* to start.
+
+Two rules follow:
+
+- **The fallback is the dangerous branch**, not the missing rule. An unmatched ctype does not fail
+  loudly — it gets *guessed*, into something with the right size and the wrong alignment. Prefer a
+  fallback that raises on an unrecognised spelling to one that guesses from width.
+- **When you add a ctype spelling to a producing sweep, add its emission rule in the same change.**
+  The two live in different files and nothing links them; the compile is what connects them, and it
+  connects them only after the artifact has already been written.
+
+This is the same target-vs-host hazard as pointer width, one level subtler: fixing the *width* of
+every emitted type does not fix its *alignment*, and a pointer array is exactly where the two come
+apart.

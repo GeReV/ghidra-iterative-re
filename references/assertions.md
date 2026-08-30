@@ -947,3 +947,57 @@ divergence (`??B`, a user-defined conversion whose target type is in the *signat
 special code) was documented *before* the grading run and pinned to that one address, so a second
 divergence is a failure rather than a quietly widening allowance. A decoder graded against its own
 table has measured nothing.
+
+## A poison that fires NOTHING is worse news than one that fires the wrong guard
+
+The rule "read WHICH check refused, not merely that one refused" has a failure mode below it that
+looks identical in a summary line. Measured on one round that added five new guards and nine poison
+arms: **three arms hit a guard other than the one they named, and one hit nothing at all.**
+
+| arm | aimed at | actually fired |
+|---|---|---|
+| "absorbs nothing" | the vacuity rule | the STRADDLE rule — a partly-overlapped neighbour straddles before vacuity is ever reached |
+| "claims more bytes than any witness covers" | the extent rule | the NAME-DESTRUCTION rule — the chosen span's uncovered remainder was 1 byte, not 5, so the extent rule did not apply and the arm sailed past it into the names beyond |
+| "starts on no witness" | the base-offset rule | **nothing** — the offset chosen as "mid-member" was itself a cell start |
+
+The first two still prove *a* guard works. **The third proves nothing, and it is the one that ships
+silently**, because a harness reporting `80 checks, 0 failures` reads the same whether an arm
+demonstrated its rule or merely failed to break anything. An `expect_raises` helper catches it only
+because it treats "did not raise" as failure; nothing at all catches an arm that raises the *wrong*
+exception except a human reading the message.
+
+**So: read the raise text of every arm, every time, and treat an arm whose poison turned out to be
+valid input as an UNTESTED rule rather than a satisfied one.**
+
+Two constructional sub-rules, both paid for in that round:
+
+- **A poison for a "this region is too big / has unexplained bytes" rule cannot be built out of
+  PADDING.** Padding is bounded by the alignment maximum *by definition*, so a span made of it can
+  never exceed the threshold. It needs an explicitly-*unknown* region.
+- **A poison for "starts on nothing" needs a GAP, not an interior offset.** In a gap-free tiling
+  every interior offset is some cell's start. The intuition "the second of four components is
+  mid-member" is false precisely when the four components are four separate cells — which is the
+  case the rule exists for.
+
+## Making an artifact more EXPRESSIVE enlarges what an existing check can grade
+
+A check that grades "every row with a decided name" has a denominator that moves whenever naming
+moves. Measured: a round taught a layout artifact to express grouped members, which named three
+previously-anonymous offsets; a descendant-drift probe that had been green immediately reported
+three faults against a ratchet ceiling of zero.
+
+**Nothing had regressed.** Those three offsets had never been in that probe's population, so it had
+never been able to look at them; the faults were pre-existing, and two other gates were already
+reporting the same three cells.
+
+Both of the obvious readings are wrong and expensive. Reading it as a regression raises the ceiling
+and buries three real faults. Reading it as "my change broke something" reverts a correct change.
+
+**The discriminator: does the newly-graded population OVERLAP what another gate already reports?**
+If yes, it is newly visible, not newly wrong. If no, it is a genuine finding and deserves its own
+investigation.
+
+Practical consequence: **state a check's denominator in the round's write-up whenever it moves, not
+only when its verdict does.** In that incident the probe had been printing `grading the 82 with a
+DECIDED NAME` all along, and the number had been 74 the previous day. The information was on screen
+and nobody was watching that column.
