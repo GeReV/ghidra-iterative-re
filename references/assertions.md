@@ -829,6 +829,74 @@ one record has never heard of. **If one poison fires an arm you were not aiming 
 demonstrated the arm you were aiming at** — add the second poison rather than accept the first
 exit code.
 
+## A poison that reports "did not fire" is a claim about the HARNESS first
+
+The previous item is a poison that could not reach its guard because of where the guard sat. This one
+is the same failure caused by the *test harness*, and it is more dangerous, because its output invites
+you to go and "fix" a check that was working perfectly.
+
+**Measured.** A guard inside a generator's merge step had just had its condition widened, so it was
+re-poisoned: copy the input directory, corrupt the relevant file, run the generator against the copy,
+expect a raise. It reported **"DID NOT FIRE — the guard is inert."** The guard was fine. The generator's
+`main()` ignores `argv` and reads module-level constants for its input and output paths, so the
+poisoned directory was never opened; the run read the real, healthy artifact and passed, exactly as it
+should have.
+
+Two rules:
+
+- **Before believing a poison's verdict — in either direction — prove the poisoned input is what the
+  code under test actually read.** A raise proves reachability by itself; a *pass* proves nothing until
+  you can show the input arrived. Print the value the code loaded, or assert on a census the poison
+  should have moved.
+- **Prefer calling the function directly with the poisoned argument to influencing it across a process
+  boundary.** Every layer between your poison and the guard — argv parsing, a module constant, an
+  environment variable, a config file, a cached path — is a place the poison can be silently dropped.
+  The fix here was to call the merge function with the poisoned directory as its parameter, which has
+  no such layer.
+
+## A condition CHANGED is an assertion UN-DEMONSTRATED
+
+An assertion that was demonstrated firing, then had its condition edited, is back to being an untested
+rule wearing a tested rule's clothes. The edit is usually made to accommodate a new case, under time
+pressure, by someone who already knows the check works — which is exactly the state in which a guard
+gets quietly weakened.
+
+**Measured.** A vacuity guard read *"N rows and none of them reached a target cell: the join is broken,
+not the file empty."* A new row state was introduced whose rows deliberately reach no cell. The first
+edit added that state to the guard's **numerator** — treating one of the new rows as evidence that the
+join works. The guard still fired on a totally empty result, still passed on a healthy one, and would
+have reported a genuinely broken join as healthy whenever the input happened to contain one of the new
+rows. Nothing about it looked like a regression. The correction took the new state out of the
+**denominator** instead — *of the rows that SHOULD have reached a cell, at least one must have* — which
+preserves the original strength exactly.
+
+**Three arms is the shape for a re-demonstration, and the first is the one that matters:**
+
+| arm | input | required |
+|---|---|---|
+| A | broken **with the new state present** | RAISE — this is the arm a weakened version passes |
+| B | broken **with the new state absent** | RAISE — proof the original condition survived the edit |
+| C | the real committed input | **quiet** — a guard that always fires grades nothing |
+
+Arm A is the discriminating one and is the arm most likely to be skipped, because "I already know it
+fires on a broken join" is true of arm B and feels like it covers both.
+
+## When a new state satisfies a bucket's TEST but inverts its MEANING, split the bucket
+
+A drift checker bucketed a cell as `RECORDED` when the program named it and a curated artifact had a
+row for it — documented as *"expected, and the state that makes a rebuild lossless."* A new row state
+meaning *this name is refuted, drop it* satisfies the same literal test (there is a row) and means the
+exact opposite. Left folded in, the checker would have booked outstanding cleanup as *"accounted for"*,
+in the one instrument whose job is to notice names that are out of step.
+
+The test had stopped being a proxy for the intent. Split the bucket, and let the new count be the
+tracker for the work — it should fall to zero when the work is done.
+
+**Report such a count; do not ratchet it.** The neighbouring buckets are ratcheted to 0 because they
+are defects. A deliberate-pending-loss count is *expected* to be non-zero until the debt is paid, so a
+`max=0` ratchet on it is a gate that fails by design — which is a gate that gets excused, and an
+excused gate grades nothing.
+
 ## Grade what the artifact CONTAINS, not what a variable holds
 
 An AI-provenance filter check computed the filtered name into a variable, wrote a *different*

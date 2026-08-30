@@ -448,6 +448,42 @@ unbounded one reaches everything.
 > file, and name the tier of each link. A chain that passes through your own symbol table at any
 > point is not a witness, however many links it has.
 
+## A tier scale that runs "strong" to "weak" rounds WRONG up to WEAK
+
+Provenance tiers answer *how well is this supported*. They do not answer *is this true*, and most
+tier vocabularies are built without noticing the difference — because they are designed during the
+phase when everything recorded is presumed right and only the strength of the support varies.
+
+**Measured.** A curated artifact of recovered field names had two tiers: `decided` (a citable witness)
+and a demoted tier meaning *present in the program, evidence judged insufficient by a recorded round,
+kept so a rebuild cannot destroy it*. Both were applied to the program and both reached the emitted C
+header, on the stated grounds that "both describe what the program holds." A later round then
+**refuted** two of the demoted names — measured them onto cells whose contents the noun does not
+describe (one was a reference count, one a one-shot latch). There was no value to put in the column.
+Filed under the demoted tier they were indistinguishable from weakly-witnessed-but-probably-right, and
+the emitted struct ended up carrying two members that claimed to be the same thing.
+
+**Add a REFUTED value, and keep the row.** Deleting it loses the measurement that condemned the name,
+and invites the next round to re-derive the same wrong name from the same evidence — which, for a name
+derived by a mechanical rule from an accessor, it certainly will. The row is now the record of a
+finding rather than a claim.
+
+Two consequences worth taking:
+
+- **Refuted and demoted must be treated differently by consumers.** A demoted name is one nobody has
+  disproved; withholding it discards work. A refuted name is one somebody has. Only the second should
+  be withheld from an emitted artifact, and conflating them either leaks wrong names or silently drops
+  good ones.
+- **A skip must be PRINTED by every consumer that performs it.** A refusal that produces no output is
+  how the name comes back: the next person sees a row in the artifact, no warning anywhere in the
+  build, and "fixes" the omission.
+
+**And check what the consumers actually read.** In the measured case, the header emitter had *never
+looked at the tier column at all* — it had been overlaying every row regardless of tier since the
+column was introduced. The tier was doing real work in one consumer and none in another, and nothing
+said so. When you add a tier value, grep every reader for the column; a tier only exists where
+something branches on it.
+
 ## The tier of a row and the availability of evidence are different questions
 
 A findings file's confidence column describes how sure the analyst was. It says nothing about
