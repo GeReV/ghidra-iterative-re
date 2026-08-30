@@ -215,6 +215,51 @@ Commands in `ghidra.app.cmd.refs`: `AddMemRefsCmd`, `AddOffsetMemRefCmd`,
 `AddShiftedMemRefCmd`, `AddRegisterRefCmd`, `AddStackRefCmd`, `EditRefTypeCmd`,
 `RemoveReferenceCmd`, `AssociateSymbolCmd`, `SetFallThroughCmd`, `ClearFallThroughCmd`.
 
+### Ask the disassembler what an operand DOES — `getOperandRefType`, not operand order
+
+`Instruction.getOperandRefType(i)` returns the `RefType` for operand `i`, carrying `isRead()`,
+`isWrite()` and the flow kind. Use it whenever a sweep classifies a memory operand as a read or a
+write.
+
+The hand-rolled alternative — *"on x86, operand 0 is the destination"* — is right often enough to
+survive review and wrong on the cases that decide a round. It is correct for
+`MOV [ESI+0x39c], EBX`; it is **wrong for `CMP dword ptr [ESI+0x39c], EBX`**, whose operand 0 is a
+read, and equally wrong for `PUSH`, `TEST`, and every compare. **Measured:** a field census built on
+the operand-order heuristic would have reported the single `CMP` that is the *only read of that cell
+in the entire program* as a write — turning a test-and-clear latch into a write-only field with no
+reader, which is precisely the shape the round was trying to distinguish.
+
+Same family as *"parse with the language's parser, not a regex"*: the tool ships the answer, and the
+approximation fails exactly on the instructions nobody thinks to enumerate.
+
+**Operand-scanning idiom**, for finding every `[reg + disp]` access to a struct offset — the route to
+reach for when the members are already NAMED, since a decompiled-text scan for placeholder member
+spellings is blind to those (`trust-and-circularity.md`):
+
+```python
+from ghidra.program.model.lang import Register
+from ghidra.program.model.scalar import Scalar
+
+for i in range(instr.getNumOperands()):
+    objs    = instr.getOpObjects(i)                 # Register / Scalar / Address
+    regs    = [o for o in objs if isinstance(o, Register)]
+    scalars = [o for o in objs if isinstance(o, Scalar)]
+    if not regs or not scalars:
+        continue                                    # immediate, or register-only
+    if any(str(r.getName()).upper() in ("ESP", "EBP", "SP", "BP") for r in regs):
+        continue                                    # frame slot, never a member
+    if any(s.getUnsignedValue() == disp for s in scalars):
+        rt = instr.getOperandRefType(i)             # NOT `i == 0`
+        yield i, ("write" if rt and rt.isWrite() else "read")
+```
+
+Two scope facts worth stating with any result it produces. A **small displacement is not rare** — 
+`0xc` is any object's fourth dword and is also a member of whatever *other* struct a pointer in the
+body happens to point at, so a small-offset census is a **locator**, not a census, and every witness
+must be read individually. And a **large displacement scanned program-wide collects other classes'
+fields at the same offset**: attribute them from your size and hierarchy artifacts and report the
+split, rather than dropping them silently or counting them in.
+
 ## Analysis control
 
 ```python

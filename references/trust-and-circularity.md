@@ -316,6 +316,35 @@ on the compiler not having inlined something will silently cover only part of an
 the gap is not random — it correlates with small, hot, frequently-called bodies, which is exactly
 where the high-fan-in naming targets live.
 
+### The decompiler renders YOUR member names, and that is where self-harvest is least visible
+
+The previous item is about phrasing a witness. This one is about where the bad phrasing comes from,
+because once a struct is applied the decompiler *hands* it to you.
+
+Apply a struct with a member named `Position` at `+0xc`, and every body touching that offset now
+decompiles as `this->Position`. Read three such bodies and the impression is overwhelming that the
+program agrees with the name — but the text was generated **from your own markup**, and it would
+read identically if the name were wrong. A decompiled body is the place self-harvest looks most
+like corroboration, precisely because the corroborating sentence writes itself.
+
+**The mechanical discipline: cite the OFFSET and the operations, never the rendered member name.**
+"`AboveGround` uses `this->Position`" records nothing. "`AboveGround` loads the dword at `[this+0xc]`,
+null-checks it, and uses the pointee's fourth field as the index into an already-decided
+`LayerGrid`" is a claim that survives renaming the member to `m_0xc` — which is the test. If a
+witness sentence changes truth value when you rename the member, it was never evidence.
+
+**The corollary bites the instrument, not just the prose.** A very common field-locating route is to
+grep decompiled C for the decompiler's placeholder spelling of an unnamed member (`m_0x1c4`,
+`field_0x1c4`, `unk_1c4`, depending on the setup). That route is **structurally blind to every cell
+you have already named** — and "cells already named, on evidence somebody later doubted" is exactly
+the population a re-examination round is about. Measured: three field names were re-examined and the
+established text-level locator would have returned a confident zero for all three. Scanning
+instruction operands for `[reg + disp]` sees them regardless of what the member is called and
+regardless of whether the body's `this` is typed.
+
+So: **before reusing a text-level member locator, ask whether the cells in question are named.** If
+they are, the tool's silence is a property of the tool.
+
 ## The lower tier is for a strong ARGUMENT with a weak CITATION — they are different things
 
 A two-tier confidence scheme (`decided` / `held`, or any equivalent) is usually explained as

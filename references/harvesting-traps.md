@@ -1804,3 +1804,52 @@ thing you are now scanning.**
 > inherits every fiction the decompiler needs in order to render an expression in C.** The array
 > cookie is not in the binary; it is in the rendering. Parse operand objects where you can, and
 > where you genuinely must read text, enumerate its fictions first.
+
+## A setter names a CELL, not a function — and setters write bookkeeping beside the datum
+
+The standard field-naming route pairs an exported accessor with the offset its body writes:
+`SetFoo` writes `[this+K]`, therefore `K` is `Foo`. It is one of the highest-yield naming routes
+there is, and its failure mode is specific and quiet: **a setter routinely touches more than one
+cell**, and the rule charges the noun to whichever one it picked.
+
+**Measured.** Four field names came from four setters on one pass. A later round distrusted all four
+and demoted them, on the stated grounds that the bodies were **too short to be a sufficient witness**
+— 23, 30, 55 and 134 instructions. Re-examined against the program:
+
+| setter | length | verdict |
+|---|---|---|
+| `SetCommander` | 23 | correct — promoted on a consumer join |
+| `SetAlpha` | 30 | **wrong cell** — the value goes elsewhere; the charged cell is a *reference count* the setter increments |
+| `SetPosition` | 55 | correct — promoted on two reading bodies |
+| `SetTarget` | 134 | **wrong cell** — the target is an inherited member the body also writes; the charged cell is a *one-shot latch* tested and cleared in the prologue |
+
+**The shortest was right and the two longest were wrong**, so the discriminator was not merely weak
+— on this population it was anti-correlated, because a longer setter has more cells for the noun to
+be charged to the wrong one of.
+
+**The rule.** The question an accessor-derived name has to answer is not *"is this body a big enough
+witness"* but ***"does the setter's noun denote the cell the rule charged it to"*** — and that is
+answerable only by reading the body. Expect at least these three shapes beside the datum:
+
+- a **counter** the setter increments and a matching `ClearFoo`/`ReleaseFoo` decrements, with the
+  resource torn down at zero. Acquire / release / detach-at-zero is a reference count, whatever the
+  setter is called;
+- a **latch or dirty flag** written on one branch and consumed elsewhere — often in the *prologue* of
+  the same function, which makes it look like the function's own subject;
+- the **datum's real home in a base class**, already named by an earlier round, with the setter
+  writing a derived-class mirror or scratch copy as well.
+
+Two cheap checks that would have caught both errors before either name was applied. **Read the
+matched inverse** — `ClearFoo`, `ResetFoo`, `GetFoo` — because a pair discriminates where a single
+body does not; `ClearAlpha` was twelve instructions and settled the question outright. And **look
+for an already-decided cell that the noun fits better**: `Target` was applied to a class that already
+carried a decided `TargetHandle` at an inherited offset, so the emitted struct ended up with two
+targets. A naming route should refuse, or at least flag, a noun that duplicates a decided member of
+the same object.
+
+**Corollary for the demotion tier.** If your project has a tier meaning *"applied, but the evidence
+was judged insufficient"*, note what it does and does not protect. It protects the name from being
+destroyed by a rebuild. It does **not** stop the name reaching an emitted header, a struct, or a
+reader — so a name later measured to be on the *wrong cell* is a defect with a mutating fix, not a
+row that can be left sitting in the demoted tier.
+
