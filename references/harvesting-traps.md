@@ -1898,3 +1898,56 @@ free pass and a later change to the rule silently exempts exactly the population
 The measurable payoff: across the apply, **every byte-derived count held identically** and only the
 verdict census moved. **An artifact whose numbers survive its own apply is a regression detector; one
 that must be re-pinned every round is a snapshot.**
+## Match the SCOPE of a measure to the scope of the question
+
+A similarity measure over a whole structure is the wrong instrument for a question about one element
+of it, and the failure is quiet because the number looks reasonable.
+
+Measured, on vtables. The question was *"do these two classes mean the same method at slot N?"*; the
+rule answered *"do their tables agree on ≥50% of all common slots?"*. That statistic is dominated by
+the shared **base prefix** — every class in a hierarchy copies its base's entries — so it stays high
+for two classes that diverged long before slot N. A 223-slot table was grouped with five 184-slot
+ones at 51–53% agreement that agree with it on **0%** of the slots near the slot in question. Their
+slot N held a different method, and the callee-cleanup byte counts proved it.
+
+**And the obvious fix failed in the opposite direction, which is why it needs its own failure
+analysis.** Narrowing the same measure to the element's neighbourhood is too STRICT wherever the
+derived structure legitimately differs most: a class that overrides many neighbouring methods has
+*low* local agreement with its own base **precisely because it is derived**. Two genuinely related
+classes differed at 22 of 41 low slots. Swept over 20 (window, threshold) settings, the local rule
+condemned the same row at **every one** — unanimity that read as a robust finding and was an artefact
+of the flaw every setting shared.
+
+**A fix to a heuristic is a new heuristic.** "It disagrees at every setting" is not robustness when
+all the settings share one defect.
+
+### Prefer recovered structure to a structural heuristic — and check whether you already have it
+
+The sound test needed no threshold at all:
+
+> element N means the same thing for two types iff N lies within the *declaring* ancestor — the
+> nearest common ancestor whose own structure is large enough to contain it.
+
+That is recovered **parentage** plus sizes, both of which the project had already committed months
+earlier and neither of which the round used. It validates by inspection: a slot declared in the
+38-entry root admits every one of its 38 descendants; a slot declared in the 47-entry intermediate
+admits 67; a deep slot narrows to 1.
+
+**Before inventing a structural heuristic, grep the evidence directory for an artifact that answers
+the question directly.** The heuristic is the thing you build when the answer genuinely is not
+recoverable — not the thing you build first.
+
+**Report the recovered instrument's own coverage gap rather than absorbing it.** The hierarchy
+mapped 244 of 296 tables; a subject in one of the other 52 gets an explicit `untestable` verdict
+naming the gap, never a silent pass or a silent failure. Those two mean opposite things and a single
+"no evidence" value hides which one you have.
+
+### A shared NAME is not a parentage
+
+The intuition that flagged the local rule as wrong was *"these two classes are obviously related,
+look at their names"*. Their chains met only four and five links up. The intuition reached the right
+conclusion by the wrong route, which is the hardest kind to catch: the slot was shared because it sat
+inside the ROOT's table, and the shared prefix in the names was irrelevant. **When a naming intuition
+contradicts a measurement, resolve it against the hierarchy artifact — do not let either win on
+plausibility.**
+

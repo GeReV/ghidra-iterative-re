@@ -1114,3 +1114,59 @@ that it reaches it for the right reason**, and only the per-item witness disting
 Over-correction is the mirror image and just as easy: the first fix here rejected the target
 platform's *standard idiom* for the thing being detected, and quietly discarded a third of the real
 evidence. When you tighten a rule, check what it now REFUSES, with the same sampling.
+## Keep a replaced rule in the file, wired to its own poison arm
+
+When a rule that produced *committed results* is found unsound and replaced, deleting it is tidier
+and worse. Keep it, unused, as a poison arm.
+
+Measured: a similarity-based grouping rule was replaced by one based on recovered parentage. The old
+rule stayed in the file behind a `poisonglobal` flag. The arm is unusually good precisely because it
+is not a reconstruction — it is the original — and injecting it moves four separate pinned counts
+*and* reproduces on demand the specific false positive that motivated the replacement. A reader
+comparing the two functions sees exactly what changed and why.
+
+The general shape: **a poison arm modelled on a real historical defect cannot drift from the thing it
+models.** A hand-written "wrong version" can, and usually does, become subtly easier to catch than
+the mistake it stands in for.
+
+## An adjudicated exception is a NUMBER, not a category
+
+A round found one already-applied row whose evidence no longer held, and the decision was to record
+the downgrade rather than revert it. The naive way to encode that is a check that tolerates rows in
+that state — which then waves through every future one, silently, forever.
+
+Instead pin the **count**, with the address in the constant's comment:
+
+```python
+EXPECT_APPLIED_UNWITNESSED = 1     # 0xNNNNNNNN Class::Method, slot 109 (§284)
+EXPECT_APPLIED_UNTESTABLE  = 1     # 0xNNNNNNNN Class::Method, vftable unmapped
+```
+
+The check does not raise on the adjudicated row; it raises the moment either population **changes
+size**. A second such row then stops the gate instead of joining a standing exemption. **Never widen
+the constant to make a gate pass — adjudicate the new row.**
+
+## Split a status that has come to mean several things
+
+One status had accreted three outcomes needing opposite responses: *still supported*, *supported by
+evidence this instrument cannot examine*, and *support disproved*. Collapsed into one label, the only
+one that mattered was invisible; the fix was three verdicts, not a footnote in prose beside the
+artifact. **When adjudication finds a status covering outcomes that call for different actions, split
+the status.**
+
+## Make the control group the nearest neighbours, not the leftovers
+
+A first round used its own abstentions as the control for its apply. The follow-up used *every row
+not being applied* — which now included the rows the first round had already treated. Those are the
+closest possible neighbours of the treatment group in class, shape and provenance, so they are where
+a stray effect of the apply or its cascade would actually show. **Prefer a control group that has
+already received the same treatment over one that was merely never eligible.**
+
+## Where two artifacts partition a population, assert the partition
+
+A sweep drew its population from two artifacts — "still outstanding" and "already done" — which are
+disjoint by construction. Run in the wrong order after an apply, three addresses appeared in both. A
+one-line intersection assertion named them; without it the population would have carried silent
+duplicates and surfaced rounds later as an unexplained count. **Assert the partition, not just the
+total.**
+

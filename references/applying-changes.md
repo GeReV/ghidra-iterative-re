@@ -587,3 +587,20 @@ Two consequences. **The same script produced different bytes down the two execut
 precisely the byte-identity property the gate was built to test. And an encoding check over the
 artifacts could not see it: double-encoded text is *valid* UTF-8, so a gate asserting
 **decodability** passes on it forever. **Assert what you mean: decodable is not correct.**
+## A pre-mutation snapshot must be APPEND-ONLY, or the second round destroys the first round's recovery
+
+The rule *"capture the BEFORE state into the artifact before mutating"* has a failure mode that shows
+up on its second use, not its first.
+
+Measured: an applier wrote its pre-mutation snapshot with an overwriting write. Re-pointed at a later
+round's three targets, it would have replaced the previous round's twenty-three rows — that round's
+*only* revert source — with three, **while executing the very rule that exists to make recovery
+possible**. The safety mechanism was about to erase its own history, and the dry run looked perfect
+because the snapshot it wrote was correct for the rows it knew about.
+
+Make it append-only and give every row the round that wrote it; make `revert` filter on that column.
+Then backfill the existing rows with theirs, so the file is consistent rather than half-labelled.
+
+**The general rule: any artifact whose purpose is recovery is append-only and self-identifying. An
+overwriting safety mechanism is not one.**
+
