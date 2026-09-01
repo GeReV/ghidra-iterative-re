@@ -328,8 +328,11 @@ struct into another category — is in `references/applying-changes.md`.
 
 - Gate mutating scripts behind an explicit `apply` argument so a bare run is a dry run.
 - **Non-returning functions**: if Ghidra doesn't know a function never returns, it
-  disassembles the data after every call to it, which "wreaks havoc." Check Error
-  bookmarks; `FixupNoReturnFunctionsScript.java` lists candidates and repairs damage.
+  disassembles the data after every call to it and corrupts the listing from there on. Check
+  Error bookmarks; `FixupNoReturnFunctionsScript.java` lists candidates and repairs damage.
+  *(An earlier revision put "wreaks havoc" in quotation marks as if citing Ghidra's own text; a
+  scan of the shipped 12.1.2 tree — 817 plain files plus all 79 `*-src.zip` — found the phrase
+  in 0 files. The mechanism is confirmed by that script's header; the quotation was not.)*
 
 ### Checkpoint, and prove rollback works
 
