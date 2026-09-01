@@ -1951,3 +1951,32 @@ inside the ROOT's table, and the shared prefix in the names was irrelevant. **Wh
 contradicts a measurement, resolve it against the hierarchy artifact — do not let either win on
 plausibility.**
 
+### A trap fixed in one derivation is waiting in its siblings — audit a metric per column, not per tool
+
+A project that reduces its progress to a handful of computed denominators has built something worth
+auditing one column at a time, because each column is its own derivation and each can mean something
+other than its definition. Measured on one project with four: the **fourth** column audited was the
+fourth to fail, and it failed in the way the tool's own docstring had documented for the second.
+
+- The tool said, of the size column, *"sizes live in FOUR producers and no single file is
+  authoritative; a check reading one reports 280 unsized where the truth is 55"* — and poison-tested
+  it. Three functions down, the layout column read **one** artifact of four and reported **12** where
+  the truth was **205**. Nothing looked wrong: 12 is a plausible number, its rule was printed beside
+  it, and a 282-class wave had been planned against it. **When a defect is documented for one
+  derivation, grep the tool's own source for sibling derivations with the same shape** before
+  believing any of them.
+- **A metric's supporting sentence is a population claim, and one join checks it.** The plan said
+  *"41 of the 55 are unnamed vftables; they need naming before they can be sized."* The tool's own
+  join said 40; naming is not a prerequisite for sizing (the witness is an allocation); and 39 of the
+  40 already carried an exact allocation size in a committed artifact the size deciders never read.
+  The sentence stood a day; the check took a minute.
+- **A boolean presence metric hits its target with one row per entity.** "Classes with a layout"
+  needed two companions to mean anything: the entities laid out *by construction* (101 classes that
+  add no storage to their base — a target of "every class" that counts them as missing can never be
+  reached), and **coverage** — bytes of own storage under a field row, 56.6% there against "205 of
+  294 present". Report presence and coverage apart; the second is what a wave plans against.
+- **Keep the old rule reachable as the negative twin.** The legacy derivation stayed callable and
+  became a fixture arm: the new rule must see what the old one could not, on a fixture where the old
+  one demonstrably fails. That is the two-step diff for a definition change, and it is what makes
+  "12 → 205" a repair rather than a relabel.
+
