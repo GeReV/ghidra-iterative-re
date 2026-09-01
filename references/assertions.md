@@ -1290,3 +1290,60 @@ failure is expanded to every row *by the gate that knows it failed*. So:
 routes, with nothing asserting they agree. Where two components must compute the same set, one
 should CALL the other, or a check should assert the two agree on real data — and that check must
 then be tested for firing on the right *reason*, per the section above.
+
+## A gate ratifies a guess when the guesser and the gate read the same way
+
+The standard defence against a bad automated proposal is a gate that re-derives the claim from the
+binary and compares. It is a real defence, and it has one hole that no amount of gate-hardening
+closes: **where the underlying evidence is ambiguous, the producer's guess and the gate's
+re-derivation will usually make the SAME guess**, because they scan the same bytes in the same
+order. The gate then ratifies it, and a guess ratified by a checker sharing its bias is
+indistinguishable from a measurement.
+
+**Measured.** A generator emitted a name for each compiler-generated initializer, derived from the
+global that body writes. 106 of 441 bodies write more than one global — one writes 144. "Take the
+first store" would have produced a plausible name for every one of them, and the gate, taking the
+first store too, would have agreed. The generator instead **emitted nothing and recorded the address
+and the reason**; 122 of 489 candidate rows died there. That refusal count is the wave's most
+valuable output, not its shortfall.
+
+- **Where a body admits more than one derivation, refuse.** A smaller correct wave beats a larger
+  one carrying invisible guesses, and the deferrals are a queued backlog with addresses rather than
+  a worry.
+- **Make the producer INDEPENDENT of the gate.** If the producer imports the gate's helpers,
+  "N of N passed" is a tautology — the gate is confirming the producer's own arithmetic. Share the
+  schema and the file format; never the rule that turns evidence into a claim.
+- **Give the gate a question whose answer you already know.** Do not generate over the pre-filtered
+  population expected to pass. Generate over the WHOLE one and predict the refusals: here the
+  calibration named nine addresses that must be refused, the gate refused exactly those nine, and
+  the producer had predicted the same nine independently. That turns a green run from *"nothing
+  objected"* into *"two separately-written readers agree on the accepts AND the rejects"*.
+- **`input = emitted + skipped`, asserted, is the only thing that sees a FALSE NEGATIVE.** A gate
+  judges only what was emitted, so a too-narrow pattern is invisible to it: the wave quietly does
+  less than it should and reports success. Make the arithmetic raise, and check that each leg is a
+  measurement — one leg here defined its population by the same predicate that later emitted, so
+  `36 = 36 + 0` was an identity that could never fail.
+
+## A dry run that skips a stage rehearses only the parts that were already easy
+
+A mutating tool's dry run exists so the apply holds no surprises. It earns that only if it executes
+every stage except the write.
+
+**Measured.** A batch applier's dry run stopped before the signature parser. The parse was therefore
+the one failure class discoverable only by attempting a real apply — and that is exactly how it was
+discovered, with the whole batch rolling back. The fix is one line of ordering: parse and translate
+every row during the dry run, discard the result, and report `N of N parsed`.
+
+**And the root cause was upstream of the parse, in a place no failure pointed at.** A constant
+`PROTO_ARGS = (True, False)` sat under a comment naming the API's second argument
+`includeCallingConventionOverride` — **a parameter name that does not exist**. The real signature
+took `(formalSignature, includeCallingConvention)`, and `formalSignature=True` silently omits
+auto-parameters. Two consequences, neither visible from the failure: one guard was structurally
+dead, and the pre-mutation snapshot — the round's only way back — had been recording an unfaithful
+"before" state. **A comment asserting an API's shape is a tool claim like any other**, and it is one
+a claim-auditing sweep will miss, because it names nothing checkable.
+
+The compensating design worth copying: the failed apply wrote **nothing**. One transaction, 367
+writes, atomic rollback. Concentrating mutation in a single bracketed applier — rather than
+spreading it across per-round scripts — is what made a defect in the mutating component cost one
+re-run instead of a program to repair.
