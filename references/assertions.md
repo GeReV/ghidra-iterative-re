@@ -1170,3 +1170,61 @@ one-line intersection assertion named them; without it the population would have
 duplicates and surfaced rounds later as an unexplained count. **Assert the partition, not just the
 total.**
 
+
+## A gate's premise about ITSELF goes stale like any other claim — and it lives where no audit looks
+
+A stability harness that re-runs your producers and byte-compares their artifacts is usually a
+project's most trusted instrument. It is also the one whose *own* assumptions nobody re-derives,
+because everything it reports is about something else.
+
+**Measured.** A harness drove two populations: `SWEEPS` (which write artifacts) and `PROBES`
+(asserted on their printed verdict). It ran the probes **after** taking its comparison snapshot,
+computing the artifact diff and computing coverage — on a premise it printed on every pass:
+*"driven probes … they write no artifact, so the diff above cannot see them."* True when written.
+Then one probe began writing an artifact, and the sentence became false inside the instrument that
+audits everything else.
+
+- **REGISTERING SOMETHING NEW WITH A GATE IS A TEST OF THE GATE, AND IT IS FREE.** The intent was
+  bookkeeping. The harness answered `REACH FAULTS: 1 committed CSV … neither regenerated nor
+  excluded` in the same run that printed `wrote …(120 rows)` twenty lines above. Nothing about the
+  artifact was wrong. The only way to find the defect was to hand the gate a shape it had never
+  been handed.
+- **THE LOUD HALF AND THE SILENT HALF HAD OPPOSITE SIZES.** Loud: one coverage fault, refusing the
+  whole run. Silent: because the write landed after the snapshot, **the artifact was never
+  byte-compared at all** — a probe writing something *different* would still have produced
+  `0 CHANGED`. The half that shouted was the harmless one. Ask of any gate reporting coverage:
+  *what does it do with a thing that arrives after it has finished measuring?*
+- **THE WRONG FIX WAS ALSO THE UNDETECTABLE ONE.** Adding the artifact to the "deliberately
+  excluded" table would have silenced the fault in one line, and that table's self-retiring guard —
+  *an exclusion whose artifact IS regenerated raises* — could not have caught it, because under the
+  old ordering the artifact was never counted as regenerated. **A self-retiring exclusion does not
+  retire when the thing that would retire it runs too late to be seen.**
+- **FIX BY ORDERING, NOT BY A SECOND DIFF.** Running the probes *before* the snapshot puts both
+  populations under one diff and one coverage arithmetic. Re-snapshotting afterwards and folding the
+  result in would have been a second copy of the diff logic — the "one home for a rule" failure this
+  file exists to prevent. When moving a block inside a large gate, anchor on CONTENT rather than
+  memorised line numbers, and assert that the moved block references nothing defined in the section
+  it jumped over.
+- **AND THE CLAIM WAS INVISIBLE TO THE PROJECT'S OWN CLAIM AUDITOR**, which read `#` comment lines
+  in `.py` and never string literals. A claim about a tool, emitted *by* that tool, inside a
+  `print(...)`. If you have an instrument that hunts unbacked claims about your tooling, ask what
+  syntax it cannot see before trusting its zero.
+
+**A ground-truth refusal beats a constructed poison here.** A poisoned copy restoring the old
+ordering was built and discarded unrun: the first live run had already demonstrated the failure, on
+real data, for the real reason.
+
+## Share an implementation; never share the number a check is graded against
+
+A gate and the probe it trusts frequently need the same calibration constant — a floor, a ceiling,
+an expected population. Importing it from one to the other is the instinct, and it is wrong.
+
+**Measured.** A premise gate rested on a probe's calibration (*21 of 25 ground-truth rows must
+classify a certain way*). The gate defines `CALIBRATION_FLOOR = 21` **as its own literal**, a second
+definition of the probe's. Importing it would make the two agree *by construction*: the gate would
+follow the probe silently wherever the probe moved, and a probe re-calibrated downward would drag
+its own gate down with it, still green.
+
+Two independent literals that must agree convert a drift into a **disagreement somebody has to
+adjudicate**. This is the deliberate exception to "one copy of a rule on disk": share the code that
+computes, never the threshold the computation is judged against.
