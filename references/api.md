@@ -104,6 +104,28 @@ which you used — and note two things the obvious reading gets wrong: the boole
 **direction** (`true` = ascending address order), *not* a filter, and an internal
 thunk-to-DLL (a `JMP [IAT]` stub with an entry point in `.text`) **is** returned by it.
 
+### `getCalledFunctions` returns a SET — the ORDER is the thing you wanted
+
+`Function.getCalledFunctions(monitor)` answers *which* functions this one calls. It is a
+`Set`, so it drops the two properties that make a large body readable: **sequence and
+repetition** *(doc — the return type, not executed here)*. Same for `getCallingFunctions`
+and for a bare `getReferencesFrom` sweep once you collect it.
+
+For a body too big to read — a 5 KB main loop, a tick function, a serializer — walk
+`listing.getInstructions(body, True)` in address order and emit each `CALL` target as its
+own row. What you get is a **call script**: the ordered, duplicate-preserving spine of what
+the function does, resolved through import thunks to real names, in a few dozen lines
+instead of a few thousand. It is the cheapest instrument for reconciling a reimplemented
+loop against the original, and it makes the *shape* of a function legible without
+committing to decode it. *(The technique is `tools/callgraph.py` in the third-party project
+`gmegidish/crux-re-claude`, done there over raw PE bytes; inside Ghidra the listing gives it
+to you with the names already attached.)*
+
+Two things it is not: it is address order, not execution order, so a loop reads once and a
+branch reads as if taken; and it says nothing about arguments. Use it to decide *which*
+region of a body to actually read — which is the point, since the standing rule is to read
+the body before building a producer over it.
+
 ## Symbols, namespaces, classes
 
 ```python

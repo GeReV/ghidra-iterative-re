@@ -12,6 +12,14 @@ layout that a 64-bit host will silently relay.
 
 - The external oracle — the only check that is not the program grading itself
 - Target ABI vs host ABI — the width that breaks three things
+- The format's own integrity checks ARE the oracle — find them first
+- The binary's own instrumentation is an oracle — switch it back on
+- An in-binary check can corroborate a TOOLING conclusion by an unrelated route
+- A back-patched length field tells you the reader's shape
+- Read BOTH sides of a symmetric pair — the reader carries the semantics
+- Check for validation at EVERY granularity, not just the one you found
+- An unexplained constant array is usually allocator or index state — read its MERGE RULE first
+- The C compiler is the only instrument in the loop that models ALIGNMENT
 
 ## The external oracle — the only check that is not the program grading itself
 
@@ -191,6 +199,65 @@ class rather than to the file — a far sharper instrument than "does the save l
 - **A length or end-offset field is the check.** Any format that records where a record ends is
   telling you it intends to verify that, or to skip — either way it hands you a boundary you can
   assert against.
+
+## The binary's own instrumentation is an oracle — switch it back on
+
+The section above is about the checks a format performs on itself. This is the same move one level
+out: **the release build ships diagnostic instrumentation with the sink removed or muted, and you can
+restore the sink on a patched COPY.** Those call sites are normally mined for the *strings* they pass
+(`references/game-recon.md`, round zero). That is the weaker use. The stronger one is to let the
+original binary emit a runtime trace you can diff a reimplementation against.
+
+*Source: this section generalises the approach taken by the third-party project
+`gmegidish/crux-re-claude` (a Win95 adventure engine, `tools/patch_trace.py` + `tools/tracediff.py`).
+Its counts below are its write-up's, read but not re-measured here.*
+
+Two shapes to look for:
+
+- **A compiled-out stub.** Their release build reduced `Debug_Trace(line, srcFile, fmt, ...)` to a
+  body that moves each argument onto itself and returns. **177 call sites still push their
+  arguments** and nothing consumes them; no flag re-enables it, because the body is gone and only
+  the calls survive.
+- **A live sink writing where nothing collects it.** A per-object status-string setter, or a global
+  `char *` breadcrumb assigned a literal at checkpoints for a crash handler to print. This one runs
+  in retail on every frame — the data is produced and discarded.
+
+**The mechanism, and why it is cheaper than it sounds: patch a copy, and call the binary's own
+statically linked CRT.** An era-typical MSVC game already contains `vsprintf`, `fopen`, `fprintf`
+and `fclose` at fixed addresses — your library partition (`references/game-recon.md`) already names
+them. Assemble a small body into a code cave (the `int3` or zero run between sections) that formats
+the varargs and appends to a file, then point the stub at it. No new import, no new section, no
+relocation, no loader change.
+
+Two disciplines separate a tool from a foot-gun:
+
+- **Refuse to patch unless the target bytes still match exactly.** Their script hard-compares the
+  expected no-op stub and exits rather than patch a build it does not recognise. A trace harness
+  applied silently to the wrong build produces a plausible log, which is worse than no log.
+- **Never write the original.** Emit a `_DEBUG` copy and leave the analysed file byte-identical, or
+  the artifact every other oracle is calibrated against has moved underneath them.
+
+**Why this is worth more than its size: it is the only oracle in this file that grades ORDER.**
+Every other one here is static — a header's `_Static_assert`ed offsets, a recompile-and-diff, a save
+round-trip — and grades *structure*. A trace grades the sequence a state machine actually walks:
+which phase, for which object, in what order, on which frame. Where the destination is functional
+equivalence, that is exactly the class of defect the layout oracles cannot see, and it localises to a
+call site rather than to a subsystem.
+
+**Diff on a reduced event vocabulary, not on text.** Their differ maps each side — engine log and
+reimplementation log, written independently and worded differently — through its own regex table into
+a shared alphabet of event kinds, then aligns the two sequences (`difflib.SequenceMatcher`). That
+reduction is what turns two logs into "you diverge HERE". Diffing raw lines cannot work; the two
+implementations have no reason to phrase anything alike.
+
+**Keep a NAMED list of permanent divergences.** They carry one — the engine loads cursors and area
+backdrops as animation slots where the port has separate paths — because a differential oracle with
+known-benign noise in it stops being read, and an oracle nobody reads is precisely the rot the
+standing instruction at the top of this file is about.
+
+**Record it at the runtime tier.** A trace is a fact about one execution, one build and one
+configuration — the same provenance caveat as any runtime observation, never `IMPORTED`. And be
+clear about what it grades: your reimplementation, not the binary.
 
 ## An in-binary check can corroborate a TOOLING conclusion by an unrelated route
 

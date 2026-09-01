@@ -98,6 +98,10 @@ here is `IMPORTED`-grade, and analysis done without them is wasted effort.
    establish the source root and one subdirectory, not enough to reconstruct modules,
    because release builds compile most asserts out. Cheap to check, so always check; do
    not budget a phase around it before measuring.*
+   **When this row yields, ask the second question before moving on: what FUNCTION are
+   those strings passed to, and can its sink be restored?** The strings are a naming source;
+   the sink is a runtime oracle, and it is the only one that grades order — see "The
+   binary's own instrumentation is an oracle" in `references/oracles-and-abi.md`.
 11. **Linker-contract tables: static initializers, TLS callbacks, and exception data.**
    Not names, but **ground truth about function starts** — and for EH, about types — with a
    linker contract behind them rather than a heuristic. Measured on one binary: the
@@ -464,6 +468,23 @@ hierarchy nodes.
 Recording "exhausted, as of this measurement" costs one query and saves every future round the same
 hopeful detour. It is also honest in a way "not yet tried" is not: a stale unknown reads as an
 opportunity forever.
+
+### "Exhausted" is a claim about a ROLE, not about a source
+
+Keep the qualifier attached, because a bare "exhausted" reads as closed forever, and the same
+construct is often untouched in a different role.
+
+**The case is the self-announce strings immediately above.** As a *naming* source they are finished —
+62 strings, 13 classes, all already known. But those strings are arguments to a live diagnostic
+sink, and restoring that sink on a patched copy turns the same call sites into a runtime execution
+trace of every body that announces itself. That is not a weaker version of the naming use; it is a
+different oracle, graded differently, answering a question no static witness in this skill can
+("in what ORDER"). See "The binary's own instrumentation is an oracle — switch it back on" in
+`references/oracles-and-abi.md`.
+
+So write the record as **"exhausted as a source of X"**, and when you retire a source, spend one
+thought on what else it is attached to: a string is also a call site, a call site is also a function,
+and a function is also a runtime hook.
 
 ### When a round prices out, ask what the blocked population has in COMMON
 

@@ -1980,3 +1980,30 @@ fourth to fail, and it failed in the way the tool's own docstring had documented
   one demonstrably fails. That is the two-step diff for a definition change, and it is what makes
   "12 → 205" a repair rather than a relabel.
 
+## Frequency over a corpus counts COPIES, and a corpus of assets is full of them
+
+Ranking a work queue by how often something occurs across the shipped data is the obvious
+prioritisation, and it is right often enough to be trusted without checking. The failure is specific:
+**a histogram over a corpus measures occurrences, and content is duplicated between corpus members
+far more often than code is.**
+
+*Observed in the third-party project `gmegidish/crux-re-claude`, whose `tools/opcode_usage.py`
+carries the warning in its own docstring.* It histograms script opcodes across all 29 of the game's
+scenes to rank which unimplemented ones the port should do next — and notes that a high count can
+mean **duplicated debug code**: a give-all-items program written once and copied into every scene
+inflates one opcode to 29 occurrences with a single author decision behind it.
+
+The general shape, and it applies to any per-asset sweep, not just scripts:
+
+- **A count over a corpus is `occurrences`; what you usually want is `distinct members that need
+  it`.** Report both. `29 occurrences / 1 distinct origin` and `29 occurrences / 29 members` are the
+  same number ranking opposite work, and only the second is a queue.
+- **Duplication in a corpus is the norm, not a defect to fix.** Templates, per-level copies of a
+  shared prologue, boilerplate emitted by a tool, and debug scaffolding left in every map all
+  multiply one decision into N rows. This is the same instinct as the rule that coverage is stated
+  as a **fraction of the population it claims to cover**, one level down: a bare count hides whether
+  the denominator is authors or artifacts.
+- **The cheap check is a hash, not an analysis.** Before believing a frequency ranking, group the
+  containing records by content hash and see how much of the top of the histogram collapses. If it
+  does, the ranking was measuring your corpus's copy-paste history.
+
