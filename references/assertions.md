@@ -1228,3 +1228,65 @@ its own gate down with it, still green.
 Two independent literals that must agree convert a drift into a **disagreement somebody has to
 adjudicate**. This is the deliberate exception to "one copy of a rule on disk": share the code that
 computes, never the threshold the computation is judged against.
+
+## A refusal that FIRES is not a refusal that fired for its REASON
+
+A guard that refuses when it should is usually taken as proven. It is not: it has been shown to
+produce the right *verdict*, which is a much weaker claim than producing it for the right reason.
+
+**Measured.** A batch applier compared an approved change-list against the rows that would actually
+fire and raised on any difference. It refused a deliberately-shortened list correctly on every run —
+while its parser was returning `('', '', '<- witness…')` for every row. It was comparing garbage
+against garbage and reaching the correct answer. A test asserting *"this run refused"* would have
+passed forever, and so would the exit status.
+
+- **Assert on the refusal's CONTENT** — the addresses, the values, the reason string — not on the
+  fact of refusal. That is the only thing separating a working guard from a coincidence. A harness
+  that prints what a failing probe *said* is the same instinct one level down; this is the version
+  that belongs in the arm itself.
+- **A COUNT-BASED VACUITY GUARD IS BLIND TO A SHAPE CHANGE.** The parser above asserted it had
+  recovered as many rows as the header claimed. When the format grew from one line per row to two,
+  it began counting one *witness* line per row — the count matched exactly while every field was
+  wrong. Guard the SHAPE (this field is an 8-hex address, this one is a registered enum value, this
+  one is non-empty), not the tally. A guard on how many is blind to what.
+- **Both defects here scored green on exit status**, and both were found by reading text. Where a
+  check's output is the evidence, a run nobody read is a run that did not happen.
+
+## Changing a RENDERING is an interface change, and the consumer breaks silently
+
+Text output that another component parses is an interface, whether or not anyone wrote one down —
+and it is the interface people forget is one, because it has no signature to break.
+
+**Measured.** Removing a truncation from a census renderer — a correct, necessary fix — silently
+broke a parser in another component within the hour. The sweep that would have named the victim in
+advance was one command: grep for the function symbol, which returned exactly three files.
+
+**Before changing any rendering another component reads, enumerate its consumers and say what each
+one does with it.** Then change them together. The same rule as "a rule change in a producing sweep
+needs an old-vs-new diff", pointed at the one output nobody thinks of as data.
+
+## A status flag that conflates two failure kinds makes its consumers diverge
+
+When a result object carries a boolean `passed` and a list of `refused` items, the boolean will be
+false for two structurally different reasons, and independent consumers will read it differently.
+
+**Measured.** A category gate refused both when its *premise* collapsed (false for every row that
+rests on it) and when a single row was *inadmissible* (false for nothing). One consumer read
+`passed=False` as "drop the whole category"; another dropped only the listed rows. Neither reading
+is unreasonable, and the divergence was expensive in two directions: one bad proposal would have
+discarded 432 good ones, and because the two consumers must produce identical sets for a drift check
+to pass, a perfectly healthy batch could never have been applied at all.
+
+**The fix needed no new field.** The item list was already correct for both cases, because a premise
+failure is expanded to every row *by the gate that knows it failed*. So:
+
+- **the list is the decision; the boolean is for reporting** — say so in the docstring, because the
+  next consumer's author will otherwise re-derive the wrong reading;
+- **then make it a contract**: raise if a result is `passed=False` with an EMPTY list. Otherwise a
+  future category's premise failure reads as "nothing to drop" and the whole category is APPLIED —
+  the failure in the direction that writes to the program.
+
+**And note the shape, because it recurs**: two components deriving the same population by different
+routes, with nothing asserting they agree. Where two components must compute the same set, one
+should CALL the other, or a check should assert the two agree on real data — and that check must
+then be tested for firing on the right *reason*, per the section above.
