@@ -1561,3 +1561,23 @@ Four measured instances in a single round, all the same species:
 
 The last one generalises past schemas: **an example in a brief IS a specification.** Readers follow
 the example.
+
+### A check nothing runs is a premise decaying unobserved
+
+A probe that is in no harness — no sweep list, no gate, no CI — still contains assertions, and those
+assertions are claims about a program that keeps changing. It does not fail quietly; it does not
+fail at all, because nothing invokes it. The next person to run it finds a raise, and cannot tell
+whether they broke it.
+
+Measured: seven producers were edited in one round and run by hand afterwards. One raised —
+*"`CBasicGobject +0x1c4` is now named `TargetHandle`; the gap this probe measures has been closed by
+some other route"* — an assertion working exactly as designed, about a fact that had changed some
+rounds earlier. It was in neither of the two lists the harness drives.
+
+- **Registering a probe is what keeps its premise honest.** If it is too expensive to run every
+  pass, excuse it *by name with a reason*, so the exemption is visible; an unlisted probe is neither
+  covered nor excused, it is invisible.
+- **When you touch a script the harness does not drive, run it, and run the PRE-EDIT copy too.**
+  `git show HEAD:path` into a scratch name, run both, diff the output. Otherwise a pre-existing
+  failure becomes yours and a failure you introduced becomes "it was already like that" — and both
+  mistakes are made in the same direction, toward the answer that costs less.

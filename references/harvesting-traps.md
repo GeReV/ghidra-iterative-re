@@ -1229,6 +1229,27 @@ reported a four-resolution screen with full confidence and a clean citation.
   printing a blank citation menu for bodies that already carried a name — because the census
   covering them was scoped to unnamed bodies — and the blank read as *"references nothing."*
 
+### And the cap comes back as a blind spot in the CHECK you write next
+
+Adding `+N more` fixes the *consumer's* reading. It does not fix the next thing anyone writes: a
+guard over the emitted artifact. That guard reads the capped cell, so **it judges a sample and
+reports a clean zero for anything past the horizon** — the same measured-absence defect the cap
+rule exists to prevent, rebuilt one function lower down and now wearing the authority of an
+assertion.
+
+Measured, in the same file whose `cap` docstring records the incident above. A new guard asserted
+that no emitted citation names a placeholder. Run over the CSV it found **1**; run over the
+uncapped in-memory lists the same run found **4**. On a quieter day the emitted-cell version would
+have returned zero and been believed.
+
+- **A guard belongs on the widest form of the data the producer holds**, not on the form it prints.
+  Accumulate the complete list and assert over that.
+- **Keep the emitted-cell arm too**, as the weaker second one: it is the only thing that catches a
+  defect introduced at the *formatting* stage, which the uncapped list cannot see.
+- **Any count taken from a capped artifact is a FLOOR.** Say so where the number is quoted — one
+  round's "146 citations" was measured from the emitted file and inherited by the next round's
+  write-up as if it were a census.
+
 ## When you fix a join in one checker, grep the file for the same join
 
 The cheapest possible instance of *sweep the pattern, not the instance*, and it was still missed.

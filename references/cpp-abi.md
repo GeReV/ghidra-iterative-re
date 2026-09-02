@@ -177,6 +177,31 @@ other reports 0/N forever and reads as a failing sweep rather than a broken test
 first. Likewise `Function.getName()` is unqualified while `getName(True)` includes the
 namespace.
 
+**And there is a THIRD string space, which is the one that bites after you start applying
+names: QUALIFIED versus BARE.** `Function.getName()` is unqualified, `getName(True)` includes the
+namespace, and any check written as an anchored prefix test — `^FUN_`, `startswith("DAT_")`,
+`name.startswith(placeholder_prefixes)` — is **correct on one of those and silently wrong on the
+other.** `CRT::FUN_004ce523` is Ghidra's own placeholder wearing a real namespace, and `^FUN_` does
+not match it.
+
+The trap is that such a test is usually *written correct*. Early on, every name a harvester sees is
+bare, so the anchor is right. Then a round puts functions into namespaces — which is exactly what a
+successful C++ recovery does — and the same line starts answering *"yes, that has a ground-truth
+name."* Measured on one project: 17 functions acquired a namespace with a placeholder leaf, and a
+census offered 146 citations of the form `call_to_named : 0x004ce523=CRT::FUN_004ce523` to
+delegated readers as ground truth. Nothing failed; the population that made the rule wrong was one
+the pipeline itself created.
+
+Two things follow, and the second is the useful one:
+
+- **Ask the LEAF.** Split on the last `::` before testing a prefix. Put it in one shared function,
+  and let the *prefix set* stay a parameter — call sites legitimately differ — so that the part
+  which must never differ is the part with no choice in it.
+- **When a checker and a producer disagree, ask what SHAPE each is reading before deciding which is
+  wrong.** In that incident the citation *verifier* carried the identical anchored regex and was
+  **correct**, because it asked the unqualified name. The same regex in two files, right in one and
+  wrong in the other — and the disagreement was the only signal either one gave.
+
 Ghidra 12.1 added Microsoft demangler **output options** controlling user-defined-type tags
 (`struct` etc. in argument positions) and anonymous-namespace presentation
 (`_anon_ABCD01234` vs the generic form). Both affect whether demangled and non-demangled
