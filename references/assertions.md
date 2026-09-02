@@ -1643,3 +1643,66 @@ staleness was invisible until a round happened to open the file.
   caused it and a committed artifact that corroborates it — `+188 symbols` is one round's applied
   names, checked both directions by the ledger gate; `+2 datatypes` are two placeholder structs
   named in that round's own record. A re-pin without that account is a re-baseline.
+
+
+## A guard that succeeds destroys its own positive control
+
+A probe that grades a guard cannot be calibrated on the guard's output. This sounds obvious
+stated that way and is invisible in practice, because the calibration is usually written
+*before* the guard works, when the thing it looks for is still there.
+
+Measured. An exposure probe required a specific applied type name to be findable in a
+committed evidence column — a drift a previous round had genuinely measured, so the
+calibration was real when written. The producer of that column then gained a suppression
+filter for exactly that class of name. From that moment the calibration could only fail: the
+thing it looked for is the thing the producer now removes. It went unnoticed because the probe
+was also raising for an unrelated reason, so nobody ever reached the calibration.
+
+The obvious repair — point it at a *different* committed artifact whose whole job is naming
+such types — also failed, and the failure is the general case: measured across **every**
+committed column, once the guard worked, **no** column of that kind carried a qualifying name
+except the handful the probe was there to report. A successful guard drives its own positive
+control to zero everywhere.
+
+So the control has to be **constructed**, and constructed controls have a failure mode of
+their own:
+
+- **Synthesise from real data through the real code path.** Take a genuine name from the
+  ledger, render it in the actual format of each column being scanned, and run it through the
+  same tokeniser and matcher the probe uses. A control that exercises a simplified path proves
+  the simplified path works.
+- **Make it TWO-SIDED.** A matcher that returns everything passes a positive-only check exactly
+  as well as a correct one. Assert both that a real name IS found and that a name in no ledger
+  is NOT — per scanned column, so the count is a fraction of the surface (`5/5 found, 5/5
+  rejected`) rather than a bare "calibration ok".
+
+And the diagnostic worth keeping: **when a calibration starts failing, ask whether the world
+changed or the instrument did.** Here the world changed, correctly, in the direction the
+project wanted — and the check that was supposed to notice regressions had been quietly
+measuring a quantity that success was designed to eliminate.
+
+## Three regex answers to one question means the question needs a parser
+
+A completeness check that asks *"which scripts write a file?"* by pattern-matching source text
+will be wrong, and widening the pattern is not the fix.
+
+Measured on one project, on a single producer that had to be found:
+
+- the check scanned with `os.listdir(dir)` rather than a walk, so an entire subdirectory —
+  164 files, a third of the tree — did not exist to it;
+- its write-pattern matched only the project's own two CSV helpers, missing a hand-rolled
+  `csv.writer`;
+- and the producer wrote as `import csv as _c` / `_c.writer(`, so **widening the pattern to
+  `csv\.writer\(` still missed it.**
+
+Three shots at the same question by pattern, three wrong answers — and the project already had
+an AST-based resolver for exactly this question, written earlier *because three regex copies of
+it had disagreed with each other*. Reuse it. An `ast` walk answers "does this module CALL this
+method" without confusing a mention in a comment for a call, which the regex also got wrong in
+the other direction.
+
+**The corollary that bites during the fix:** an AST resolver honestly returns a *glob* when an
+output filename is computed at runtime. Matching its answers against real filenames with a set
+intersection then silently drops every such producer. Match with `fnmatch` when the name
+carries a metacharacter — and note what surfaced this: the stale-entry arm had just been
+changed from a `print` to a `raise`. **A note printed by a check nobody runs is not a signal.**
