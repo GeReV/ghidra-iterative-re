@@ -1181,3 +1181,51 @@ And note which way the earlier failure ran: that pair had been declined once wit
 ground-truth callees"* — true of the two **bodies**, false of the **translation unit**. **Scope the
 naming SEARCH to the TU; scope the CITATION to what the checker can verify.** They are different
 questions and conflating them costs you either a name or a false citation.
+
+
+## A vptr store identifies the class in a CONSTRUCTOR and not in a DESTRUCTOR
+
+"The body stores a vftable into `[this]`, so it belongs to that vftable's class" is the most
+reliable hand-read name available on an MSVC binary without RTTI. It is sound for
+constructors and **wrong for destructors**, and the failure is silent because the store is
+right there in the disassembly.
+
+**Constructor.** The base constructor runs first and stores the base vftable; the derived
+constructor then overwrites it. Both stores are live — the object really does hold the base
+vptr for the duration of the base ctor — so the LAST store is the most-derived class. The
+idiom works.
+
+**Destructor.** The order reverses: the derived destructor stores its own vftable, then the
+inlined base destructor stores the base's. Nothing reads the first store between them, so
+the compiler's dead-store elimination deletes it. What survives in the binary is the
+**base's** store. Read naively, every trivial derived destructor in the program claims to
+belong to its base.
+
+Measured on a 1999 MSVC/x86 target, from a single evidence pack:
+
+- Two bodies write the identical `CTbdStaticResource` vftable, but their array-destruction
+  loops step **4** and **0x18** bytes. Two different element sizes cannot be the same class.
+- **Ten byte-identical 32-byte bodies** all write `CMover`'s vftable, while `CMover`'s own
+  slot 0 is a different address entirely. Naming them from the store would have produced
+  ten identical, confidently wrong names.
+
+**What to use instead, for a destructor:** the vtable the body is a SLOT TARGET of, not the
+vtable it stores. A slot-0 target is that table's class; the stored vftable is its base.
+
+**And the related trap that costs an apply:** slot 0 of an MSVC polymorphic class holds the
+**deleting destructor** (`vector deleting destructor` / scalar), not `~X`. A body that is a
+vtable slot target and reads like a destructor should be named `<Class>::vector_deleting_dtor`
+or the scalar equivalent — never `~Class`, which belongs to a different body reached from it.
+On the project above a gate caught exactly this, 0 → 8, immediately after an apply; the
+distinction is worth a check of its own, because a reader following the vptr-store rule
+correctly will still produce the wrong KIND of name.
+
+**Two array strides that differ are a class-identity witness in their own right.** A
+destruction loop's stride is `sizeof(element)`, so it can refute a shared-vftable reading
+without any other evidence — and where it agrees with a recorded class size it corroborates
+one. The same signal has a second reading worth knowing: a body whose loop strides
+`sizeof(T)` while calling a per-element destructor is an **array-destruction helper**, not
+the destructor. Mistaking one for the other puts a real, already-correct ground-truth name
+onto the wrong address, which a collision check against your own applied-name ledger cannot
+see — the existing name came from the binary and never entered that ledger. Join against the
+PROGRAM.
