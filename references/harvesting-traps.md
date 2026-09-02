@@ -2007,3 +2007,42 @@ The general shape, and it applies to any per-asset sweep, not just scripts:
   containing records by content hash and see how much of the top of the histogram collapses. If it
   does, the ranking was measuring your corpus's copy-paste history.
 
+
+## An index nothing populated answers like a measurement
+
+A query tool over a derived index has two failure states that look identical to the caller and
+neither is an error: the index is **absent** (the export did not finish) and the index is **empty**
+(it finished and wrote nothing). Both must **refuse**, with different messages — collapsing them
+tells the reader to re-export when the export is fine, or the reverse.
+
+**Measured.** An offline corpus wrote two of its program-wide indexes as empty lists, under a
+comment explaining that *a bounded trial* writes them empty. There was no trial branch, so the full
+export did it too — for as long as the corpus had existed. The two commands built on those indexes
+then printed nothing (exit 0) and `no recorded writer for <addr>` (exit 0), for a string with three
+real referrers and a global with five real writers. Three of the seven evidence kinds the whole
+delegation pipeline runs on were silently unserviceable, and any agent told "query the corpus
+first" would have recorded absences that are not there.
+
+> **A comment describing a branch is not a branch.** Grade the branch: if a conditional matters,
+> there is a run of the tool in each arm that proves it.
+
+**The independence of a second derivation is what makes this findable.** The same facts existed in a
+committed artifact built by a different script for a different purpose. Deriving the index *from the
+program* rather than from that artifact kept the two independent — and cross-checking them caught
+**two** defects in the repair itself: a raw newline written unquoted (splitting one row into two,
+one parsing with a punctuation mark as its address), and a collector that kept only code referrers
+while its own docstring claimed the rest were counted. The tidier design — have the index read the
+artifact — would have made them agree by construction and shipped both.
+
+**Report the residue as a named column, not as a count.** After the repairs the two derivations
+still differed on 71 of 2,972 rows. Every one of the 71 had a non-zero `true_offset` and an
+`interior` reference shape in the artifact, and the raw value matched the artifact's *uncorrected*
+column in 71 of 71 — one correction layer, fully explaining both the text and the referrer
+differences. *"They differ on 71 values"* is a worry; *"they differ exactly where this column says
+they should"* is a closed finding.
+
+**And give an expensive producer a cheap re-run for the part that is cheap.** These indexes depend
+on references and memory, not on the decompiler, but repairing them was costing a full 25-minute
+re-export. A mode that rebuilds only them — refusing unless the on-disk export matches the live
+program version, so it can never patch a stale cache into looking current — took 80 seconds, and
+that is the difference between fixing both defects and recording one as a known issue.
