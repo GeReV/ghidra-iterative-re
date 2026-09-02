@@ -505,3 +505,59 @@ other twenty-seven was probably fine, and it is not evidence.
   only because each installs a *different* vtable. Had they shared one, the count would satisfy the
   two-kind bar while establishing nothing about which sibling this is. A kind count cannot check
   that; the author owes it.
+
+
+## An anti-circularity filter can fail in TWO directions, and only one of them usually has a guard
+
+You build a filter so your own applied names and types cannot come back out of a harvester as
+evidence. You then write an assertion proving the filter worked: *no name we applied appears in
+a committed cell*. That assertion is real and it is worth having. It watches exactly one of the
+two ways the filter can be wrong.
+
+The other way is that the filter **suppresses evidence that was never yours** — and nothing in
+the design notices, because every check is looking for contamination arriving, not for ground
+truth departing.
+
+Measured on the 1999 MSVC/x86 project. The suppression set was built from a ledger of "types we
+changed", and 32 of its 362 names were classes the COMPILER had mangled into the binary's own
+export table — the demangler created them at import, before any apply. The filter had been
+writing `undefined` over them in the committed signature column of the file twenty consumers
+read: **711 ground-truth type references in 626 rows**, three quarters of everything it
+suppressed. The assertion beside it was green the whole time and correctly so — nothing had
+leaked *in*.
+
+Two things make this specific rather than a warning:
+
+- **The ledger answered a different question than the filter asked.** The `ours` verdict was
+  built from *did we change this type's DEFINITION* (which version boundary, which artifact
+  claims the path). The filter needed *would this NAME be in a type position if we had done
+  nothing*. For a demangler-created category the second answer is always **yes**, however much
+  of the struct you later filled in. **A provenance verdict is only usable by a filter that asks
+  the same question the verdict answers** — check that explicitly, because the two questions
+  read alike and the column name (`ours`) suits both.
+- **The correct rule already existed and was evaluated over too small a domain.** The filter had
+  an exemption — *"a type explained by the binary's own mangled name is ground truth"* — asked
+  **per address**: does the mangled label at THIS function spell the type? But whether `CGobject`
+  is a word the binary uses is a fact about the **whole program**. A correct rule scoped to the
+  wrong domain looks exactly like a correct rule, and it fails only at the sites the domain
+  excludes — which are, by construction, the ones nobody is looking at.
+
+**So: when you add a suppression rule, state what a false POSITIVE costs and instrument that
+too.** The cheap version is a count — how many names the rule suppresses, and how many of those
+the binary itself supplies — printed on every run beside the leak assertion. A filter that
+reports only what it caught cannot tell you what it destroyed.
+
+**And when you fix such a rule, run the OLD rule against TODAY's program first.** The committed
+artifact is not the old rule's output unless nothing else has moved since it was written, which
+is the very thing in question; a control run separates "my rule change did this" from "the
+program drifted" from "my new code has a bug", and nothing about staring at the diff will. On the
+project above the control reproduced three artifacts byte-identically, which is what made the
+626-row diff attributable at all.
+
+**Then check every OTHER producer of the artifact the filter protects.** The same project found a
+second writer of that file — the original, from an early phase, still named in the replay
+sequence as *"the only step that writes it"* — which applied **neither** filter and carried
+**neither** assertion. It had not been edited in months, so nobody had re-read it; a literal
+replay would have regenerated the artifact fully contaminated and it would have looked entirely
+normal. A guard is worth what its weakest writer applies, and the producer that never changes is
+the one that never gets re-read.

@@ -2067,3 +2067,29 @@ on references and memory, not on the decompiler, but repairing them was costing 
 re-export. A mode that rebuilds only them — refusing unless the on-disk export matches the live
 program version, so it can never patch a stale cache into looking current — took 80 seconds, and
 that is the difference between fixing both defects and recording one as a known issue.
+
+
+## `git show` is not a byte comparison, and reaching for the local hazard to explain it is its own trap
+
+Comparing a regenerated artifact against the committed one is the core move of any
+regression check on a harvester. `git show HEAD:path` looks like the way to get the committed
+bytes. It is not: it prints the **normalised blob**, after whatever clean filters and CRLF
+conversion the repo is configured for.
+
+Measured: a 5630-row CSV written by Windows-hosted Ghidra read **505179** bytes in the working
+tree and **499548** from `git show`. That is a 5631-byte gap — one CR per line, header included —
+and it looks exactly like a real content change on a file that had not changed at all.
+
+**Compare with `git rev-parse HEAD:<path>` against `git hash-object <path>`.** Both apply the
+same clean filter, so they agree exactly when the content agrees; both emit a single value, which
+is the shape least likely to be mangled by whatever sits between you and the terminal.
+
+The second half of this is the reasoning failure, and it is the more expensive one. The project
+where this happened has a documented, real hazard in its own toolchain — an output-filtering
+proxy that genuinely does rewrite some commands' output — and the first explanation reached for
+was *"the proxy truncated it"*. Plausible, locally famous, and wrong. **A known hazard is a
+hypothesis, not an explanation**, and a known hazard that would explain the anomaly is exactly
+when to test rather than conclude: the test here was one command (`/usr/bin/git` directly, then
+the byte arithmetic) and it took under a minute. Writing down a plausible mechanism as though it
+were measured is how a project acquires a confident wrong answer that nothing later re-examines —
+the anomaly is "explained", so nobody looks again.
