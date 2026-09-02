@@ -201,6 +201,45 @@ main executable that project had spent months on. The DLL also carried a CodeVie
 directory naming its build-time `.pdb` path — i.e. the source tree layout — which is free
 and needs no import either.
 
+### Never regex a mangled name for the types it mentions — ask the decoder
+
+The types in a signature are the second-largest free-evidence source in a stripped C++
+binary, and the tempting way to get at them is one line: `[UV]([A-Za-z_]\w*)@@` over the
+raw string, since `V` introduces a class and `U` a struct. **It does not work, and it fails
+in the direction that looks like success.** `U` is also the access character of a *public
+virtual* member, so
+
+```
+?ToolbarCommand@CMessage@@UAEHPAVCToolBarButton@@@Z
+                          ^ this U is "public virtual", not "struct"
+```
+
+matches at `UAEH…` and yields `AEHPAVCToolBarButton`. Worse, `re.finditer` does not
+overlap, so having swallowed the `@@` the scan resumes *past* the real `CToolBarButton`
+and never sees it at all. Measured on one 1999 MSVC/x86 binary's 979 exported names: **47
+of the regex's 89 tokens were parse garbage and 31 real type names were lost** — including
+five classes of one GUI family that a naming round was blocked on, and every `V0@@`-style
+back-reference, which a regex cannot resolve by construction.
+
+Both halves matter and only one is loud. The garbage is *admitted* by whatever the tokens
+feed, and 47 nonsense namespaces nobody will ever propose are harmless. The 31 losses are
+silent: a gate that refuses real evidence is indistinguishable from a gate working. That
+asymmetry is why this survived two rounds of review with a comment beside it naming the
+expensive direction.
+
+`msvc_demangle` exposes the decoded set as `Symbol.udts` (and a `udts` column in `--tsv`)
+so the correct thing is not more work than the regex.
+
+**And a decoder that reports a symbol's KIND but not its type has a hole you cannot see
+from its output.** The same tool decoded all 979 names without error while silently
+dropping the type of every *data* symbol — MSVC puts a storage class (`0`–`5`) where a
+function puts its access character, and the parser stopped there. 57 of 979 exports are
+data, and six real classes in that binary (`CInputDevice`, `CMoverCreator`, `CRendEng`,
+`CRendPalette`, `CSoundSystem`, `CWorld`) are named by the export table **only** as the
+pointee type of a global. Every field the decoder did fill in was right; the absent one
+read as *"this symbol has no type"* rather than as *"nobody parsed it"*. A second decoder
+found it in one comparison — see the two-tier self-test below.
+
 ### Read the IMPORT table too, not just the exports
 
 An export table says what a binary offers; an **import** table says what it actually uses

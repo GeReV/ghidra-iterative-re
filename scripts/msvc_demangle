@@ -26,13 +26,31 @@ wrong, so `--selftest` runs two tiers and reports them apart:
   oracle    `--oracle DIR`, or the working directory, holding
             `symbols/exports.csv` -- mangled names with their expected class,
             member and static/virtual flags -- and optionally
-            `symbols/demangled_type_witness.csv` with a `ghidra_return` column.
-            This CORROBORATES, because those values came from somewhere else.
+            `symbols/demangled_type_witness.csv` with a `ghidra_return` column,
+            and `symbols/demangled_udt_witness.csv` with a
+            `ghidra_udt_tokens` column (pipe-joined `<tag>:<name>`, e.g.
+            `class:CVector|union:HGOBJECT`). This CORROBORATES, because those
+            values came from somewhere else.
 
 Both tiers have caught a real bug that the other could not see. The oracle
 found the type back-reference table and pointer-to-member-function missing. The
 vectors found every constructor argument being silently dropped -- invisible to
-an oracle that compares only names, flags and return types.
+an oracle that compares only names, flags and return types. The UDT witness
+found DATA symbols losing their type entirely: `?pWorld@@3PAVCWorld@@A` decoded
+to a name with no type at all, so six classes that one binary's export table
+names ONLY as the pointee of a global were invisible to every consumer.
+
+What a decoded symbol carries
+-----------------------------
+Beyond the name: `return_type` (a DATA symbol's one type goes here too),
+`parameters`, and `udts` -- the set of user-defined types the signature names,
+back-references resolved, pointers and cv stripped. Reach for `udts` rather
+than a regex over the mangled string: `[UV](\\w+)@@` matches the access
+character of a public virtual member, so
+`?ToolbarCommand@CMessage@@UAEHPAVCToolBarButton@@@Z` yields
+`AEHPAVCToolBarButton` and hides the real `CToolBarButton` behind it. Measured
+on one 1999 binary: 47 of that regex's 89 tokens were garbage, 31 real names
+lost.
 
 Usage:
   msvc_demangle '?Dwim@CMessage@@UAEXTHGOBJECT@@ABVCVector@@@Z'
@@ -105,6 +123,27 @@ FUNCTION_CLASS = {
     "Z": ("", False, False),
 }
 STATIC_OR_FREE = set("CDSTYZ")
+
+# A DATA symbol puts a storage class where a function puts its access character,
+# and follows it with `<type><cv-modifier>` -- `?pWorld@@3PAVCWorld@@A` is
+# `CWorld *pWorld`. Dropping that type silently loses a whole evidence channel:
+# measured on one 1999 MSVC binary, 57 of 979 exports are data, and six real
+# classes -- CInputDevice, CMoverCreator, CRendEng, CRendPalette, CSoundSystem,
+# CWorld -- are named by the export table ONLY as the pointee type of a global.
+# A consumer that swapped a regex for this decoder would have lost all six,
+# which is the expensive direction: a rule that refuses real evidence looks
+# exactly like a rule working.
+#
+# The values are (access, is_static) as C++ means them, and they are deliberately
+# NOT assigned to the Symbol below -- see the comment at the use site.
+DATA_STORAGE_CLASS = {
+    "0": ("private", True),      # private static member
+    "1": ("protected", True),    # protected static member
+    "2": ("public", True),       # public static member
+    "3": ("", False),            # global
+    "4": ("", True),             # function-local static
+    "5": ("", True),             # function-local static, second form
+}
 
 CALLING_CONVENTIONS = {
     "A": "__cdecl",
@@ -208,6 +247,24 @@ class Symbol:
     calling_convention: str = ""
     return_type: str = ""
     parameters: list[str] = field(default_factory=list)
+    #: Every USER-DEFINED type this symbol's signature names -- classes,
+    #: structs, unions and enums, stripped of pointers, references and cv, and
+    #: with `V0@@`-style back-references already resolved to the name they stand
+    #: for. NOT the declaring class, which is `declaring_class`.
+    #:
+    #: It exists because the alternative is a regex over the mangled string, and
+    #: that is not a small shortcut: `[UV]([A-Za-z_]\w*)@@` matches the `U` that
+    #: marks a public virtual member, so
+    #: `?ToolbarCommand@CMessage@@UAEHPAVCToolBarButton@@@Z` yields
+    #: `AEHPAVCToolBarButton` and -- because `re.finditer` does not overlap --
+    #: the real `CToolBarButton` behind it is never seen at all. Measured on one
+    #: 1999 MSVC binary: 47 of that regex's 89 tokens were parse garbage and 31
+    #: real type names were lost.
+    #:
+    #: It is a SET, deliberately: MSVC's second back-reference table lets a
+    #: repeated composite type be written as a digit, so occurrences cannot be
+    #: counted from the mangling without also decoding that table's state.
+    udts: list[str] = field(default_factory=list)
 
     @property
     def qualified(self) -> str:
@@ -218,7 +275,12 @@ class Symbol:
         return "::".join(p for p in parts if p)
 
     def signature(self) -> str:
-        if self.kind in ("vftable", "vbtable", "data"):
+        if self.kind == "data":
+            # A data symbol's one type belongs in front of its name, the way the
+            # declaration was written. Printing the bare name hid the fact that
+            # the type was never decoded at all.
+            return f"{self.return_type} {self.qualified}".strip()
+        if self.kind in ("vftable", "vbtable"):
             return f"{self.qualified}"
         params = ", ".join(self.parameters) if self.parameters else ""
         ret = f"{self.return_type} " if self.return_type else ""
@@ -236,6 +298,13 @@ class Parser:
         # types. A digit means "the n-th name" in a name position and "the n-th
         # composite type" in a type position; the two tables are unrelated.
         self.type_backrefs: list[str] = []
+        #: User-defined type names seen in a TYPE position, in first-seen order,
+        #: no duplicates. See `Symbol.udts`.
+        self.udts: list[str] = []
+
+    def _note_udt(self, name: str) -> None:
+        if name not in self.udts:
+            self.udts.append(name)
 
     # -- primitives ---------------------------------------------------------
 
@@ -314,11 +383,15 @@ class Parser:
             return PRIMITIVES[c]
         if c in "VUT":  # class / struct / union
             parts = self.read_qualified_name()
-            return "::".join(reversed(parts))
+            name = "::".join(reversed(parts))
+            self._note_udt(name)
+            return name
         if c == "W":  # enum: W<size-code><name>
             self.take()
             parts = self.read_qualified_name()
-            return "::".join(reversed(parts))
+            name = "::".join(reversed(parts))
+            self._note_udt(name)
+            return name
         if c in "PQRS":  # pointer, with cv on the pointee
             return self.read_pointer(const_pointee=c in "QS")
         if c in "AB":  # reference
@@ -379,10 +452,20 @@ class Parser:
 
 def demangle(name: str) -> Symbol:
     """Decodes one MSVC-mangled symbol. Raises DemangleError if it cannot."""
+    p = Parser(name)
+    sym = _decode(name, p)
+    # Set here rather than at each of `_decode`'s seven `return sym` points: a
+    # field populated at some returns and not others is a field that is empty for
+    # reasons the caller cannot see, which is the same defect as a decoder that
+    # silently drops data types.
+    sym.udts = list(p.udts)
+    return sym
+
+
+def _decode(name: str, p: Parser) -> Symbol:
     if not name.startswith("?"):
         raise DemangleError("not a mangled name (no leading '?')")
     sym = Symbol(mangled=name)
-    p = Parser(name)
     p.i = 1
 
     if p.peek() == "?":  # special name: ??0Class@@..., ??_7Class@@6B@
@@ -442,8 +525,33 @@ def demangle(name: str) -> Symbol:
 
     code = p.take()
     if code not in FUNCTION_CLASS:
-        # Data symbols carry a type here instead of a function class.
+        # Data symbols carry a storage class here instead of a function class,
+        # and then the variable's own TYPE. Reading `kind = "data"` and returning
+        # -- which is what this did until the type channel was needed -- is the
+        # decoder bug that is invisible from its own output: every field it fills
+        # in is correct, and the one it never fills in reads as "this symbol has
+        # no type" rather than as "nobody parsed it".
+        #
+        # The type goes in `return_type` because that is the field the TSV, the
+        # oracle and `signature()` already read; a data symbol has no return, but
+        # it has exactly one type and inventing a second column for it would
+        # leave every existing consumer still seeing nothing.
+        #
+        # `access` and `is_static` are deliberately LEFT ALONE even though
+        # DATA_STORAGE_CLASS knows them. The oracle's `is_static` column is
+        # populated from a function's access character and is 0 for every data
+        # row in it, so filling these in would turn a real improvement into 42
+        # apparent disagreements against a column that never covered data. Add
+        # them the day an oracle can grade them.
         sym.kind = "data"
+        if code in DATA_STORAGE_CLASS:
+            sym.return_type = p.read_type()
+            # The trailing character is the cv-qualifier of the VARIABLE, not of
+            # anything inside the type: `?NullVector@@3VCVector@@B` is a const
+            # CVector. B and D are the const ones, exactly as in a type position.
+            if p.i < len(p.s) and p.peek() in "ABCD":
+                if p.take() in "BD":
+                    sym.return_type = "const " + sym.return_type
         return sym
     sym.access, sym.is_static, sym.is_virtual = FUNCTION_CLASS[code]
     if code not in STATIC_OR_FREE:
@@ -631,6 +739,39 @@ VECTORS: list[dict] = [
     dict(name="?GetId@@YAKPBD@Z", oracle=False,
          kind="function", cls="", member="GetId", static=False, virtual=False,
          ret="unsigned long", params=["const char *"]),
+    # -- DATA symbols. One per storage class this binary uses, plus the two type
+    # shapes that carry the evidence: a pointer to a class, and a cv-qualified
+    # class by value. Their expected types are Ghidra's MSVC demangler's, read
+    # off `MicrosoftDemangler().demangle(name).getDataType()`, so they are a
+    # SECOND DECODER's output rather than this one's written down --
+    # `oracle=True` in the sense the flag means here. The one place the two
+    # spellings differ is word order on a cv-qualified value: Ghidra prints
+    # `class CVector const`, this decoder prints `const CVector`, as it already
+    # does for `?BK` -> `const unsigned long`. Same type, this tool's convention.
+    dict(name="?pWorld@@3PAVCWorld@@A", oracle=True,
+         kind="data", cls="", member="pWorld", static=False, virtual=False,
+         ret="CWorld *", params=[]),
+    dict(name="?pCreators@CMover@@0PAVCMoverCreator@@A", oracle=True,
+         kind="data", cls="CMover", member="pCreators", static=False, virtual=False,
+         ret="CMoverCreator *", params=[]),
+    dict(name="?pSymbolTable@CTbdFixupManager@@1PAVCHashTable@@A", oracle=True,
+         kind="data", cls="CTbdFixupManager", member="pSymbolTable", static=False,
+         virtual=False, ret="CHashTable *", params=[]),
+    dict(name="?GameTime@CGameTimer@@2MA", oracle=True,
+         kind="data", cls="CGameTimer", member="GameTime", static=False, virtual=False,
+         ret="float", params=[]),
+    dict(name="?NullVector@@3VCVector@@B", oracle=True,
+         kind="data", cls="", member="NullVector", static=False, virtual=False,
+         ret="const CVector", params=[]),
+    dict(name="?Mode@CGameTimer@@1W4GAME_TIMER_MODE@@A", oracle=True,
+         kind="data", cls="CGameTimer", member="Mode", static=False, virtual=False,
+         ret="GAME_TIMER_MODE", params=[]),
+    dict(name="?TicksPerMillisecond@CHighresTimer@@0_JA", oracle=True,
+         kind="data", cls="CHighresTimer", member="TicksPerMillisecond", static=False,
+         virtual=False, ret="__int64", params=[]),
+    dict(name="?ppPaletteSource@CPlayerManager@@0PAPAVCRendPalette@@A", oracle=True,
+         kind="data", cls="CPlayerManager", member="ppPaletteSource", static=False,
+         virtual=False, ret="CRendPalette * *", params=[]),
 ]
 
 
@@ -703,8 +844,34 @@ def selftest(oracle_dir: Path | None) -> int:
             r["mangled_name"]: r
             for r in csv.DictReader(io.open(witness_path, encoding="utf-8", errors="replace"))
         }
+    # A SECOND independent decoder's opinion of the USER-DEFINED types each name
+    # mentions. `symbols/demangled_udt_witness.csv` holds a disassembler
+    # demangler's rendered signature per name plus the class/struct/union/enum
+    # tokens extracted from it -- a different code path from this decoder's
+    # (that one keys off the tag word the other tool chose to print, this one off
+    # the mangling's own V/U/T/W codes), sharing nothing but the input bytes.
+    # Optional: a project that has not produced it simply gets no UDT line.
+    #
+    # CONTRACT: `ghidra_udt_tokens` is pipe-joined `<tag>:<name>`, e.g.
+    # `class:CVector|union:HGOBJECT|enum:CBasicUnit::PowerStatus`. The tag is
+    # split off on the FIRST colon, which is unambiguous because a tag word
+    # never contains one and a nested name is separated by `::`. The tag is
+    # carried in the file rather than dropped at write time so a consumer can
+    # corroborate a type's KIND against this decoder's V/U/T/W code as well as
+    # its name; this self-test compares names, since `Symbol.udts` has no kind.
+    udt_path = oracle_dir / "symbols/demangled_udt_witness.csv"
+    udt_witness = {}
+    if udt_path.is_file():
+        udt_witness = {
+            r["mangled_name"]: {t.split(":", 1)[1] for t in
+                                r["ghidra_udt_tokens"].split("|") if t}
+            for r in csv.DictReader(io.open(udt_path, encoding="utf-8", errors="replace"))
+        }
     rows = [r for r in exports if r["mangled_name"].startswith("?")]
     tally = {"parsed": 0, "class": 0, "member": 0, "flags": 0, "return": 0}
+    udt_checked = 0
+    udt_agree = 0
+    udt_disagreements: list[str] = []
     return_checked = 0
     failures: list[str] = []
     for r in rows:
@@ -747,6 +914,15 @@ def selftest(oracle_dir: Path | None) -> int:
         elif len(failures) < 12:
             failures.append(f"  FLAGS {name}: ours static={sym.is_static} virtual={sym.is_virtual}")
 
+        if name in udt_witness:
+            udt_checked += 1
+            if set(sym.udts) == udt_witness[name]:
+                udt_agree += 1
+            elif len(udt_disagreements) < 12:
+                udt_disagreements.append(
+                    f"  UDT {name}: {sorted(sym.udts)} != {sorted(udt_witness[name])}"
+                )
+
         w = witness.get(name)
         # A constructor or destructor has NO return type in the mangling.
         # Ghidra supplies a placeholder ("undefined" / "void") so its column is
@@ -769,7 +945,17 @@ def selftest(oracle_dir: Path | None) -> int:
     print(f"  member name          : {tally['member']}/{len(rows)}")
     print(f"  static/virtual flags : {tally['flags']}/{len(rows)}")
     print(f"  return type          : {tally['return']}/{return_checked}   (vs Ghidra's demangler)")
+    if udt_checked:
+        # Reported as DISAGREEMENTS, not as a match percentage: a 98% agreement
+        # with the 2% hidden is exactly how a decoder bug survives.
+        print(f"  user-defined types   : {udt_checked - udt_agree} disagreement(s) "
+              f"over {udt_checked} names   (vs a disassembler demangler)")
+    else:
+        print("  user-defined types   : no witness file; the `udts` field is "
+              "UNCORROBORATED here")
     for line in failures[:12]:
+        print(line)
+    for line in udt_disagreements:
         print(line)
 
     # POISON. The agreement above means nothing unless the comparison can
@@ -796,13 +982,29 @@ def selftest(oracle_dir: Path | None) -> int:
             continue
         if normalise(sym.return_type) != normalise(w["ghidra_return"] + "_poisoned"):
             poison_return += 1
+    # The UDT comparison needs its own poison for the same reason: a set
+    # comparison that always succeeds because one side is empty reads exactly
+    # like a decoder that agrees. Injecting one extra token into each expected
+    # set must make every checked name disagree.
+    poison_udt = 0
+    for name, want in list(udt_witness.items())[:50]:
+        if set(demangle(name).udts) != (want | {"CPoisonedType"}):
+            poison_udt += 1
     print(
         f"  poison: {caught_class}/{len(poison_rows)} bad classes, "
         f"{caught_flags}/{len(poison_rows)} inverted flags, "
-        f"{poison_return} bad return types -- all rejected"
+        f"{poison_return} bad return types, "
+        f"{poison_udt} corrupted UDT sets -- all rejected"
     )
     if caught_class != len(poison_rows) or caught_flags != len(poison_rows) or poison_return == 0:
         print("  POISON FAILED: a deliberately wrong expectation compared equal")
+        return 1
+    if udt_witness and poison_udt != len(list(udt_witness)[:50]):
+        print("  POISON FAILED: a corrupted UDT set compared equal")
+        return 1
+    if udt_checked and udt_agree != udt_checked:
+        print("  UDT DISAGREEMENT: one of the two decoders is wrong -- this is a "
+              "finding, not a tolerance")
         return 1
 
     if len(rows) != BASELINE["rows"]:
@@ -929,7 +1131,7 @@ def main() -> int:
         return 2
 
     if args.tsv:
-        print("mangled\tkind\tclass\tmember\taccess\tstatic\tvirtual\treturn\tparameters")
+        print("mangled\tkind\tclass\tmember\taccess\tstatic\tvirtual\treturn\tparameters\tudts")
     failed = 0
     for name in names:
         try:
@@ -954,6 +1156,7 @@ def main() -> int:
                         "1" if sym.is_virtual else "0",
                         sym.return_type,
                         "; ".join(sym.parameters),
+                        "; ".join(sym.udts),
                     ]
                 )
             )

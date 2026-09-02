@@ -345,7 +345,29 @@ DemanglerCmd(addr, mangledName).applyTo(program, monitor)   # applies NAME and S
 
 `ghidra.app.util.demangler` (75K): `DemangledFunction`, `DemangledObject`,
 `DemanglerOptions`, `DemanglerUtil`; MSVC specifics in
-`ghidra.app.util.demangler.microsoft`. Ghidra 12.1 added Microsoft demangler **output
+`ghidra.app.util.demangler.microsoft`.
+
+**To demangle WITHOUT touching the program — and note which entry point you use.** Measured
+live on Ghidra 12.1.2: `DemanglerUtil.demangle(program, name, addr)` returns a
+**`java.util.List`** of candidate objects, not a `DemangledObject`, so `getDataType()` and
+`getSignature()` are simply *absent* on what comes back. A probe built on it reported a type
+for **0 of 979** exports and looked like a measured absence rather than a wrong API — an
+instrument-manufactured zero, caught only by its own vacuity guard. The single-object entry
+point is the demangler class itself:
+
+```python
+from ghidra.app.util.demangler.microsoft import MicrosoftDemangler
+obj = MicrosoftDemangler().demangle(mangled)   # -> DemangledObject, or None
+obj.getSignature(False)   # 'public virtual void __thiscall CMessage::Dwim(union HGOBJECT, ...)'
+obj.getDataType()         # on a DemangledVariable: 'class CWorld *'
+```
+
+It needs no `Function`, no applied data and no analysis to have run, which makes it usable as
+an independent second decoder over a whole export table. It also spells every user-defined
+type with its C++ tag word (`class` / `struct` / `union` / `enum`), so extracting the type
+tokens from its rendering is a genuinely different code path from parsing the mangling's own
+`V`/`U`/`T`/`W` codes — the two share nothing but the input bytes, which is what makes their
+agreement worth something (`references/cpp-abi.md`). Ghidra 12.1 added Microsoft demangler **output
 options** controlling user-defined-type tags and anonymous-namespace naming *(doc)*.
 Rust demangling: `ghidra.app.plugin.core.analysis.rust.demangler`.
 
