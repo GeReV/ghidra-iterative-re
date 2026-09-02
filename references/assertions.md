@@ -1488,3 +1488,76 @@ Both are cheap to close and neither is visible without mutating:
   mutation that fires an *unrelated* arm is a coupling worth knowing about.
 - Do it **when the code is written**, not later. The undetected guard above was in the function that
   looked least risky, which is why it had no arm and why nothing else would ever have found it.
+
+### The mutation harness is source too, and it is wrong first
+
+The most convincing mutation report is the one where the harness itself is broken: **every mutant
+"fails", nothing is measured, and the run prints `7/7 detected`.** Measured — seven mutants of a
+producer were written to a temp directory and every one exited non-zero on `FileNotFoundError`,
+because the script derives its repo root from `__file__` and the copy was outside it. Not one arm
+had fired.
+
+Two lines close it, and they turn the harness into an instrument that can report its own failure:
+
+- **Run the mutants where the original runs**, and **assert an UNMUTATED copy at that same path
+  PASSES first.** A baseline that fails means the harness is broken, and every result after it is
+  noise.
+- **Require the failure to come from a NAMED ARM, not from a non-zero exit.** Grep the output for
+  the arm's own label. A crash, a usage error and a fired assertion all exit non-zero, and only one
+  of them is evidence.
+
+Do the same for the arms themselves once they pass: a mutation that fires an arm you did not aim at
+is telling you the arm you *did* aim at is not testing what its name says.
+
+### A presence check over a two-source join tests the UNION, not the source you meant
+
+A row assembled from two witnesses — two decoders, two sweeps, a probe plus an artifact — appears in
+the output if **either** contributed it. So `X is in the result` is an assertion about the union, and
+it stays green while the source you actually care about goes silent.
+
+**Measured.** A producer joined its own parse against a second decoder's and tagged each row
+`both` / `a_only` / `b_only`. Two arms asserted that six specific classes "survive", by membership.
+Mutating the parse to drop all six left both arms green: the rows were still there, now tagged
+`b_only`, and nothing looked at the tag. The arms now assert `witness == both`, and the mutation
+that motivated the tightening is what fires them.
+
+The general form: **assert the row's PROVENANCE, not its existence**, wherever a row can arrive by
+more than one route. The tag already exists — a join that classifies its rows and then checks them
+without reading the classification has built the instrument and thrown away the reading.
+
+### A vacuity guard written for the poison case will fire on the live one
+
+Guards that exist so a poison arm has something to trip are usually described as ceremony. Two
+measured cases say otherwise, and in both the guard fired on **real input, before any poison ran**:
+
+- A cross-check probe called `DemanglerUtil.demangle(program, name, addr)`, which on Ghidra 12.1.2
+  returns a `java.util.List` rather than a `DemangledObject` — so `getDataType()` was simply absent
+  and the probe reported a decoded type for **0 of 979** symbols. That reads as *"the second decoder
+  has nothing to say about these"*, which is a finding, rather than as *"this is the wrong entry
+  point"*, which is a bug. `if decoded == 0: raise` said so in one line.
+- A sweep whose whole product is an agreement count, run against an artifact that had not been
+  regenerated: it compared nothing and would have reported health.
+
+So write the guard for the shape of the answer — *"this producer's entire output is a comparison; a
+comparison of zero things is a broken instrument, not a clean result"* — and let the poison arm be
+the demonstration rather than the reason.
+
+### A schema or a check that embeds a fact the pipeline routinely rewrites will go stale silently
+
+Ask of every stored string: **which part of this does a later round routinely change?** That part is
+a fact about the program, not about the check, and freezing it inside the check turns the check into
+a claim that the program never moves.
+
+Four measured instances in a single round, all the same species:
+
+- a gate comparing a **rendered prototype** as a whole string — the rendering embeds the function's
+  own name and the `this` parameter's type, both of which a naming round rewrites, so twelve
+  correctly-unchanged signatures were reported as partial reverts;
+- an evidence pack citing a neighbour **by name** where the name may still be the disassembler's
+  placeholder;
+- a template set embedding an **input format** the producer had since changed;
+- an example in a brief writing an integer in **hex** where the grammar's type is decimal — and five
+  independent readers copied the example rather than the type.
+
+The last one generalises past schemas: **an example in a brief IS a specification.** Readers follow
+the example.
