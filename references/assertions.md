@@ -1581,3 +1581,65 @@ rounds earlier. It was in neither of the two lists the harness drives.
   `git show HEAD:path` into a scratch name, run both, diff the output. Otherwise a pre-existing
   failure becomes yours and a failure you introduced becomes "it was already like that" — and both
   mistakes are made in the same direction, toward the answer that costs less.
+
+### A licence recorded in a round's WRITE-UP is not a licence the next round inherits
+
+The dangerous form is not a missing check. It is a check that was **run once, by hand, and
+reported in prose** — because the prose reads like the property holds, and the next round
+inherits the conclusion without the test.
+
+Measured. An applier relabels a calling convention on the argument that two conventions pass
+their first parameter in the same register. True of the *convention table*; a claim about a
+*body* only if that body has no argument in the register the two conventions do **not** share.
+One round knew this, ran a liveness probe by hand over its 13 targets, and wrote *"13 of 13
+dead"* in its write-up as the independent witness the original argument lacked. Nine rounds
+later the same producer issued a fresh census, adjudicated **without** it. Re-run: of six
+proposed repairs, **four clean, one refused, one actively contradicted** — a third of the census
+resting on a verdict nobody had asked for.
+
+- **If a hand-run check licensed an apply, the next apply must not be able to skip it.** Emit the
+  verdict as an artifact and have the producing rule CONSUME it. A precondition that lives in a
+  round's notes is a precondition with a one-round half-life.
+- **Have the producer and the checker read the bytes differently.** If the rule that proposes and
+  the gate that grades both compute liveness the same way, their agreement proves nothing.
+- And when you propose the apply: **read what the PREVIOUS round used to license the same
+  operation before writing the census**, not after. In this incident a census of six went out for
+  approval on body reads alone and two rows had to be withdrawn.
+
+### `if not X` catches an EMPTY join, never a MISMATCHED one — count what matched
+
+A lookup between two artifacts fails in two ways, and the guard everyone writes catches only the
+harmless one. `if not TABLE: raise` fires when the file is empty. It cannot fire when both sides
+are fully populated and simply **do not meet** — different address spelling, different case,
+different zero-padding — and that is the failure that reads as a clean result.
+
+Measured, caught by testing the join before wiring it up rather than after: one artifact spelled
+addresses `0x00411460` (a shared normaliser), the consuming sweep keyed on the disassembler's
+own rendering `00411460`. **134 keys on each side, intersection 0.** Every row would have
+received no verdict, every proposal would have demoted for want of one, and the sweep would have
+printed a healthy `0 repair, 146 abstain` — a census emptied by a string format, with no error
+anywhere in the pipeline.
+
+- **Assert the MATCH COUNT, not the presence of the table.** `matched == expected`, and say what
+  a partial match means, because a partial match is two censuses drifting apart.
+- **Normalise on BOTH sides through one function**, and reach for the project's existing
+  normaliser. In this case its own docstring already named the failure — *"a lookup that silently
+  misses and reads as no such function"* — in a module the call site had chosen not to import.
+
+### The brackets that matter at the moment of a mutation are the ones nothing checks
+
+Pre-flight tooling tends to grow around the **read-only** harness, because that is what runs every
+pass. So the invariant constants inside *appliers* — the ones asserting the program's state
+immediately before it is changed — are exactly the ones no routine check covers.
+
+Measured: a pre-flight checker reported *"2 bracket constant(s) checked, 0 stale"* while **all five**
+of a mutating applier's pre-state constants were stale by an intervening round's deltas. The
+applier would have **refused** rather than mis-applied, so the design held; the defect is that the
+staleness was invisible until a round happened to open the file.
+
+- **Enumerate bracket constants across mutating scripts too**, or state in the checker's own output
+  which population it covers, so "0 stale" cannot be read as "0 stale anywhere".
+- **Re-pin with a named account, never by subtraction.** Each delta should cite the round that
+  caused it and a committed artifact that corroborates it — `+188 symbols` is one round's applied
+  names, checked both directions by the ledger gate; `+2 datatypes` are two placeholder structs
+  named in that round's own record. A re-pin without that account is a re-baseline.
