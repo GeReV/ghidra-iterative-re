@@ -1347,3 +1347,101 @@ The compensating design worth copying: the failed apply wrote **nothing**. One t
 writes, atomic rollback. Concentrating mutation in a single bracketed applier — rather than
 spreading it across per-round scripts — is what made a defect in the mutating component cost one
 re-run instead of a program to repair.
+
+## A schema field nothing READS is a check you believe you have
+
+A gate can be missing in a way no gate detects: the *data it would grade* is collected faithfully,
+round after round, and no code ever opens the column.
+
+**Measured.** A naming catalog carried a `prediction` field — described in every delegated reader's
+brief as *"a falsifiable consequence of your name being right"* — for **987 rows across 13 rounds**.
+The identifier appears in the catalog's verifier exactly once, **inside the schema header list**. No
+checker touches it. Eight other scripts in the same pipeline carry it through a header list or a
+plan tuple and write it back out unchanged. The project meanwhile made predictions gate-bearing in
+three *mutating* appliers, one of whose headers reads *"the prediction is the TEST — reconcile it,
+do not adjust it to match"*. The pipeline that collected predictions was the one place that graded
+none.
+
+**The reason it survived thirteen rounds with every gate green is the part worth keeping:**
+
+> There is no observable state in which an **ungraded** field differs from a field that is
+> **checked and always passes**. Schema checks, encoding checks, ledger joins and byte-identity
+> canaries all pass on a full column exactly as they would on a graded one.
+
+So the defect is invisible to every instrument *except* the question *who consumes this column?* —
+which nothing asks on a schedule. Two cheap habits close it:
+
+- **When you add a field to a schema, name its consumer in the same commit**, or write
+  `# NOT GRADED` beside it. An ungraded field is legitimate; an ungraded field that reads as
+  graded is not.
+- **Periodically invert the artifact/consumer map.** A tool that answers *"which script writes
+  this CSV"* is usually already present; the useful direction is the other one, per column.
+
+**And check what the collected values actually claim before switching a check on.** Of the 912
+`decided` rows above, **586 (64%)** carried one boilerplate sentence — *"this body still references
+**the cited** string and **the cited** global"* — which restates the row's own citations, i.e.
+exactly what the citation checker already re-verifies every pass. Grading them would have graded the
+population against itself. **A prediction that names only what the row already cites is a
+restatement wearing a prediction's column**, and it is the guesser-and-gate-read-the-same-way
+failure moved one column over.
+
+**The corollary that pays.** The remaining 243 rows had converged, unprompted, across **seven
+separate rounds**, on one shape: **exclusivity** — *"no other body calls this import"*, *"the ONLY
+non-vtable caller"*, *"never reached by any other class"*. That is the right shape for a structural
+reason, and a grammar invented at a desk had missed it: a citation says *this body references S*,
+and the falsifiable consequence of the **name** is *and nothing else does* — **a whole-program query
+the reader could not run and its evidence pack did not contain.** When you finally build the checker
+for a long-collected field, **derive its grammar from what the producers already wrote**, not from
+what a clean design would prefer. They have been solving the problem for longer than you have.
+
+## A 100% pass rate is a corroboration only after you measure the BASE RATE of violation
+
+A check that returns *N of N pass* is reporting one of two very different things, and the output
+looks identical either way: *"the population genuinely has this property"*, or *"this property is
+structurally impossible to violate here"*. The second is an unfireable arm with a healthy-looking
+number in front of it.
+
+**Measured.** A predicted claim — *"slot 38 of this class's vtable is never reached by any other
+class"* — was checked over 203 catalog rows: **203 OK, 0 FAIL, 0 unresolvable.** Clean sweeps are
+exactly when to stop and ask. The follow-up query was one line over the same artifact: of the
+**1,779** distinct vtable targets in the program, **708 (39.8%)** appear in more than one vtable. So
+the claim is violable by two functions in five, the 203 sit in the satisfying minority, and the pass
+is a real corroboration. Had the answer been *0 of 1,779 are multi-table*, the 203 would have been a
+tautology, and the check would have been reporting health it never measured.
+
+- **The base rate is usually one aggregate over the artifact the check already reads.** It costs
+  nothing next to writing the check, and it converts *"nothing objected"* into *"the property held
+  where 40% of comparable cases would have broken it"*.
+- **Print it beside the verdict**, the same way a vacuity guard prints `empty=` and `unexercised=`
+  as values. A reader who sees `203/203` cannot tell; a reader who sees `203/203, base rate of
+  violation 39.8% over 1779` can.
+- **The demonstration still matters, and prefer ground truth to construction.** Here the same claim
+  asserted for four *real* multi-table bodies — one of them reached from **225** vtables — returned
+  `PASS=False` on all four, which is a stronger arm than the constructed poison beside it because
+  nothing about it had to be fabricated.
+
+**A measured zero from the same sweep is worth keeping even when nothing needs it.** The base-rate
+query above also returned *0 of 1,779 targets appear at more than one distinct slot **index***, i.e.
+a function occupies one slot number across every table that holds it. No claim depended on it; it is
+a whole-population invariant that cost nothing to observe and would cost a round to re-derive.
+
+## A comment describing a branch is not a branch
+
+The same round found the inverse failure — a query tool that **answered where it should have
+refused**, with exit 0.
+
+**Measured.** A corpus exporter wrote two of its program-wide indices as empty lists, under a
+comment reading *"a bounded trial writes them EMPTY rather than partial, because a partial index
+reads exactly like a measured absence."* The reasoning is correct and **the branch it describes does
+not exist**: the full export writes them empty too. The two CLI commands built on those indices then
+printed nothing (exit 0) and `no recorded writer for <addr>` (exit 0), for a string with three real
+referrers and a global with real writers — three of the seven evidence kinds the whole pipeline runs
+on, silently unserviceable.
+
+> A comment asserting a code path is a tool claim like any other, and it is one a claim-audit sweep
+> will miss, because it names nothing checkable. **Grade the branch, not the comment**: if a
+> conditional matters, there is a run of the tool in each arm that proves it.
+
+And for anything that answers queries over an index: **an empty index must produce a refusal, not an
+answer.** The rule is the same one that governs a stale stamp — print what to do instead of
+returning a result the caller cannot distinguish from a measurement.
