@@ -1445,3 +1445,46 @@ on, silently unserviceable.
 And for anything that answers queries over an index: **an empty index must produce a refusal, not an
 answer.** The rule is the same one that governs a stale stamp — print what to do instead of
 returning a result the caller cannot distinguish from a measurement.
+
+### Two sharpenings of the base-rate rule, from the round that first used it
+
+**1. A base rate measured over the population you selected FOR passing is the vacuity it was meant
+to detect.** Measured: the first cut computed one form's violation rate over *the addresses the
+artifact cites* and reported **0.0%** — which is not a base rate, it is the checked rows passing,
+restated with a percent sign. Over the comparable population (every string any body references) the
+answer was **9.2%**. The denominator must be the population the checked rows were drawn FROM, never
+the checked rows.
+
+**2. A claim can be TRUE and still not worth checking, and retiring it is a result.** One form was
+seeded, evaluated and withdrawn inside a single round. Its rows failed; adjudicating them showed
+every failure was the *checker's* fault, not the reader's. The obvious repair was then **measured
+before being written** and turned out to be satisfied by 307 of 312 comparable cases — a 1.6%
+violation rate — because the behaviour it tested for *is the language idiom the claim describes*, so
+the claim's own exception clause swallowed its assertion. It was retired rather than shipped weak,
+with the rule kept in the file wired to its own arm.
+
+> Ship the measurement, not the arm. A check at a 1.6% base rate spends real runtime to report a
+> property nothing was going to violate, and it does it wearing the same green as a check that means
+> something.
+
+## Writing assertion arms is not knowing they can fail — mutate the source
+
+Arms are written against the failures the author imagined. The ones that matter are the guards that
+looked too simple to need an arm.
+
+**Measured.** Ten deliberate one-line breaks to a freshly written, heavily-armed module: **nine
+fired the arm written for them, and one — deleting a duplicate-row guard in the loader — was not
+detected at all**, with the selftest still reporting *34 of 34 pass*. Three further breaks made an
+arm raise a domain exception rather than fail its assertion, so the harness printed a **traceback**
+where it should have named the broken check; the selftest still exited non-zero, so the mutation was
+caught, but the report answered *"something broke"* where the whole purpose is *"THIS check broke"*.
+
+Both are cheap to close and neither is visible without mutating:
+
+- **The arm-runner catches every exception, not just `AssertionError`.** Anything narrower converts
+  an informative failure into a stack trace at exactly the moment you need the name.
+- **Mutate one guard at a time and record which arm fires.** An unfired mutation is a missing arm;
+  a mutation that fires three arms is usually correct (one guard, several consequences), and a
+  mutation that fires an *unrelated* arm is a coupling worth knowing about.
+- Do it **when the code is written**, not later. The undetected guard above was in the function that
+  looked least risky, which is why it had no arm and why nothing else would ever have found it.
