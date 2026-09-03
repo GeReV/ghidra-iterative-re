@@ -1848,3 +1848,44 @@ Two rules, and the second is the load-bearing one:
 - **A rule that can promote can mis-promote, so print the promoted population in full.** With a few
   hundred rows the audit is free and happens by eye on every run, and it is the only thing that
   found this. A count would have said `360 sites` and been believed.
+
+## A documented escape that requires hand-editing a constant is not implemented
+
+A gate with a pinned census will, sooner or later, deadlock against the thing that produces its
+input. The usual fix is an escape argument — a flag that downgrades one arm so the pipeline can
+take one step and re-prime itself. Check that the escape can actually be *taken*.
+
+Measured. A signature sweep pinned four censuses (A1–A4) and then joined against a probe's
+artifact (A5). The probe built its population by reading the sweep's own output, so after an
+apply that GREW the population neither could move first — documented, understood, and solved with
+a `bootstrap` flag that downgraded A5. The flag was useless: **A4 raises before A5**, and a
+bootstrap run abstains on every row *by construction*, so A4 failed against any pin describing
+real verdicts. The only path through was: edit the pin to the abstain-everything value, run
+bootstrap, re-prime the probe, run bare, edit the pin back.
+
+That procedure works and is a trap. **A constant that must be edited back is one interrupted
+session away from being committed as the gate** — after which it passes forever while grading a
+state that only exists during a bootstrap.
+
+The fix is not discipline, it is an assertion that knows which mode it is in: under the escape
+flag, assert what the escape run *must* look like (here: every row abstains, checked against the
+row count) rather than skipping the arm. That is strictly stronger than a skip and needs no edit.
+
+**Test: can the documented recovery procedure be executed without modifying a checked-in
+constant? If not, the procedure is a bug report about the gate.**
+
+## Report the ROOT CAUSE of a dependency refusal, not the symptom
+
+When a build has an ordering constraint, refusals get bucketed by the immediate blocker — "base
+not built", "input missing", "dependency unresolved". That is true and nearly useless, because it
+does not say whether the blocker is a *scheduling artefact* (it will build later, or on a second
+pass) or a *hard block* (nothing can ever build it in its current state).
+
+Measured. A struct-building wave refused 23 classes under `base_not_built:<X>`. Splitting the
+bucket by *why* the base was unavailable — `base_unsized:<X>` (no decided size, so no prefix can
+ever be flattened from it) versus `base_not_built:<X>` (buildable, just not yet) — turned 21 of
+the 23 into a finding about three specific classes, one of which single-handedly blocked a
+16-member family. The same 21 rows went from a wall to a backlog item with three names on it.
+
+The refusal bucket is a report to a human who has to decide what to do next. **Bucket by the
+cause they can act on, not by the check that happened to fire.**

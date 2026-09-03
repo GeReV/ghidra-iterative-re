@@ -2173,3 +2173,23 @@ The corollary for writing items: **say what the item needs in terms of the OBSER
 mechanism.** "Needs a witness that the body touches bytes the declared type does not have" survives
 contact with a changing toolbox; "needs offset-aware alias tracking" was wrong the day it was
 written and read as authoritative for eight rounds.
+
+## In a topological population, "contributes nothing" is not "can be skipped"
+
+When a population is computed by fixpoint — build what you can, then build what that unblocked,
+repeat — every node has two roles: what it contributes, and what it unblocks. A filter written
+against the first quietly destroys the second.
+
+Measured. A wave built structs for classes whose base was already built. The rule skipped any
+class with a decided size, a built base and no recovered fields of its own, reasoning correctly
+that it contributes zero components. That kept it out of the `built` set, so **every class derived
+from it was refused for a base that could have been built** — one 184-byte class took its only
+descendant down with it, and the wave reported a single pass where there were two.
+
+The tell is that the skipped node looks *obviously* pointless in isolation, which is exactly why
+nobody re-examines it. The fix was to build it with its own region left undefined: an undefined
+region claims nothing, the inherited prefix is real, and the node stops being a hole in the graph.
+
+**Before skipping a node for having no payload, ask what depends on it.** In a flat population
+this costs nothing; in a topological one it silently truncates the result, and the missing items
+are refused with a plausible-looking reason rather than being visibly absent.

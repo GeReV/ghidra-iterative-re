@@ -561,3 +561,23 @@ sequence as *"the only step that writes it"* — which applied **neither** filte
 replay would have regenerated the artifact fully contaminated and it would have looked entirely
 normal. A guard is worth what its weakest writer applies, and the producer that never changes is
 the one that never gets re-read.
+
+## Progress elsewhere can quietly degrade a probe keyed on a shared attribute
+
+A probe that identifies candidates by a *shared attribute* — most often size — gets weaker every
+time the project creates another thing with that attribute. Each individual step is correct, no
+gate fires, and the probe's discrimination erodes anyway.
+
+Measured. A block-copy probe lists the known types matching each copy's byte count, so an analyst
+can pick the likely element type. Giving one previously-unmodelled class a real struct made it a
+third 64-byte type, and five rows went from two candidates to three. Nothing about the copies
+changed; the probe just answers a slightly less useful question than it did the day before.
+
+This is not a defect to fix and usually not a reason to act — but it is a real cost, and it is
+invisible unless someone writes it down, because *the artifact diff looks like noise and the
+change is genuinely correct*. Record it with the round that caused it. A probe whose candidate
+lists have been growing for twenty rounds is one worth re-examining, and nothing else will ever
+prompt that.
+
+**The general shape: an inference that ranks candidates by a shared property has a denominator
+that your own work keeps increasing.** Watch it the way you would watch a false-positive rate.
