@@ -2193,3 +2193,30 @@ region claims nothing, the inherited prefix is real, and the node stops being a 
 **Before skipping a node for having no payload, ask what depends on it.** In a flat population
 this costs nothing; in a topological one it silently truncates the result, and the missing items
 are refused with a plausible-looking reason rather than being visibly absent.
+
+## When a prerequisite turns out to be unobtainable, re-derive what the GOAL needed
+
+A blocked task usually carries a stated prerequisite, and the prerequisite is usually a property
+of the *method someone first imagined*, not of the goal. When it turns out to be unobtainable, the
+reflex is to abandon the task or to go hunting for a stronger witness. Check first whether the
+goal ever depended on it.
+
+Measured, twice in four rounds on the same project. A struct-building wave was blocked on the size
+of three base classes; investigation established those sizes are **genuinely unrecoverable** — a
+base never allocated on its own only ever has `sizeof(derived)` materialised by the compiler, and
+nothing observable lies inside the remaining window. The wave landed anyway, because the structs
+are **flattened at absolute offsets**: a field at offset X sits at X whichever class owns it, so
+the undecided base boundary changes *attribution*, not *layout*. Flattening from the nearest
+ancestor that IS decided, and leaving the region above it undefined, asserted strictly less and
+delivered the whole payoff. Separately, a signature-narrowing item had been queued for eight
+rounds behind "needs offset-aware alias tracking"; the witness it actually needed had existed for
+a hundred rounds and closed 79% of the population in one probe.
+
+**The question to ask is not "how do I obtain the prerequisite" but "what does the deliverable
+actually consume".** Those differ whenever the prerequisite was written down by someone sketching
+one route.
+
+The corollary for writing the item down in the first place: **state what the goal needs in terms
+of the OBSERVATION, not the mechanism.** "Needs a prefix to flatten" survives contact with a
+changing toolbox; "needs sizeof(immediate_base)" sends the next reader after a number nobody can
+measure.

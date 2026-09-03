@@ -643,3 +643,32 @@ months, and a class scoring 7% coverage that nobody re-opened.
 A soundness argument names a blind spot whether or not it says so. **Write the blind spot down in
 the same comment**, in the vocabulary a coverage report uses, so the honest `unknown` in the
 artifact can be traced back to the rule that guarantees it.
+
+## A deferral is only honest if something can find it again
+
+It is often right to apply markup that is correct but incomplete — a struct with an undefined
+region, a field typed by width and not by meaning, a layout flattened from an ancestor because the
+immediate base's extent is unknown. Claiming less than you know is the whole discipline. But
+"we'll revisit this when we know more" is a promise that decays the instant the round ends, unless
+the revisiting is mechanised.
+
+The cheap mechanism is a **worklist artifact**: one committed row per deferred decision, carrying
+the identity of the thing deferred, the exact region affected, and what was used instead.
+Measured: 21 structs were built from an ancestor rather than their immediate base because three
+base sizes are unrecoverable; each skip became a row of `(class, skipped base, gap lo, gap hi,
+prefix actually used)`. When one of those sizes later becomes measurable, the affected structs are
+a **query**, not an archaeology exercise — and the applier's state machine already refreshes a
+flattened prefix whose source has changed, so the rebuild is a re-run rather than a new round.
+
+Three properties make it work, and the third is the one usually missed:
+
+- **The row names the region, not just the class.** "This class is approximate" is not actionable;
+  "bytes [840, 872) of this class are undefined because sizeof(X) is undecided" is.
+- **The row names what was used instead**, so a later reader can tell a deliberate substitution
+  from an omission.
+- **The artifact is covered by whatever checks your committed artifacts** — reach model, encoding
+  gate, stability canary. An uncovered worklist is a text file that silently stops being
+  regenerated, which is the same as not having written it.
+
+An undefined region plus a sentence in a commit message makes exactly the same claim about the
+binary and none of the claims about the future.

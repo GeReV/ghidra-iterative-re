@@ -1889,3 +1889,36 @@ the 23 into a finding about three specific classes, one of which single-handedly
 
 The refusal bucket is a report to a human who has to decide what to do next. **Bucket by the
 cause they can act on, not by the check that happened to fire.**
+
+## An invariant inferred from ONE observation is a coincidence with a raise attached
+
+The dangerous moment is right after you fix a real defect. You have just watched the system do
+something, you understand why it did it, and encoding "it must always do that" feels like
+tightening the check. Sometimes it is; sometimes you have promoted an accident to a law.
+
+Measured. A gate could not be passed without hand-editing its own pinned census — a genuine
+defect, since a constant that must be edited back is one interrupted session away from being
+committed as the gate. The fix asserted the observed behaviour: *under the escape flag, every row
+abstains*. That was true of the run in front of it, and it was a property of one **stale cache**,
+not of the escape. Two rounds later the cache was richer, rows legitimately carried verdicts, and
+the assertion raised on a completely healthy run.
+
+The contract being modelled was about **trust**, not values: the escape run's results are not to
+be believed for any row, because the program moved underneath the artifact they were computed
+from. There is no value-level invariant that expresses that. The honest encoding is a **loud
+abstention** — announce that the arm did not grade and why — which still removes the hand-edit,
+which was the actual defect.
+
+Two rules:
+
+- **Before asserting a newly-observed invariant, ask what would have to be true for it to hold
+  next time.** If the answer names a cache, a version, or a population size, you are asserting a
+  snapshot.
+- **When the property you mean is about trust or provenance rather than values, do not
+  manufacture a value check for it.** An arm that declines to grade, loudly, is a real control;
+  an arm that grades the wrong thing is worse than no arm at all.
+
+And the consolation, which is also the argument for writing checks early: **this one fired within
+two rounds.** A false invariant that happens never to fire is indistinguishable from a true one,
+and every round in between will have believed it. The cost here was one raise and one
+adjudication.
