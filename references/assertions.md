@@ -1766,3 +1766,57 @@ on the 9 known-vector controls, refusing the whole run if the discriminator coul
 where the array path had been read by hand. Prefer ground truth to constructed poison for
 these arms: feeding the 9 genuine vectors to the "must not be a vector" rule and requiring all
 9 rejected is exactly the arm the original probe never had, and it needs no fixture.
+
+## A lesson you keep re-learning is a missing CHECK, not a missing note
+
+Measured on a long-running project, by tagging its own lessons file — 192 blocks, 844 KB,
+written faithfully round by round over months. How many blocks had to re-learn each theme:
+
+| theme | blocks |
+|---|---|
+| something was stale (an artifact, a number, a note, an installed copy) | 59 |
+| a count reported without the population it is a fraction of | 32 |
+| a check that cannot fire, cannot fail, or grades nothing | 30 |
+| a pattern, API or fact recalled instead of derived | 30 |
+| a zero or a gap produced by the instrument, not the binary | 23 |
+| the cascade reverting what was applied | 23 |
+| our own applied work read back as independent evidence | 20 |
+
+(Regexes over prose, overlapping, with 32% of blocks untagged — so every count is a floor.)
+
+**These were all written down before they recurred.** Twice in one session, a lesson was
+re-learned by the round *immediately after* the round that recorded it. That is the number
+worth internalising: **writing a lesson down has a measurable failure rate**, and a lessons
+file is the instrument that measures it.
+
+So when a round ends with "we keep making this mistake", the productive question is not *how
+do I write this more memorably* but **"what artifact join would have SEEN it?"** In this
+project the things that actually stopped defects recurring were checks, not prose: a gate that
+refused destructor names at vtable slot targets; a corpus query tool that *refuses* on a stale
+stamp instead of documenting staleness.
+
+**The worked example, because the shape generalises.** A round named 9 functions
+`<Class>::vector_deleting_dtor` after reading their bodies. A later round applied the same token
+to 203 more that were structurally different. Every one of the 212 rows was individually
+well-evidenced and every gate stayed green for four months, because **no check compared rows
+that SHARE A NAME against each other** — the defect lived in the vocabulary, where no per-row
+check can reach. The join that finds it is small: *for every name token this project INVENTED
+(the binary's own symbol table never spells it) that spans more than one round, require a
+registered rule that all its rows satisfy.* On that binary the first clause gives 66 of 4678
+tokens and the second cuts it to 10 — a reviewable population, not noise.
+
+Three things made it a real gate rather than a gesture:
+
+- **Validate it against the historical defect, not against a poison.** Replayed over the
+  artifacts as they stood before the repair, it fires on exactly the offending row set. A poison
+  you wrote to be caught proves far less.
+- **Its population must depend only on committed inputs.** A draft also consulted a
+  git-ignored export, which would have let the *scope of the check* drift with a cache. The
+  weaker evidence moved into the ledger's `witness` column instead, where a reader can see it.
+- **Join both directions and refuse on an empty population** — an unregistered token, a stale
+  registration, a drifted count, and a population of zero all have to raise.
+
+And when the recurring lesson genuinely is discoverability, prefer a tool that **recomputes and
+writes nothing** to an index file. The same project's hand-written "current state" section sat
+thirty-four versions behind the truth with accurate prose beside it; a derived query cannot go
+stale, and a committed summary always can.
