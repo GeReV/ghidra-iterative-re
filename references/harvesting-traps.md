@@ -2093,3 +2093,55 @@ when to test rather than conclude: the test here was one command (`/usr/bin/git`
 the byte arithmetic) and it took under a minute. Writing down a plausible mechanism as though it
 were measured is how a project acquires a confident wrong answer that nothing later re-examines —
 the anomaly is "explained", so nobody looks again.
+
+## A backlog item is a claim; re-derive it when you pick it up, not when you doubt it
+
+`SKILL.md`'s round zero says to keep *measured-zero* distinct from *not-yet-run*, because a
+stale "unknown" reads as an opportunity forever. Here is that failure at project scale, and
+the two habits that would have prevented it.
+
+Measured on a 1999 MSVC/x86 binary. A backlog carried, across three session handoffs and two
+notes files, *"a mangled-name string table at ~`0x005003xx` — a THIRD place the binary spells
+class names, and nobody has looked at what it does cover"*, ranked as the highest-certainty
+open naming source. It is not a third place. It is the **PE export directory's own name-string
+pool** — the same names, seen as strings instead of as export records. Read by address range:
+**977 strings, 977 already in the project's own exports artifact, 0 new.** The mechanism was
+confirmed rather than assumed: each string carries exactly one data reference, from a
+contiguous array of RVAs, with the strings in alphabetical order — the shape of the export
+directory's `AddressOfNames` table.
+
+Two things make this worth a rule rather than a shrug:
+
+- **The refutation was already in the repo.** Another notes file recorded *"1970 export rows
+  over 986 addresses; 976 addresses exported twice (mangled + undecorated)"*, and a third
+  exploited that twin as a free demangler cross-check. The knowledge was present; the lead was
+  written as though it were not. **Two prose files disagreeing is invisible** — nothing joins
+  prose to prose, so a stale claim and its refutation can sit in the same tree for months.
+- **Nobody had priced it, because inheriting it felt like knowing it.** The check cost one
+  query against a file already committed. What kept it alive was that each session received it
+  as a *stated fact* in a handoff and scheduled it rather than testing it.
+
+**So: write the PREDICTED YIELD into the backlog item.** "Unswept source X" is not a task, it
+is a noun; "unswept source X, expected to name ~N functions the export table does not" is a
+task whose premise can be graded the moment someone picks it up — and would have been graded
+false here in one step. Then, when you do pick it up, **re-derive the premise before scoping
+the work**, not because you doubt it but because it is a claim and its age is not evidence.
+
+## When a population has a POSITIONAL definition, do not select it with a PATTERN
+
+Same round, and the instrument defect it walked into is worth its own line, because the
+correct fix is not "write a better pattern".
+
+The first two passes selected mangled names with a recalled regex,
+`^\?[\w?$]+@[\w@?$]*@@[A-Z_0-9]`. It matched `??0AIPlayer@@QAE@ABV0@@Z` and **rejected**
+`??0AIPlayer@@IAE@XZ` — identical prefixes, differing only in the signature tail. The match on
+the first succeeded by backtracking so that `[\w@?$]*` swallowed `@QAE@ABV0` and the `@@` then
+matched deep inside the *signature*, not the scope terminator. The regex was not measuring the
+property it was named for at all. It reported 906 members of a 977-member population and
+manufactured an unexplained 793-item gap that cost two further measurements to chase down.
+
+The population had a positional definition all along — a contiguous address range — and
+selecting by range removes the instrument from the answer entirely. A pattern is a *hypothesis
+about the data*; it needs its own evidence before it can be used to gather evidence. Prefer,
+in order: an address range or a table's own bounds; a set intersection against a committed
+artifact; a census of the actual token vocabulary in the population; and only then a pattern.
