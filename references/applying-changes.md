@@ -672,3 +672,28 @@ Three properties make it work, and the third is the one usually missed:
 
 An undefined region plus a sentence in a commit message makes exactly the same claim about the
 binary and none of the claims about the future.
+
+## Split an apply by RISK CLASS, so stronger evidence cannot launder weaker
+
+When a round has several changes to make and they all pass their checks, the efficient-looking
+move is one apply with one census. Resist it whenever the changes rest on **different witnesses**.
+A single census makes the population look homogeneous, and if one subset later proves wrong there
+is no way to attribute the failure — the strong evidence and the weak evidence shipped together
+under one number.
+
+Measured. 76 signatures were repaired in one round and deliberately applied as two:
+
+- **58 `__fastcall` → `__thiscall`.** Both conventions pass argument 1 in the same register, so
+  the relabel is *abi-identical* — it renames what the code already does. The witness is a
+  liveness probe showing the second register carries nothing.
+- **18 `__stdcall` → `__thiscall`.** This *adds* a parameter the signature never modelled, which
+  is a claim **about** the ABI rather than a relabelling of it. The witness is entirely different:
+  sibling implementations of the same vtable slot dereferencing the object register.
+
+Two censuses, two approvals, and a **checkpoint between them**, so the program has a named version
+in which the safe half is applied and the risky half is not. If the second half ever has to be
+reverted, the revert target exists and is not entangled with the first.
+
+The test is not "how confident am I" but **"if this subset turned out to be wrong, would I be able
+to tell which evidence failed, and could I undo it alone?"** If the answer to either half is no,
+it is a separate census.

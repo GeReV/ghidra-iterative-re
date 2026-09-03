@@ -1922,3 +1922,42 @@ And the consolation, which is also the argument for writing checks early: **this
 two rounds.** A false invariant that happens never to fire is indistinguishable from a true one,
 and every round in between will have believed it. The cost here was one raise and one
 adjudication.
+
+## A producer that consumes another producer's artifact should assert the contradiction a stale input creates
+
+Pipelines acquire ordering constraints quietly: sweep B reads sweep A's CSV, so B must run after
+A. That order gets written in a comment, read once, and then violated the first time someone runs
+the steps in a different sequence — usually right after an apply, when several artifacts are stale
+at once and the obvious next command is the one that looks most relevant.
+
+The failure is not that B crashes. It is that **B produces a plausible census from stale input**,
+and a plausible census is indistinguishable from a correct one.
+
+Measured. An applier repaired 18 signatures and appended them to its ledger. The consuming sweep
+builds its "still blind" population by reading the *upstream* sweep's artifact, which had not been
+regenerated yet — so 18 addresses were simultaneously in the still-blind set and in the applied
+ledger. It raised with exactly that sentence: *"18 address(es) are BOTH still blind and in the
+ledger, which cannot both be true."* One re-run in the right order fixed it, and nothing had to be
+remembered.
+
+**The rule: when a producer joins two artifacts that a mutation updates at different times, assert
+the JOIN's contradiction, not the ordering.** "X cannot be in both sets" is a property of the data
+that holds under every schedule; "run A before B" is a fact about the operator. The first fires
+every time it is violated; the second is documentation.
+
+## Two checks moving in OPPOSITE directions by the same amount is one account, not two problems
+
+After a mutation, adjudicating pinned counts one at a time invites a re-pin per count and an
+understanding of none. Look for the counts that move together first.
+
+Measured. A signature apply gave two functions a sibling's stack parameters. Four pinned things
+moved: an under-modelled candidate set 43 → 41, a control population 121 → 123, one verdicts CSV
+68 → 66, one mismatch CSV 93 → 91. All four are the **same two functions** leaving the set whose
+declared cleanup disagrees with its `RET` immediate and entering the set where they agree — which
+is precisely what the repair was *for*. Two of the four moved down and one moved up, and that
+opposition is the evidence they are one event.
+
+Adjudicated separately, each would have read as an unexplained drift and earned its own
+hand-waved re-pin. **Before re-pinning anything, list every count that moved and look for equal
+and opposite pairs**: they usually name the population that crossed a boundary, and one sentence
+then covers all of them.
