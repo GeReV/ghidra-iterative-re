@@ -2145,3 +2145,31 @@ selecting by range removes the instrument from the answer entirely. A pattern is
 about the data*; it needs its own evidence before it can be used to gather evidence. Prefer,
 in order: an address range or a table's own bounds; a set intersection against a committed
 artifact; a census of the actual token vocabulary in the population; and only then a pattern.
+
+## A queued item's stated BLOCKER is an untested premise too
+
+A backlog item is a claim, and the claim that decays quietest is not *"this fact is still true"* —
+it is ***"this is still what the item is waiting for."*** The item's facts get re-derived when
+someone finally works it; its stated blocker gets copied forward verbatim, because it reads as
+scoping rather than as a finding.
+
+Measured. An item asking whether a function's first parameter, typed as an ancestor of the owning
+class, should be narrowed to the owner had been queued for eight rounds and restated in three
+handoffs as needing a specific new capability — offset-aware tracking of *call receivers*. It never
+needed it. The question is about member **accesses**, not call **receivers**, and the witness for
+it — how far any access through `this` reaches, compared with the declared type's known size — had
+been produced by the existing scanner for over a hundred rounds. One probe over the whole
+population: 79% of the rows met the condition immediately.
+
+Two things follow, and the second is why this is cheap enough to be a rule:
+
+- **When you pick up a queued item, re-derive the blocker before you build for it.** The item's
+  author knew less than the project knows now, and nothing re-checks that sentence.
+- **Testing a blocker is cheaper than testing a fact**, because it is a question about tools you
+  already have rather than about the target. It is usually one probe over the item's own
+  population, and it either closes the item or tells you the blocker is real.
+
+The corollary for writing items: **say what the item needs in terms of the OBSERVATION, not the
+mechanism.** "Needs a witness that the body touches bytes the declared type does not have" survives
+contact with a changing toolbox; "needs offset-aware alias tracking" was wrong the day it was
+written and read as authoritative for eight rounds.

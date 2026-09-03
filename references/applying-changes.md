@@ -604,3 +604,42 @@ Then backfill the existing rows with theirs, so the file is consistent rather th
 **The general rule: any artifact whose purpose is recovery is append-only and self-identifying. An
 overwriting safety mechanism is not one.**
 
+
+## Look for the smaller change before you accept the blast radius
+
+A queued item can be right about the risk and wrong about where the change has to go, and the
+warning about blast radius is what stops anyone looking for a cheaper site.
+
+Measured. A project's construction-body scanner tracked "which registers provably hold the object
+pointer at offset 0" — a set several sweeps, appliers and diagnostics all read. Member sub-objects
+are constructed through `LEA ECX,[this+K]`, which by design never enters that set, so a chain walk
+driven by it could not follow them and a large fraction of every class's storage went unwitnessed.
+The backlog scoped the fix as *"make the set offset-aware"*, correctly noted that it was shared by
+a dozen consumers, and required a two-step old-rule-vs-new-rule diff with the old rule run live.
+
+The set did not need changing. The same function already carried a **parallel** alias tracker
+resolving `reg -> this + delta` for an unrelated side channel, and the call branch already ran
+before the caller-saved registers were cleared — so the offset could simply be *read* at the site
+the old rule was rejecting. What shipped was a new key appended at an existing site, with a
+perturbation surface that was **empty by construction**; the two-step diff then confirmed that
+rather than discovering it.
+
+So: when a change looks like it must touch shared machinery, **enumerate what the function already
+computes before you change what it computes.** A side channel added for one purpose is often the
+capability the next round needs, and the cost of checking is one read of the file.
+
+## Document what a rule cannot witness, beside the rule that makes it sound
+
+The same module explained, correctly and at length, *why* the offset-0 discipline is sound —
+member constructors receive `LEA ECX,[this+K]`, a class with its own vfptr cannot embed a member at
+offset 0, therefore the set is trustworthy. What it never said is the consequence: that every byte
+a member constructor writes is invisible to any consumer driven by that set, **by construction**.
+
+The cost of the omission was not a wrong number, it was a *misread* one. The producer emitted a
+3,152-byte region marked `unknown` — it had seen the region and could not name it — and downstream
+that read as "nobody has looked here yet" rather than "this instrument cannot look here". Four
+months, and a class scoring 7% coverage that nobody re-opened.
+
+A soundness argument names a blind spot whether or not it says so. **Write the blind spot down in
+the same comment**, in the vocabulary a coverage report uses, so the honest `unknown` in the
+artifact can be traced back to the rule that guarantees it.

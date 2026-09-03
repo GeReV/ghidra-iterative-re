@@ -1820,3 +1820,31 @@ And when the recurring lesson genuinely is discoverability, prefer a tool that *
 writes nothing** to an index file. The same project's hand-written "current state" section sat
 thirty-four versions behind the truth with accurate prose beside it; a derived query cannot go
 stale, and a committed summary always can.
+
+## A bound is not a discriminator — and passing the bound is not evidence about attribution
+
+A containment check — *every recovered cell must lie inside the object's known size* — is a real
+assertion. It fires on real data, it catches arithmetic that overruns, and it is worth writing.
+It cannot catch a cell attributed to the **wrong, smaller** object, because such a cell is
+comfortably inside the bound by construction.
+
+Measured. A new witness followed constructor calls whose receiver resolved to `this + K` and
+rebased the callee's cells by `K`. One body allocated a 0x134-byte block of its own, did
+`LEA reg,[EAX+4]`, and built a four-element array inside *that* block: the receiver really was
+`something + 4`, just not `this + 4`. The rebased cells reached offset 308 in a 1,124-byte class
+and the containment check passed cleanly, as it always would — the misattributed object was
+smaller than the one it was charged to.
+
+What caught it was a human reading one promoted row that looked wrong (an offset of 4 in a class
+whose base is 932 bytes), and that only happened because the rule **printed its promoted population
+in full** instead of summarising it to a count. The eventual fix was a different question
+altogether: not *"is this cell inside the object"* but *"is the tracker still on the object"* —
+answered by counting how many times the tracker had been re-seeded onto an allocation result.
+
+Two rules, and the second is the load-bearing one:
+
+- **Ask what your check is a bound on, and what it is silent about.** A range check grades
+  arithmetic. Attribution — *whose* object this is — is a separate claim and needs its own witness.
+- **A rule that can promote can mis-promote, so print the promoted population in full.** With a few
+  hundred rows the audit is free and happens by eye on every run, and it is the only thing that
+  found this. A count would have said `360 sites` and been believed.
