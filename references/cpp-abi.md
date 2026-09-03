@@ -145,6 +145,26 @@ rule above. Note the binary exported **no `??_E` or `??_G` symbol at all** (only
 `??_B`), so it could not adjudicate its own naming; the identification came from the body
 shape plus the documented MSVC rule, not from a symbol.
 
+> **AND THAT NINE WAS A SAMPLE, NOT THE POPULATION — measured 2026-09-03, and it inverts the
+> conclusion drawn from it.** The same binary has **224** slot-38 targets, not nine. Scanning
+> every one of them for the `& 2` branch: **9 carry it and 215 do not.** The nine are exactly
+> the anchored classes above. A round that had read only those nine generalised "the slot holds
+> `??_E`" across the other 203 it went on to name, and all 203 names were wrong.
+>
+> So on **this** toolchain the vtable slot holds `??_G` far more often than `??_E`, and the
+> "MSVC always puts the vector deleting destructor in the vtable" statement quoted above does
+> not hold. Both sources for that statement are about *contemporary* MSVC (the LLVM
+> compatibility work is 2025-era); neither speaks to 1999 MSVC 6, and the measurement is direct
+> observation of 224 bodies. Read it as **version-bound**: plausibly MSVC 6 emitted `??_E` only
+> for types the program actually `delete[]`s and `??_G` otherwise. This has not been confirmed
+> against a compiler, so treat the *mechanism* as unproven and the *count* as solid.
+>
+> **The operational rule is the same either way, and it is the one that matters: never infer
+> the form from the toolchain — test the `& 2` branch in the body you are looking at.** It is
+> one predicate over the instruction stream, it separates the two forms exactly, and no amount
+> of agreement on the other markers substitutes for it (see *"A witness that agrees with BOTH
+> hypotheses"* in `references/assertions.md`, which this incident produced).
+
 **The converse trap, and it bites when you go looking for the SCALAR destructor.** There are
 **two** destructor bodies per polymorphic class, and the obvious way to recognise either one
 recognises *both*: the scalar `~X` and the vector deleting destructor **both install the

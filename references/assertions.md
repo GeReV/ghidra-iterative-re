@@ -1706,3 +1706,63 @@ output filename is computed at runtime. Matching its answers against real filena
 intersection then silently drops every such producer. Match with `fnmatch` when the name
 carries a metacharacter — and note what surfaced this: the stale-entry arm had just been
 changed from a `print` to a `raise`. **A note printed by a check nobody runs is not a signal.**
+
+## A witness that agrees with BOTH hypotheses is not a witness for either
+
+Auditing your witnesses for INDEPENDENCE is not the same as auditing them for DISCRIMINATING
+POWER, and a round can do the first impeccably while skipping the second entirely.
+
+Measured on a 1999 MSVC/x86 binary. A probe was written to decide whether 224 bodies at a
+fixed vtable slot were the class's **vector** deleting destructor (`??_E`). Everything about
+its design is right, and it is worth reading as a model:
+
+- it opens by REFUSING to extend a 9-target claim to 203 on artifact-side evidence alone,
+  on the stated grounds that the artifact-side observations "all reduce to *the vtable is
+  shaped the way a destructor slot would be shaped*" and would be the project corroborating
+  its own layout work;
+- it names three BODY markers as the independent witness — the `__flags & 1` deallocation
+  test, `RET 4`, and a call to the deallocator;
+- and it **discovers the deallocator by counting callees rather than hardcoding an address**,
+  explicitly so that "the leg that could most easily have been an assumption is instead a
+  discovery confirmed by ground truth". One address was called by 224 of 224 bodies and only
+  then looked up — it carried an export symbol, i.e. the binary's own statement.
+
+It reported 224 of 224 on all three legs, and the round named 203 functions
+`<Class>::vector_deleting_dtor`. **All 203 were wrong.** The three markers are carried by the
+vector deleting destructor *and* by the scalar one (`??_G`) alike. The probe could only ever
+confirm *"this is a deleting destructor"*; it was read as confirming *"this is the VECTOR
+one"*. The discriminator is one instruction it never looked for: MSVC's deleting-destructor
+flag byte has bit 1 (`& 2`) selecting the ARRAY path — read the element count the compiler
+stored at `[this-4]`, destroy each element in a loop, free from `this-4`. The probe's matcher
+accepted an immediate `1`/`0x1`; the string `2` appeared nowhere in it. Re-measured across all
+258 named bodies afterwards: the array bit occurs **9 times**, in exactly the 9 the earlier
+round had read by hand and named correctly. The split fell exactly on a round boundary, with
+no round mixed — the signature of a LABEL being copied forward rather than a shape re-read.
+
+**The check, and it costs one question.** Before adding a fourth corroborating leg, write down
+the rival hypothesis and ask *which of my legs is FALSE under it*. If the answer is "none",
+the round has no evidence for its claim at all, however many legs it has and however
+independent they are of one another. Three witnesses that cannot separate H1 from H2 are not
+three witnesses for H1; they are three witnesses for `H1 ∨ H2`, which is not what the name
+being applied says.
+
+Two things make this failure hard to see from inside, and both are worth designing against:
+
+- **The evidence was recorded honestly and only the NAME overclaimed it.** Every one of the
+  203 ledger rows gave its reason as "`& 1` flag test, RET 4 and a call to operator_delete" —
+  a true statement that does not entail the name beside it. So the artifact was never lying,
+  and no reader comparing the `reason` column against the evidence would find a discrepancy.
+  **A row whose `reason` does not ENTAIL its `name` is a defect class worth a mechanical
+  check**, and it is invisible to every check that grades reasons for truth.
+- **"It keeps one vocabulary for one thing" is a reason to reuse a TOKEN, not evidence for the
+  CLAIM the token makes.** The applying round gave exactly that as its justification, and it
+  is a good answer to the half of the question it addresses (which of *our* names to use). It
+  silently also answered the half it does not (which of two real things this *is*). Watch for
+  a justification that is about your naming convention where the claim is about the binary.
+
+**And the repair's guard must be TWO-SIDED, because a positive-only guard is the defect.** The
+repairing apply asserted the array bit ABSENT on its targets — and FIRST asserted it PRESENT
+on the 9 known-vector controls, refusing the whole run if the discriminator could not fire
+where the array path had been read by hand. Prefer ground truth to constructed poison for
+these arms: feeding the 9 genuine vectors to the "must not be a vector" rule and requiring all
+9 rejected is exactly the arm the original probe never had, and it needs no fixture.
