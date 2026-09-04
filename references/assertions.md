@@ -1961,3 +1961,66 @@ Adjudicated separately, each would have read as an unexplained drift and earned 
 hand-waved re-pin. **Before re-pinning anything, list every count that moved and look for equal
 and opposite pairs**: they usually name the population that crossed a boundary, and one sentence
 then covers all of them.
+
+## A vacuity guard belongs on the OUTPUT of a join, never on its inputs
+
+The standing rule "every producer that emits a name column carries a ledger join, vacuity-guarded"
+is easy to satisfy in a way that guards nothing. The guard gets written against the thing that is
+convenient to check — *did the ledger file load?* — rather than the thing the column depends on:
+*did a single one of its rows match?*
+
+Measured, and it survived the whole life of the artifact. A sweep built its ledger set from a CSV
+spelling addresses `0x004013a0` and looked them up with the disassembler's rendering, `004013a0`.
+The intersection was **structurally empty**: raw 0 of 213, correctly keyed 213 of 213. So the
+column that exists to distinguish *our own applied names* from *the binary's own statements* read
+`non_AI` on every row ever committed, while **every** row was one this project had named. The
+guard beside it — "the ledger is EMPTY, refusing to emit" — was green throughout, because 5,446
+addresses had loaded perfectly. The file's header even claimed *"A1 asserts the join is
+non-vacuous."* It asserted nothing of the kind, and the poison that "demonstrated" it had been
+demonstrated against the input check.
+
+Three things generalise:
+
+- **Assert the join's cardinality, not its operands' cardinality.** `matched == 0` while both
+  inputs are large is a key fault, never a finding about the program. Key it on emptiness rather
+  than a threshold so the count is free to move as the project names and unnames things.
+- **Prefer a poison that reinstates the REAL historical defect** over a constructed one. Re-keying
+  the ledger the old way is a two-line poison that proves the new check catches the thing that
+  actually happened, which a synthetic mutation only argues by analogy.
+- **A dead discriminator column is CONSTANT, and that is an artifact-side detector costing one
+  pass over the CSVs.** Sweeping every committed artifact for provenance-shaped columns taking
+  exactly one value over ≥20 rows returned 9 candidates: 8 benign (populations *defined* by that
+  column, plus one documented one-shot pre-apply harvest) and the 9th was the defect. It needs no
+  disassembler and it fires on the pre-repair file.
+
+**And the root cause was nonconformity, which is countable.** Of 70 address-shaped columns across
+60 committed artifacts, 69 were `0x`-prefixed and **exactly one was bare hex** — the one whose join
+died. Being the only artifact that spells a key differently is a standing hazard independent of any
+particular consumer; it had already propagated into a second ledger (108 of 527 rows), where 13
+addresses appeared under both spellings. Census the spellings once and the outlier names itself.
+
+## A poison that changes nothing grades nothing — validate it by watching it refuse
+
+A poison is only evidence if the run without it and the run with it *differ*. The failure mode is
+writing a poison for a rule that is genuinely important, and never noticing the poison is inert
+because the rule refutes nothing on the current population.
+
+Measured. A pricing rule required that the *owner's* size contain the body's reach — a real
+necessity, since "reaches past the declared type" is necessary but not sufficient. The poison
+dropped that guard. The census came back **byte-identical** and the assertion stayed green: the
+contradiction the rule exists to catch fires on **0 of 182** rows, so there was no row for the
+removed guard to let through. Reasoning would not have found this — the rule *is* important and
+the check *is* correct. Running it did.
+
+Two consequences:
+
+- **Replace an inert poison with one that manufactures the violation directly** (e.g. force the
+  refused rows to the accepting verdict), so the assertion is exercised on rows that really do
+  fail a witness.
+- **PRINT the measured zero in the census instead of leaving it behind a green check.** A rule
+  that refutes nothing *on this population* is a fact about the population, and a silent pass is
+  how the next round inherits "that was checked" without ever learning it never bit.
+
+Note also that a cross-check which re-derives from the columns will not catch *every* row a
+verdict rejects — ours caught 67 of 68 — and that gap is a feature: it means the check is
+independent of the refusal reason rather than a restatement of it.

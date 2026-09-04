@@ -697,3 +697,60 @@ reverted, the revert target exists and is not entangled with the first.
 The test is not "how confident am I" but **"if this subset turned out to be wrong, would I be able
 to tell which evidence failed, and could I undo it alone?"** If the answer to either half is no,
 it is a separate census.
+
+## When one operation makes two claims, say which one carries the risk
+
+Some applies are a single call that asserts two independent things. Setting a `__thiscall`
+convention with an empty formal parameter list, for instance, does a *convention relabel* and a
+*parameter retype* at once, because the disassembler then derives the implicit `this` from the
+function's parent class. Written up as "we relabelled 78 signatures", the round looks uniform. It
+is not:
+
+- the **relabel** is ABI-identical — both conventions pass argument 1 in the same register — so its
+  only claim is that the *second* register carries nothing, which register liveness decides
+  mechanically and independently;
+- the **retype** rests entirely on the parent namespace naming the right class, and on a binary
+  with no RTTI and no debug records that namespace is *your own prior inference*.
+
+Separating them is what tells you which witness the round actually needs. Once written down, the
+question "what corroborates the namespace, other than us?" has an obvious answer — the set of
+classes whose vtable holds the body, which comes from the binary — and it stops being optional.
+
+**And make that rule DIRECTIONAL rather than exclusive.** The tempting form is "a body appearing in
+several classes' vtables means the attribution is unreliable, refuse it." That is wrong: a base
+method appearing in 21 subclass vtables *is* the defining class's method — the slot is inherited,
+not ambiguous. The correct form is *the claimed owner must be an ancestor-or-self of every class
+whose vtable holds the body*. Measured, the directional rule kept 10 rows the exclusive one would
+have discarded while still refusing 4 that genuinely contradicted the namespace.
+
+Two mechanical notes that cost a guard each:
+
+- An empty formal list means the tool injects the implicit parameter **and nothing else**, so a
+  body that really takes further stack arguments has them silently DELETED. No count notices —
+  functions, symbols and types all stay put while the prototype quietly narrows. Refuse any target
+  with more than one modelled parameter rather than truncating it.
+- Re-assert **after** the cascade. An AI-tier signature is exactly what the demangler and the
+  analyzer are free to overwrite, since those tiers rank equal.
+
+## A metric moving the WRONG WAY can be the recovered layout finally telling the truth
+
+After applying a type, expect some quality metrics to get worse, and read the mechanism before
+calling it a regression.
+
+Measured. Typing 78 `this` pointers moved the good numbers hard — index expressions through the
+wrong type **998 → 0**, member accesses through the object **4 → 1708**, named (non-placeholder)
+fields **988 → 1725**, with 78 of 78 bodies improving. In the same measurement, *undefined locals*
+over those bodies **rose 167 → 334**, 40 bodies worse against 5 better.
+
+Both easy write-ups were wrong. "Cascade noise" is refuted by the control group, which held at
+190 → 190 across the same re-analysis. "The apply degraded the decompilation" is refuted by the
+body itself: `undefined1 *puVar1 = &this->field_0xf0;` — the new undefined locals come from taking
+the address of struct fields **not yet recovered**. Before the apply the decompiler had no struct
+to consult and *guessed* a type from usage; afterwards it propagates the layout's own honesty about
+which bytes are still unknown.
+
+So the number is real, it is caused by the apply, and it is not a regression: it is the recovered
+type refusing to invent what it does not know. **The worsened bodies become a query for the next
+field-recovery round** — they name exactly the classes whose layouts have the most unrecovered
+span. Report it at the same weight as the wins; a round that only reports the metrics that moved
+its way is choosing its own scoreboard.
