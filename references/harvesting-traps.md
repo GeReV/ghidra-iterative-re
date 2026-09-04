@@ -2220,3 +2220,53 @@ The corollary for writing the item down in the first place: **state what the goa
 of the OBSERVATION, not the mechanism.** "Needs a prefix to flatten" survives contact with a
 changing toolbox; "needs sizeof(immediate_base)" sends the next reader after a number nobody can
 measure.
+
+## A lookup that can answer "no" for a STRUCTURAL reason is a false zero waiting to happen
+
+Type systems in reverse-engineering tools are namespaced, and the namespace is usually invisible in
+the question you think you are asking. "Does this class have a struct?" looks like a yes/no about
+the program. Implemented as a lookup in **one** category, it is a yes/no about *where the struct
+happened to be created*.
+
+Measured. A sweep asked for a type at the root category path. Structs the project itself builds
+land there — so the lookup found every one of its own and looked healthy. Structs the tool's own
+**demangler** builds land under a different category, and for those the answer was always "no". A
+real 1124-byte structure, matching the class's independently decided size exactly, was reported as
+absent, and 25 rows of a live population were refused for a reason that was not true.
+
+Three things generalise beyond category paths:
+
+- **Ask what a `no` could mean other than "absent".** A namespace not searched, a spelling not
+  normalised, a population filtered before the join — each turns a lookup into a partial one whose
+  negative answers are indistinguishable from real ones.
+- **Assert the lookup finds SOMETHING.** A resolver that answers `no` for every row in a population
+  whose members all satisfy a related, independently-established property (here: every owner had a
+  decided size) is the instrument failing, not a finding. Key it on emptiness, not a threshold.
+- **The direction of a partial lookup decides its severity.** A false `no` that only ever REFUSES
+  is conservative — it withholds work and never corrupts it. A false `no` that admits, or that
+  feeds a count someone quotes, is not. Say which yours is, because it is the difference between a
+  round that lost 25 rows and a round that published a wrong number.
+
+## The witness a round needs is often already in the scan output it is discarding
+
+Before building a new instrument for a question, read the full return value of the one you are
+already calling.
+
+Measured. A round classified bodies by whether any class's vtable pointed at them, and the ones in
+no vtable were written up — in the round record, the commit message and the applier's header — as
+resting on the analyst's own attribution with nothing external corroborating them. That claim was
+testable and wrong for most of the population. **39 of those 49 bodies were constructors and
+destructors, which is precisely WHY no vtable slot points at them** — and a constructor *stores its
+own class's vtable pointer through `this`*. The body-scanning helper had been returning exactly
+that, in a field beside the one the sweep was reading, for dozens of rounds.
+
+The general form: a scan that walks a body usually collects several facts at once (writes, reads,
+calls, stores of known constants). A round asks for one of them and looks past the rest. **When a
+round concludes "there is no independent witness here", grep the scanner's return keys before
+believing it.**
+
+Two riders. Report such a witness as a **floor, not coverage** — a non-constructor has no reason to
+store a vtable, so a miss says nothing either way. And if the check arrives *after* the decision it
+would have informed, **record that order**: a round that turns out well-evidenced in hindsight is
+not the same as one that was well-evidenced when it acted, and the difference is exactly what a
+later reader needs to calibrate the next approval.

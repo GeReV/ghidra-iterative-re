@@ -754,3 +754,22 @@ type refusing to invent what it does not know. **The worsened bodies become a qu
 field-recovery round** — they name exactly the classes whose layouts have the most unrecovered
 span. Report it at the same weight as the wins; a round that only reports the metrics that moved
 its way is choosing its own scoreboard.
+
+## A recovery record a later run of the same script deletes is not a recovery record
+
+Applies that write a pre-mutation snapshot — the old prototype, the old type, the old name — usually
+write it with a plain overwrite, because the script was conceived as running once. Scripts that
+apply an approved census get run again for the *next* approved census, and the second run silently
+destroys the first round's only pre-apply state.
+
+Measured. An applier ran twice, for two separately approved censuses. The second run replaced 78
+snapshot rows with 57. Nothing was actually lost — every one of the 78 old prototypes was
+byte-identical in the append-only apply ledger, verified row by row — but that was luck, not design:
+the ledger happened to carry the same field. The fix is either a file per round (which is what the
+same project's other snapshots do, and it shows in their names) or one **append-only** file keyed by
+round and version, which is the shape the apply ledger already has.
+
+Generalise it: **any artifact written by a script that can legitimately run more than once should be
+append-only, or keyed so a second run cannot address the first run's rows.** And when you find one
+that was not, check whether the lost data is recoverable elsewhere *before* concluding damage — and
+say plainly that recovery was luck rather than design, so the fix does not get filed as optional.

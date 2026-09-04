@@ -2024,3 +2024,40 @@ Two consequences:
 Note also that a cross-check which re-derives from the columns will not catch *every* row a
 verdict rejects — ours caught 67 of 68 — and that gap is a feature: it means the check is
 independent of the refusal reason rather than a restatement of it.
+
+## Two places answering one question differently: the inverse of "the gate ratifies the guess"
+
+The familiar rule is that a generator and its gate must not read the same way, or the gate merely
+confirms the guess. The inverse failure is less obvious and just as silent: **they read
+*differently*, they disagree, and because the generator runs first the gate never sees the rows to
+disagree about.**
+
+Measured. A census script and the applier that consumes it both had to answer "does this class have
+a struct?". The applier enumerated every type and keyed on the bare name — correct. The census
+looked the type up in one category path — wrong for any struct the tool's demangler had created. So
+the census refused 25 rows, the applier's guard would have admitted all 25, and the two never met:
+the applier only ever sees rows the census already accepted. The population silently shrank and
+every check stayed green.
+
+The rule: **when two components answer the same question, either share the implementation or assert
+they agree.** A shared helper is better, but an assertion is cheap — have the consumer re-derive the
+predicate over the *rejected* rows too, and raise if it disagrees with the producer's verdict.
+Whichever you choose, the thing to avoid is two independent implementations of one predicate where
+only one of them can ever be observed.
+
+## A poison whose premise the round itself retires must be REPLACED, not deleted
+
+A poison arm encodes an assumption about what the round refuses. When a later round widens the
+approval, some of those arms stop being able to fire — and a poison that cannot fire still *prints
+as demonstrated* if nobody re-runs it against the new configuration.
+
+Measured. One round split a population into risk classes and approved only the strongest; its
+poison admitted a row from the excluded class to prove the guard refused it. The next round
+approved that class. The poison would now inject a legitimately-approved row, the guard would
+correctly stay green, and the arm would have looked exercised while grading nothing. It was
+replaced with one that admits a row the census refused on a *witness* (a per-row precondition the
+guard re-checks independently of the risk class), which is a property no widening of scope retires.
+
+**Prefer poisons keyed to per-row preconditions over poisons keyed to population membership.**
+Membership is what approvals change; preconditions are what the evidence actually rests on. And
+when a round widens an approval, re-run every poison — that is the moment they go inert.
