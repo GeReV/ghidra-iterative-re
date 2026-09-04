@@ -2061,3 +2061,49 @@ guard re-checks independently of the risk class), which is a property no widenin
 **Prefer poisons keyed to per-row preconditions over poisons keyed to population membership.**
 Membership is what approvals change; preconditions are what the evidence actually rests on. And
 when a round widens an approval, re-run every poison — that is the moment they go inert.
+
+## An if/elif decomposition cannot fail its own sum check
+
+A common repair, when a report is found printing hard-coded category counts beside a live total, is
+to derive the categories and assert they sum to the total. Written the obvious way, that assertion
+can never fire.
+
+Measured. A tool printed `52 repairable, 28 sret, 36 stubs` — literals measured when the population
+was 145 — beside a computed denominator that had since fallen to 91. The fix derived the six
+categories from the committed artifacts and added *"raise if the parts do not sum to the whole"*.
+But the derivation was an `if/elif` chain: each row tested in order, incremented into exactly one
+bucket. **The parts then sum to the whole by construction**, and the reconciliation — the entire
+point of the exercise — was unfireable, guarding precisely the drift it was written for.
+
+Rewritten as **independent predicates evaluated over the whole population**, the sum becomes a real
+statement: an overlap (a row matching two predicates) makes the parts exceed the total, and a gap
+(a row matching none) leaves them short. That is what "these categories partition the population"
+should mean, and only that form can be violated.
+
+**And when the poison will not fire, do not weaken the poison — ask what property the check
+actually has.** The first poison here gave a row a second category to force an overlap, and could
+not fire: every fall-through predicate was guarded on "no verdict", so they were mutually exclusive
+by construction whatever else changed. What the sum check really tested was **exhaustiveness** — an
+unrecognised category value satisfies neither the named predicates nor the "no verdict" guards, so
+the row lands nowhere and the parts fall short. Poisoning a valid value to an unknown one fires it.
+The first poison's failure was the more useful result: it named the property.
+
+## A stale count in a backlog does not merely fail to guide — it directs effort at nothing
+
+The usual argument for deriving counts is that stale numbers mislead. The sharper cost is that a
+stale *backlog* count advertises work that has already been done.
+
+Measured. A tool's category line said "52 repairable" and had said so for nineteen program
+versions. The project's own append-only ledger recorded the denominator falling 145 → 124 → 93 over
+two of those versions, and **145 − 93 = 52** — the repairable rows had been repaired, and the line
+survived them. A round was scoped from that number before anyone checked it.
+
+Two defences, and the second is the one usually missing:
+
+- **Derive the composition, not just the total.** A total that is computed beside categories that
+  are literals is the worst of both: the freshness of the number lends credibility to the stale text
+  beside it.
+- **When a findings file's number is copied into a tool, the copy is the defect, not the file.** The
+  findings file was correct — it recorded what was true when it was written, which is its job. Leave
+  it as the historical record and add a dated correction; fix the *tool* to derive. A note that must
+  be edited to stay true will go stale; one that is appended to stays current by construction.
