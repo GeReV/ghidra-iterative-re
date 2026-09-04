@@ -2343,3 +2343,38 @@ The residue is worth stating positively: after the correction, the breakdown sai
 function with **no cheap route known for any of them**. That is a more useful thing to hand the
 next round than a false cheap/expensive split, because it changes the plan from "do the easy
 half" to "this is body-read work or it is nothing".
+
+## A secondary verdict on an excluded row reads as a lead
+
+An evidence artifact that records two instruments side by side will be read one column at a time.
+If the second instrument's verdict is populated on rows the first has already excluded, the verdict
+column becomes a false lead for anyone who reaches it before the exclusion — and a citation that
+quotes only the second instrument's counts guarantees they will.
+
+Measured. A candidate census carried a structural test (*is this dispatch-table slot comparable
+between these two classes at all?*) and, beside it, an independent body-side test (*do the two
+bodies pop the same number of argument bytes?*). Every row failed the structural test and said so in
+an `exclusion` column. The body-side column still read `agrees` on 27 of them — trivially, since
+most bodies took no arguments. A report cited the file as "72 rows, 42 CONTRADICTS", and the next
+session's handoff turned that into "27 agree, 6 were applied, 21 are waiting": the 6 had been
+applied by a *different rule from a different population*, and a join by address showed the two
+shared no row. The lead cost a round to refute and had never existed.
+
+Three rules:
+
+- **A subtraction across two artifacts is a join, not arithmetic.** Before "N candidates minus M
+  applied", join by identity and count the intersection. If it is empty, so is the lead.
+- **Render a secondary verdict conditional on the primary.** `agrees` on an excluded row is a
+  coincidence; print it as one (*"27 carry an arity that agrees BY COINCIDENCE on a non-comparable
+  row"*), and print a row that passes the primary test — should one ever appear — as a live lead
+  rather than folding it into an aggregate.
+- **Cite the column that closes the question, not the one that opens it.** Quoting the count of
+  outright contradictions implies the remainder is open. Quote the exclusion count, or derive both
+  in the report so the sentence beside them cannot drift.
+
+The companion trap, from the same round: **the throwaway census is where a forbidden join key gets
+used.** A column a project has banned from its *checks* was used in a "just pricing" join and
+produced a clean-looking zero from a dead key — 149 of 149 shared bodies with no owner. Run the
+positive control (the names the rule already applied must re-derive) before believing any zero, and
+exclude pairs that agree by construction (a non-overriding subclass points at the *same* body as its
+base) before quoting a calibration; the trivial pairs inflated one here by a factor of five.
