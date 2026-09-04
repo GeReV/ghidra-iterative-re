@@ -2107,3 +2107,53 @@ Two defences, and the second is the one usually missing:
   findings file was correct — it recorded what was true when it was written, which is its job. Leave
   it as the historical record and add a dated correction; fix the *tool* to derive. A note that must
   be edited to stay true will go stale; one that is appended to stays current by construction.
+
+## Stale PROPORTIONS are worse than a stale total, and a docstring is where they hide
+
+When a report's headline number is computed but its accompanying breakdown is prose, the breakdown
+rots faster than anyone notices — and it rots in the more dangerous direction.
+
+Measured. A tool's help text described its largest denominator as *"1,771 is not 1,771 units of the
+same work: ~588 are mechanical (429 of them one mechanical kind) and ~1,181 need a body read."*
+Re-derived later, over a denominator that had fallen to 939: the mechanical kind was **111**, not
+429 — three quarters of them had been named — and the body-read share was **452**, not ~1,181.
+
+The asymmetry is the point. **A stale total is self-evidently dated and gets discounted; a stale
+ratio reads as structure and gets trusted.** Someone scoping work would have dismissed "1,771" as
+old and still planned against "429 of one kind" as the shape of the problem.
+
+Two habits:
+
+- **Derive the composition, not only the total.** A computed headline beside a hand-written
+  breakdown is the worst arrangement: the freshness of the first lends credibility to the second.
+- **Grep any prose that quotes measurements for multi-digit numbers, and ask of each one: is this a
+  date, a cross-reference, or a fact that can move?** It takes seconds. Writing the correction for
+  the case above, the live value got typed into the very paragraph explaining why live values must
+  not be written down — twice, in two different paragraphs. That grep is what caught both.
+
+Note also that a module docstring is often *published*: argparse and many CLI frameworks print it
+as the program's help description, so "internal comment" is the wrong mental model for it.
+
+## Not every decomposition can carry a sum check — say which, and guard what can actually fail
+
+Having added a parts-sum-to-the-whole check to one derived breakdown, the instinct is to add it to
+its siblings for symmetry. Sometimes it is unfireable there, and adding it is worse than omitting
+it: a green check nobody can falsify reads as coverage.
+
+The discriminator is where the categories come from:
+
+- **An OPEN vocabulary can fail.** If buckets key on a status string read from another artifact, a
+  value the code has never heard of satisfies no named predicate and no fall-through guard, so the
+  row lands nowhere and the parts fall short. That is worth asserting, and it is what actually
+  catches a new status appearing upstream.
+- **Set algebra over one population cannot.** Buckets defined as `A-only`, `B-only`, `both`,
+  `neither` partition their input by construction; the sum is a tautology.
+
+Where the sum check would be a tautology, guard the failure that is real instead. For the case
+above that was **a source artifact reading empty** — with no rows in one input, every row it would
+have classified silently falls into the catch-all bucket and the population reads as far more
+hand work than it is. That is the false-zero shape, it is one `if` away, and it is demonstrable.
+
+**And put the reasoning in the code.** The next reader's instinct will also be symmetry; a comment
+saying *why this one has no sum check, and what it has instead* is what stops the tautology being
+added back.
