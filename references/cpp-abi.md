@@ -1249,3 +1249,32 @@ the destructor. Mistaking one for the other puts a real, already-correct ground-
 onto the wrong address, which a collision check against your own applied-name ledger cannot
 see — the existing name came from the binary and never entered that ledger. Join against the
 PROGRAM.
+
+## An override that calls its ancestor's same-slot body names its own member
+
+When a slot-keyed naming route is closed — the slot index collides across sibling branches by
+construction, and every export-named ancestor slot has already propagated — the residue is a set
+of unnamed overrides under ancestor slots that carry only *your own* applied names, and those
+names may be labels for what the base's body does rather than the member's name. That residue
+looks like "one body read each". It has a mechanical core, and the call graph already holds it.
+
+**The witness.** `Derived::f` compiled from `void Derived::f(x) { Base::f(x); ... }` calls the
+exact body the base's table points at in the same slot. An unnamed override whose callee set
+contains its nearest differently-bodied ancestor's slot target is therefore an override of *that*
+member — whatever the slot index says, and whatever the sibling tables call theirs. A body that is
+nothing but that call is a forwarder; one that opens with it is call-and-extend. Both name the
+member; neither needs a decompiler read.
+
+**Calibrate it before sweeping it.** Over the pairs where both ends were already named on different
+bodies, measured on one 1999 MSVC/x86 binary: the witness fired on 24% of agreeing pairs and 8% of
+disagreeing ones — a discriminator, not a proof — and *every* disagreeing pair that fired had the
+ancestor's name as the member and the override's as a behaviour label (`CCryoFarm::CreateBuildCrew`
+calling `CFactory::CreateChildAtSelf`; `BriefingScreen_Activate` calling `Activate`). So where the
+witness fires, the name to propagate is the one nearer the slot's declaring class, and the specific
+name belongs in a comment. Listing those disagreeing callers is the cheapest audit of your own
+naming vocabulary you will get.
+
+**What it will not do.** It cannot name an override that does its own work without calling the
+base (157 of 320 here), and it cannot name anything under an ancestor slot that is itself unnamed —
+though it links those into equivalence classes worth recording, since one future name resolves the
+whole class. Sweep the call graph first; spend the body reads on what it leaves.
