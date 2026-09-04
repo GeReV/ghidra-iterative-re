@@ -2311,3 +2311,35 @@ The temptation is to report "57 functions, though some may be unrelated". Don't.
 answers a different question is precisely the kind that gets quoted later as though it answered
 this one** — the stale-denominator failure, seeded deliberately. Say the instrument cannot
 distinguish the subject, give the reason, and report no count at all.
+
+## A bucket label is a claim, and it is the one the reader acts on
+
+Deriving a breakdown's counts and then hand-writing its category labels leaves the analysis half
+done. Nobody scopes work from a bare number: they read the label, and the label is where an
+unbacked claim about *cost* slips in beside a number that is genuinely measured.
+
+Measured. A round replaced a stale hard-coded breakdown with a derived one — good — and labelled two
+of its four buckets *"mechanical, named by contract"* and *"mechanical, named from its slot"*. Both
+asserted a cheap naming route. Both routes had already been priced and refuted by that same
+project: one of them by a probe whose header is literally titled *"Is this naming route real?"*,
+which had found the rule structurally broken (a derived class's dispatch table is laid out as
+`[base's slots][the derived class's own new virtuals]`, so sibling branches assign the same index to
+unrelated methods **by construction**). The corrected form of that route had yielded **6** names
+against a bucket the label called mechanical at **376**.
+
+Three rules:
+
+- **A count needs a derivation; a label needs a citation.** If a label implies work is cheap, name
+  the measurement that says so. If no measurement exists, the label describes *what the rows are*,
+  not *what they will cost*.
+- **Before writing "mechanical", grep for the probe that priced it.** A project that prices routes
+  tends to name those artifacts predictably (`diag_price_*`, `*_candidates.csv`); the refutation is
+  usually one search away and a hundred sections old.
+- **Prefer structural labels.** "In the static-initializer table" and "reached from a dispatch
+  table" are facts that stay true. "Mechanical" is a forecast, and a forecast belongs in a round's
+  pricing, not in a standing report.
+
+The residue is worth stating positively: after the correction, the breakdown said three *kinds* of
+function with **no cheap route known for any of them**. That is a more useful thing to hand the
+next round than a false cheap/expensive split, because it changes the plan from "do the easy
+half" to "this is body-read work or it is nothing".
