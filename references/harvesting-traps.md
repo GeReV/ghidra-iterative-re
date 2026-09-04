@@ -2270,3 +2270,44 @@ store a vtable, so a miss says nothing either way. And if the check arrives *aft
 would have informed, **record that order**: a round that turns out well-evidenced in hindsight is
 not the same as one that was well-evidenced when it acted, and the difference is exactly what a
 later reader needs to calibrate the next approval.
+
+## An OVERLAP is not a YIELD: pricing a round from a join instead of from the witness
+
+The cheapest-looking way to price a round is a join between two committed artifacts: *"N classes
+carrying M unknown bytes were also touched by the thing we just did — so M bytes are addressable."*
+That number is an **overlap**, and an overlap is an upper bound with no lower bound attached.
+
+Measured. A layout gap of 8,767 bytes over 75 classes was joined against the 23 classes a previous
+round had just re-typed: 4,154 bytes, 47% — and that figure went into the recommendation. Actually
+pointing the witness at those bodies covered **592 of 5,534 bytes (10.7%)**, and the single largest
+target — a 784-byte span the round was scoped around — stayed **744/784 dark**, with half the
+supposedly-relevant bodies touching *nothing* inside it.
+
+The join was correct. It answered "do these populations intersect?" and was read as "how much would
+the second recover from the first?" Those differ by however sparse the witness turns out to be, and
+sparsity is exactly what you cannot see from the join.
+
+- **Price with the instrument you would actually run**, over a sample if not the whole population.
+  A probe that takes seconds beats a join that takes none.
+- **Report the population size that feeds the witness**, not just the target size. In the case
+  above, the classes scoring 0.0% had *one* method filed under them — the witness was under-fed,
+  not weak, and the per-class method count made that visible at a glance where the percentage alone
+  did not.
+- **Put the price in the message that proposes the round.** A refutation costs nothing when it
+  arrives before the work; it costs a decision when it arrives after someone has approved.
+
+## A cross-check that cannot distinguish the subject is NO result, not a weak one
+
+When a measurement comes back suggestive but the instrument cannot separate your subject from
+something else, the honest report is "unusable", not a hedged number.
+
+Measured. To test whether a 744-byte region of one class was touched anywhere, every function's
+disassembly was searched for a memory displacement inside that byte range. It returned 57
+functions — which looked like a promising lead until they were read: almost all belonged to a
+*different, larger class* accessing its own objects at the same numeric offsets. A raw displacement
+carries no type, so `+0xc6c` on one object is indistinguishable from `+0xc6c` on another.
+
+The temptation is to report "57 functions, though some may be unrelated". Don't. **A number that
+answers a different question is precisely the kind that gets quoted later as though it answered
+this one** — the stale-denominator failure, seeded deliberately. Say the instrument cannot
+distinguish the subject, give the reason, and report no count at all.
