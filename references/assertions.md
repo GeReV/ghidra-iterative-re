@@ -2157,3 +2157,22 @@ hand work than it is. That is the false-zero shape, it is one `if` away, and it 
 **And put the reasoning in the code.** The next reader's instinct will also be symmetry; a comment
 saying *why this one has no sum check, and what it has instead* is what stops the tautology being
 added back.
+
+
+## Run the poisons after the bare dry run is green, not beside it
+
+A poison arm is graded by *which* check it fires, never by whether a traceback appeared. A poison
+submitted in parallel with the first dry run of a new applier therefore proves nothing: if any
+earlier check refuses for a real reason, every arm ends in that refusal's traceback, and the arm
+that "fired" has not been demonstrated.
+
+Measured twice in three rounds on one project. A census-drop poison meant to fire the population
+pin fired the namespace check instead, because the owner class genuinely had no namespace; the
+next round, both poisons of a rename applier fired its first check, because the program spelled
+the targets without the namespace the census had rendered. In both cases the poisons were only
+demonstrated on a second run, after the real refusal had been repaired — so the parallel
+submission saved nothing and produced two tracebacks that read like demonstrations.
+
+Sequence: bare dry run until it is green; then each poison, reading the check letter in the
+exception; then apply. And when a first dry run refuses, treat it as the finding it is — three of
+the four such refusals in that project were real conditions the applier's author had assumed away.
