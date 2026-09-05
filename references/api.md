@@ -862,6 +862,17 @@ through Ghidra, these apply:
   the first line unless installed. Ghidra 12.1 needs JDK 21+.
 - Wrap DB modification in a transaction; `GhidraScript` opens one and `end(True)` closes
   it (required before save/checkin).
+- **`end(False)` is a valid rehearsal, but its rollback lands LATER than the call, and a raise
+  does not roll back at all.** Measured (12.1.2, a script run through an MCP script runner):
+  a dry run that creates functions, measures, and calls `end(False)` still READ the functions
+  afterwards in the same script. The script's transaction was nested inside the runner's;
+  `DomainObjectDBTransaction.endEntry` only marks the entry aborted, and the database rolls
+  back when the outermost transaction closes (`DomainObjectTransactionManager.endTransaction`,
+  in `Project-src.zip`). So verify a rehearsal's rollback with the NEXT run, never a read in
+  the same one. And `GhidraScript.executeNormal` ends the script transaction with `end(true)`
+  in a `finally`, so an exception COMMITS whatever was written: a rehearsal must abort BEFORE
+  evaluating any check that can raise, and an apply-mode post-check that raises leaves the
+  mutation in the (unsaved) program — write the recovery path into the script header.
 - Dispose decompilers and close files explicitly; pass `monitor` to long operations.
 - **Discover API from the local install, not memory or the web.** A Ghidra install ships
   `docs/ghidra_stubs/pypredef/` (hundreds of greppable, exact-version stub files covering

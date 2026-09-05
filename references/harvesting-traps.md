@@ -2378,3 +2378,23 @@ produced a clean-looking zero from a dead key — 149 of 149 shared bodies with 
 positive control (the names the rule already applied must re-derive) before believing any zero, and
 exclude pairs that agree by construction (a non-overriding subclass points at the *same* body as its
 base) before quoting a calibration; the trivial pairs inflated one here by a factor of five.
+
+### An address→function map built on STARTS alone never answers "no function"
+
+A tool that resolves an address by bisecting over function start addresses returns the
+nearest preceding start for every address — including addresses past the end of that
+function, in padding, or at an undiscovered entry point — and calls the result the container.
+It cannot say "no function" because it has no extents to say it with. Measured twice on one
+project: an undiscovered entry point reported as `FUN_0048faa0 +0x90` (the neighbour ended
+at `0x0048fb25`), and later a nine-row census of vtable slot targets recorded as "inside
+another function's extent" when the program held every one inside NO function
+(`getFunctionContaining == None`). The first was written up as a caveat; the second round
+read the caveat inverted — *"ask the tool which function contains it"* — and the census
+built on it stood until an applier re-derived the population from the program and got an
+empty set. A prose caveat protected nobody; the repair was in the tool: containment now
+comes from an extents source (an exported per-function size), an address past the end
+answers `-` and names the function that ends before it, and the start-only bisect survives
+only behind a flag whose output column is labelled `preceding`. **Anything that answers
+"which function is this address in" must carry extents or say that it does not.** The exact
+answer is always the program's `getFunctionContaining`, and a census that decides a
+mutation's MECHANISM should ask the program, not a symbols file.
