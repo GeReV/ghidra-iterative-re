@@ -921,3 +921,27 @@ error message enumerates the real overloads, which is the fastest way to settle 
 **The general rule this stands for: any API pair used read-then-write in one script is worth
 checking against the actual signature, not against the other call.** Symmetry is an assumption
 about the library's taste, and it is wrong often enough to cost a mutating run.
+
+
+## `SymbolTable.getAllSymbols(boolean)` does not enumerate class or namespace symbols
+
+Measured live (Ghidra 12.1.2, PyGhidra) on a program with 5,764 functions: walking
+`getAllSymbols(True)` and counting by `getSymbolType()` returned **only `Function` and `Label`**
+symbols — 33,757 in all, zero of type `Class` or `Namespace` — while `getNamespace("CFallMover",
+None).getSymbol()` in the same run reported `type=Class source=AI address=NO ADDRESS` for a class
+an earlier script had created with `createClass(None, name, SourceType.AI)`.
+
+Two consequences for a project that counts `SourceType.AI` symbols as its mutation invariant:
+
+- **Creating a class namespace does not move the AI-symbol count**, so an applier that budgets
+  its post-check as `names applied + namespaces created` will raise on a correct apply. Budget the
+  names alone and print the namespaces created beside them.
+- **A ledger keyed by address never sees the class symbol** — it sits at `NO ADDRESS` and is
+  never enumerated — so "every AI symbol has a ledger row, both directions" stays green across
+  every class ever created that way. That is convenient, and it means the *namespaces* a project
+  minted are unaudited by that gate. If their provenance matters, walk `getClassNamespaces()` or
+  the namespace tree explicitly.
+
+Written down because eleven appliers in one project had created classes this way and the
+invariant had stayed green, which read as "class symbols are counted and ledgered" until a probe
+asked. It was the opposite premise, and it happened to be harmless.
