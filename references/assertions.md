@@ -2226,3 +2226,56 @@ And when the overlap agrees, **do not let the new witness take the row.** See th
 values in a gated column: relabelling an already-decided row can silently remove it from a
 downstream channel. Record the agreement in the row's own note instead, where it reads as the
 corroboration it is rather than as the provenance it is not.
+
+## An assertion is demonstrated by breaking the INPUT; a test is demonstrated by breaking the CODE
+
+These are two different obligations, and holding only the first lets a poison arm pass while
+grading nothing.
+
+The familiar discipline is: feed the check deliberately broken *data* and watch it fire. That
+proves the check can fire. It does not prove the check is **positioned where the defect would
+be** — because a check reached only after some earlier rule has already settled the same row
+will pass its data-poison and still be blind to the bug it names.
+
+Measured on one project. A new rule promoted an allocation to an exact size when the factory
+body's write set was empty; the discriminator was deliberately the write **set** rather than the
+route **label** the producer derives from it, because a third idiom can make the two disagree.
+The poison arm constructed exactly that disagreement on a real body — relabel the route, leave
+the six measured stores alone, require the refusal — and it passed. Then the *decider* was
+mutated, replacing the write-set test with the label test, i.e. injecting the precise defect the
+arm exists to catch: **every check still passed.**
+
+The reason was positional, not logical. That body's independently measured floor already equalled
+its allocation, so an earlier sandwich rule pinned the row before either version of the new rule
+was consulted. With the row already decided, both discriminators were skipped and the arm could
+not observe which one the code used. The arm named the write set and could not see it.
+
+The repair was to the **fixture**, not to the assertion: lower the floor so an interval survives,
+and the new rule actually gets the chance to decide — at which point the label version takes it
+(wrongly) and the set version refuses. Both mutations are caught now.
+
+**The rule to carry:**
+
+- When a rule sits behind earlier rules that can decide the same row, its poison fixture must
+  **open the decision** those rules would close. Otherwise the arm grades an unreachable branch.
+- **Mutate the code, not just the data, at least once per new rule.** Replace the rule's
+  discriminator with the wrong one that would look right, and require some arm to fail. It is a
+  few minutes and it is the only thing that tests the test.
+- A useful pairing: one mutation that makes the rule read the *wrong evidence*, and one that
+  deletes the rule's *reporting*. The second usually fails loudly; the first is the one that
+  slips through.
+
+## A guard whose only effect is an absence cannot be seen to work
+
+A refusal that manifests as "the row simply did not match" is indistinguishable from the row not
+qualifying, and a clean run then reads as a passed test when nothing was tested.
+
+Where a guard exists to protect against a condition **not present in the current data** — which is
+the normal case for a guard added against a known-possible-but-unobserved idiom — make it *print*:
+name the row, the measured evidence, and the fact that the decision was refused. And print the
+unfireability explicitly on clean data, in words, e.g. *"X and Y agree on all N, so this guard is
+UNFIREABLE against this data and a clean run is NOT a passed test."*
+
+Then add the **negative twin**: assert the report does **not** fire on unpoisoned input. Without
+it, a report that fired unconditionally would satisfy the poison arm regardless of the poison —
+the same failure one level up.
