@@ -2398,3 +2398,64 @@ only behind a flag whose output column is labelled `preceding`. **Anything that 
 "which function is this address in" must carry extents or say that it does not.** The exact
 answer is always the program's `getFunctionContaining`, and a census that decides a
 mutation's MECHANISM should ask the program, not a symbols file.
+
+
+## When an instrument under-reports, print its INTERMEDIATE state, not its verdict
+
+A measured quantity disagreed with what the disassembly plainly showed: a constructor's write
+extent came back short, twice, on two unrelated bodies. Two plausible causes were written down
+and both were refuted by reading the code rather than by running it — the alias tracker does not
+drop the object pointer at a call (it drops only the caller-saved registers, and says so), and it
+does not walk through a branch it never took (that defect existed and had been repaired).
+
+Writing the refutations down is what made the next step a probe with a specific question instead
+of a third guess. The probe printed the tracker's resolution **beside every candidate store**, and
+the answer was immediate and was in neither suspected component: the tracker resolved the object
+pointer correctly at every single missing store. The consumer was discarding its answer — on a
+call to a recognised allocator it REPLACED the tracker with a fresh one seeded on the return
+value, which is right when a factory allocates the object it is building and wrong when a
+constructor allocates a sub-object while its own `this` is still live in a callee-saved register.
+
+Had the probe printed only the final number, the natural reading would have been "the tracker is
+broken", and the next round would have gone and repaired a component that was correct.
+
+**The gap between an instrument's intermediate state and its verdict is the whole finding.** Print
+the intermediate state. And when an explanation is refuted, write the refutation down — it is what
+stops the round proposing a fourth cause with the same confidence as the first three.
+
+Two further rules the same case makes concrete:
+
+- **A LOWER bound that under-reports is sound and still expensive**, and that is why it survives.
+  Nothing decided from it is wrong, no gate can fire on it, no artifact contradicts anything —
+  the cost is entirely in decisions that were never made. Defects that preserve soundness do not
+  announce themselves; they are found by noticing a number disagrees with the bytes and refusing
+  to move on.
+- **The output such a finding owes is a DENOMINATOR, not a repair.** Where the instrument is
+  shared — here, a scanner consumed by nine sweeps and three appliers — the fix is its own round
+  with a full before/after diff over every artifact those producers write. What the discovering
+  round owes instead is the exposed population (16 of 37 bodies, 1 to 23 lost stores each) and a
+  committed reproducer that grades itself, so the round that does the repair starts with the
+  measurement made and knows when it is finished.
+
+## A forward instruction walk seeded from an ADDRESS must know where the function ends
+
+A rule scanned forward a fixed number of instructions from a load to decide whether the loaded
+value was used as an address. It had no notion of a function boundary, so on the shape
+`MOV ECX,[ECX+K]; MOV [EAX],ECX; RET 4` — an out-parameter getter, where the useful instructions
+run out at the third — the walk stepped over the `RET` and read the NEXT function's instructions
+as evidence about this one. One committed row got a confident pointer type from a body it had
+never heard of.
+
+The distinction that makes this cheap to audit: **a walk over a function's address set is bounded
+by construction; a walk seeded from a single address is not.** Censusing one project's scanners on
+that basis, 31 of 36 passed an address set and were safe without anyone having thought about it,
+four were deliberate whole-section walks, and the one remaining was the defect.
+
+Stop such a walk at a non-fall-through instruction, and — where the seed sits inside a defined
+function — at any instruction outside that function's body. The two catch different cases: the
+first still holds where no function is defined, the second is the direct statement of the error.
+
+And grade the fix on the site that produced the defect, **in both directions, in every run**: call
+the rule bounded and unbounded at that address and raise if they do not disagree as the
+disassembly requires. A one-directional check goes quietly inert if the bounded arm ever stops
+firing; the unbounded arm is what keeps the check honest about its own premise.

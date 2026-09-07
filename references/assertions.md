@@ -2176,3 +2176,53 @@ submission saved nothing and produced two tracebacks that read like demonstratio
 Sequence: bare dry run until it is green; then each poison, reading the check letter in the
 exception; then apply. And when a first dry run refuses, treat it as the finding it is — three of
 the four such refusals in that project were real conditions the applier's author had assumed away.
+
+
+## A calibration whose FILTER and whose ASSERTION are the same quantity cannot fail
+
+A new witness kind was introduced with what looked like a proper calibration: run the rule over
+the classes whose size is already known independently, and require the result never to contradict
+them. Written out, the first version was
+
+```
+floor = min(offset for offset in derived_writes if offset >= sizeof(base))
+assert floor >= sizeof(base)
+```
+
+which is true by construction. It would have shipped green, and it would have protected nothing —
+the population it ran over was real, the comparison was real, and the number it compared was the
+one the filter had already guaranteed.
+
+The repair is to feed the filter a DIFFERENT quantity from the one the assertion grades. Here the
+filter took the base's own measured constructor write extent, and the assertion still compared
+against the independently known `sizeof`; the two agree on healthy data and diverge exactly when
+the rule is wrong. A poison that removes the filter then raises on committed bytes.
+
+**When writing a calibration, say out loud where each number comes from.** If the filter and the
+assertion trace to the same measurement, there is no check — only a restatement. The tell is that
+you cannot describe a state of the world in which the assertion fails without also changing the
+filter.
+
+## Run a new witness over EVERYTHING it can reach, not only the rows it was built to close
+
+A witness kind added to close an open population will, if you let it, also fire on rows that are
+already decided by some other route. That overlap is the cheapest and most honest calibration
+available, and it is the only one whose population was not chosen by the person writing the rule.
+
+Measured on one project: a new size witness was built for the classes that had none, and running
+it unrestricted also produced an answer for five classes already pinned by unrelated arithmetic.
+It agreed with all five. The round's *declared* calibration was three comparisons; this
+undesigned one was five, on rows the author had no hand in selecting.
+
+Two conditions make it usable, and both are cheap:
+
+- **Do not restrict the new rule to the open rows.** The instinct is to scope it to the problem
+  it was written for, which throws the overlap away.
+- **Print the comparison as a first-class result**, including the case where nothing overlaps —
+  a witness that can reach no already-decided row has no free calibration and should say so
+  rather than appearing to have passed one.
+
+And when the overlap agrees, **do not let the new witness take the row.** See the note on new
+values in a gated column: relabelling an already-decided row can silently remove it from a
+downstream channel. Record the agreement in the row's own note instead, where it reads as the
+corroboration it is rather than as the provenance it is not.

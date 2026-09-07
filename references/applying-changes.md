@@ -773,3 +773,38 @@ Generalise it: **any artifact written by a script that can legitimately run more
 append-only, or keyed so a second run cannot address the first run's rows.** And when you find one
 that was not, check whether the lost data is recoverable elsewhere *before* concluding damage — and
 say plainly that recovery was luck rather than design, so the fix does not get filed as optional.
+
+
+## A new VALUE in a column something gates on is a schema change
+
+Adding a new confidence label to an artifact looks additive — the column already exists, the
+header does not move, every row still parses. It is not additive, because consumers gate on the
+SET of values, not on the column:
+
+```python
+HUB_SIZE_CONFIDENCE = ("bounds_pinned",)          # and deliberately nothing else
+DECIDED_LABELS      = ("bounds_pinned", "own_alloc", "ai_decided")
+```
+
+Measured on one project: a round introduced a new label for a new witness, and because that
+witness also fired on five rows already decided by another route, those five were RELABELLED. The
+sizes did not change by a byte. A downstream producer nevertheless stopped seeing five classes and
+raised, because its allowlist admitted the old label and not the new one — and the exclusion was
+deliberate, not an oversight, so widening it would have been the wrong repair too.
+
+Two rules, and the second is the one that generalises furthest:
+
+- **Before introducing a value into a column, grep for the allowlists.** They are literal tuples
+  and they are scattered; in that project six sites gated on the same vocabulary, of which two
+  would raise, three would silently skip, and one silently misclassified a result into a
+  neighbouring bucket. Report them as *raises* versus *silently skips* — the silent ones are the
+  ones that cost you a round later.
+- **A new witness must not relabel a row it did not decide.** Where an existing rule already
+  reaches the same value, leave the row's label alone and record the new witness's agreement in
+  the row's note. That is strictly better than the relabel: it keeps every downstream consumer
+  working, and it puts the corroboration in the artifact instead of replacing the label that
+  carried it.
+
+The same shape has been seen for a new KEY (a new class or table id propagating into a channel
+that keys on it). A new value is the same event in a narrower place, and it is harder to spot
+precisely because nothing about the file's shape changes.
