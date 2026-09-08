@@ -808,3 +808,38 @@ Two rules, and the second is the one that generalises furthest:
 The same shape has been seen for a new KEY (a new class or table id propagating into a channel
 that keys on it). A new value is the same event in a narrower place, and it is harder to spot
 precisely because nothing about the file's shape changes.
+
+## A rebuild is a deletion of everything not in the plan
+
+The common shape for applying a recovered struct is *build a fresh type from the plan, then swap
+it in* — in Ghidra, `dtm.replaceDataType(old, freshly_built, true)`. It reads as an update. It is
+a replacement: **every component of the old type that the plan does not reproduce is gone**, and
+nothing in the call says so.
+
+This survives a long time by accident. Measured on one project: an applier had used exactly that
+path for dozens of program versions without ever losing anything, because the classes carrying a
+component from *some other round* always classified "already equal to the plan" in its state
+machine and were therefore never rebuilt. The safety property was held by the **state machine**,
+not by the apply, and nobody had written it down. One upstream change — an unrelated artifact
+gaining a field, so a plan gained a cell — moved one class out of that state, and the rebuild
+became reachable with another round's in-place work in its path. A precondition refused, which is
+the only reason this is a lesson and not an incident.
+
+**The rule.** When a mutating step REPLACES a whole object rather than editing it in place,
+enumerate what the replacement does not carry, and assert it. "The plan is complete" is not a
+statement about your plan; it is an assumption about every other round that has ever touched the
+same object. Three things make it cheap:
+
+- **Classify every live component before allowing a rebuild**, into *replaced* (inside the planned
+  ranges — and permitted only if it is anonymous or keeps its name, so a rebuild cannot silently
+  rename recovered work), *carried* (outside them), and *straddling the edge* — which must
+  **refuse**, because half of it would be rebuilt and half dropped and nothing can say which half
+  was decided.
+- **Re-place the carried components verbatim** after the plan's own, exactly as a flattened base
+  prefix is copied.
+- **Reuse the tolerance predicate you already have.** If a post-apply check already decides which
+  unplanned components are legitimate, call that same function pre-apply rather than writing a
+  second rule; a tolerance rule with two homes will diverge.
+
+The tell that you are exposed: an apply that constructs a new object from a plan and hands it to a
+replace/swap API, in a codebase where more than one round can touch the same object.

@@ -2331,3 +2331,41 @@ code. The reflex to avoid is loosening the guard that fired so the intended one 
 that trades a working check for a demonstrated one. Re-aim the poison at the narrowest input that
 produces *only* the state under test — often a derived structure rather than the source artifact,
 precisely because an artifact edit perturbs several measures at once.
+
+## A conservation check recomputed from the post-state conserves nothing
+
+An applier asserted, after mutating: `components == prefix + own + extras`, where `extras` was the
+set of unplanned-but-tolerated components **recomputed from the post-apply object**.
+
+Drop a component and `extras` loses it too. The identity balances. The check passes. It has the
+shape of a conservation law — a count on the left, a sum of parts on the right — and it is a
+tautology, because both sides are derived from the same post-state. The one thing it existed to
+notice, a component going missing, is precisely what it cannot see.
+
+**The rule: a conservation check must compare against a value captured BEFORE the mutation.** Not
+recounted after it. The repair here was to record, at precondition time, exactly which components
+the apply intended to carry forward, and assert each one is still present afterwards — three lines
+that turn a tautology into a check.
+
+**The tell is syntactic and worth grepping for**: in any post-mutation assertion, look at where
+each side of the comparison comes from. If both are read out of the object you just mutated, the
+assertion is describing that object to itself. A pre-state snapshot, a committed artifact, or a
+literal are the three things that make it real.
+
+## The guard that stops your round is usually telling you something true
+
+A precondition refused with what read like a stale complaint — the object *"matches neither the
+fresh placeholder nor the plan"* — and the round's whole goal lay on the other side of it. The
+tempting reading is that the check has drifted and needs relaxing.
+
+It had not. It was the only thing preventing an apply from destroying a component another round had
+written three versions earlier, and the correct response was to make the **apply** safe rather than
+the **check** permissive.
+
+**The rule: when a gate blocks the thing you came to do, work out what it is protecting before you
+touch its condition.** Two questions settle it quickly — *what state would make this pass?* and
+*what would happen if it did?* If the answer to the second is "the mutation proceeds and something
+is lost", the gate is load-bearing and the round has just found its real subject. Relaxing a
+condition to reach a goal is the single easiest way to turn a working check into a decorative one,
+and it never looks like a regression at the time: the round completes, the gate is green, and the
+guarantee is gone.
