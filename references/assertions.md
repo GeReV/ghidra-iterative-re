@@ -2279,3 +2279,55 @@ UNFIREABLE against this data and a clean run is NOT a passed test."*
 Then add the **negative twin**: assert the report does **not** fire on unpoisoned input. Without
 it, a report that fired unconditionally would satisfy the poison arm regardless of the poison —
 the same failure one level up.
+
+## Calibrate a proposed witness BEFORE building it — the calibration is cheaper than the rule
+
+A new witness kind arrives as a plausible statement about the compiler. The temptation is to
+implement it, then calibrate. Reverse that: **grade the proposed rule, by hand, against the cases
+where the answer is already known, before writing any of it.**
+
+Worked example. Proposed: *"where a derived class's serialisation record sequence begins with its
+base's and adds more, the offset of the first extra record is an upper bound on `sizeof(base)`."*
+It looked strong — 12 qualifying pairs in a committed artifact, and it would have supplied exactly
+the missing bound. Grading it against the pairs whose base already has a decided size took one
+script and about ten minutes:
+
+| pairs | verdict |
+|---|---|
+| 6 | exact hit |
+| 2 | valid but loose (12 and 16 bytes) |
+| **2** | **VIOLATION — the bound was BELOW the base's known size** |
+
+The mechanism behind the violations: a derived class freely serialises a base member the base's own
+`Save` skips. Both offending children wrote at 112, inside a base of 128, in the gaps its own
+records leave.
+
+A refinement ("only count an extra record beyond the base's *entire* serialised footprint") removed
+both violations — **and removed every row that had made the rule look calibrated**, leaving two base
+classes of support. That is the second half of the lesson: when a repair to a rule also destroys its
+evidence base, the rule was fitted to its examples.
+
+**Why the ordering matters more for an UPPER bound than a lower one.** A loose lower bound wastes a
+round. A wrong upper bound *pins a size*, and every later round treats a pinned size as evidence.
+The whole cost of not shipping this one was doing the arithmetic in the right order.
+
+## A poison that fires the WRONG guard is mis-aimed — do not relax the guard that fired
+
+Two of nine new poison arms raised a different exception than predicted. Both times the guard that
+fired was right and the expectation was wrong:
+
+- An arm meant to test a **scope** check ("only the approved row may move") instead fired the
+  **ranking** check. Cause: the poisoned edge still perturbed its row (an `observed_ancestors`
+  count rose), so it *did* count as moved and passed the scope arm — which is precisely why the two
+  are separate checks rather than one. The arm was re-aimed at the ranking marker.
+- An arm meant to test a **shared-body witness**, poisoned by retargeting three vtable slots in the
+  input artifact, instead fired an **ambiguity** guard: the retarget also dropped slot agreement to
+  a margin of 2. Correct behaviour, grading a different claim. Re-poisoned in the *derived* data
+  structure instead — a third table given the three bodies — leaving agreement and ranking
+  untouched, so the arm isolates the one property it names.
+
+**The rule.** A poison firing an unexpected guard is a finding about your test, not about your
+code. The reflex to avoid is loosening the guard that fired so the intended one can be reached:
+that trades a working check for a demonstrated one. Re-aim the poison at the narrowest input that
+produces *only* the state under test — often a derived structure rather than the source artifact,
+precisely because an artifact edit perturbs several measures at once.

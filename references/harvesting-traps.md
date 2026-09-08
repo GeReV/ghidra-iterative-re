@@ -2459,3 +2459,43 @@ And grade the fix on the site that produced the defect, **in both directions, in
 the rule bounded and unbounded at that address and raise if they do not disagree as the
 disassembly requires. A one-directional check goes quietly inert if the bounded arm ever stops
 firing; the unbounded arm is what keeps the check honest about its own premise.
+
+## A harvester's DISCARD accounting is evidence, and nothing reads it
+
+A sweep that skips inputs should record how many and why — most do. **Nobody reads the column.**
+
+Measured: a size harvester emitted `value=4 site=0x00484510 detail="slot=38 bodies=2 scanned=2
+excluded_conf=5"` for a class whose size then sat open for months behind a note reading *"no
+witness at all"*. The `value` was quoted in three handoffs. The `detail` beside it says the scan
+looked at **2 of 7** available bodies, and the 5 it dropped were the entire answer — the class's
+`Save`, `Load`, `SpecifyGui`, `SetPos` and `GetPos`, every one a direct layout witness.
+
+**The rule.** When a witness reports a suspiciously weak value — a floor at the structural minimum,
+a count of zero, a window that never narrows — read its own discard accounting *before* concluding
+anything about the binary. A weak number beside a large discard count is a statement about the
+instrument. Two cheap habits make this automatic:
+
+- **Put the discard count in the value's own row**, not only in the run log, so it survives into the
+  artifact and is joinable. (This one did, which is why the diagnosis took minutes once anyone
+  looked.)
+- **Rank your open questions by discard count once per project.** Here it took a single pass over
+  the committed evidence to find that the exclusion fired on exactly **1 of 61** classes carrying
+  member rows — and that one was the class nobody could size. A rule that bites once is either
+  harmless or load-bearing, and the count does not tell you which; the join does.
+
+## A count can improve for a reason that is not an improvement
+
+A census bucket moved in the healthy direction — `95 laid-out, 7 sized-not-laid-out` → `96 / 6` —
+in a round that mutated **nothing** in the program. Mechanism: the census skips struct components
+below the *base's* struct length, and the class's recorded base had changed to one with **no struct
+at all**, so the skip threshold fell from 56 to 0 and the class's inherited components started
+counting as its own.
+
+Nothing was gained. The same census had earlier moved 13 classes the *other* way for the mirror-image
+reason: building a base struct made their inherited bytes stop counting.
+
+**The rule: before re-pinning an absolute count, derive the mechanism — and apply the same
+scepticism to a bucket that moved in the good direction as to one that moved in the bad.** A count
+that improves is the one nobody investigates, which is exactly why a metric drifts into meaning
+something other than its definition. Record the mechanism *in the pin's comment*, because the next
+reader has only the two numbers and will otherwise book it as progress.

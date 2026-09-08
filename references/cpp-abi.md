@@ -1278,3 +1278,62 @@ naming vocabulary you will get.
 base (157 of 320 here), and it cannot name anything under an ancestor slot that is itself unnamed —
 though it links those into equivalence classes worth recording, since one future name resolves the
 whole class. Sweep the call graph first; spend the body reads on what it leaves.
+
+## An empty base constructor is elided, and it takes the ancestry evidence with it
+
+Most routes for recovering "class D derives from class B" in an MSVC binary read the same thing:
+**a store of B's vftable pointer into `[this]`** — from D's constructor before it installs its own,
+from D's destructor as it unwinds, from a factory that inlines both. A project accumulates five or
+six such routes and they feel independent. They are not: they share one witness.
+
+**The compiler deletes that witness whenever B's constructor contributes nothing.** Two stores to
+`[this]` with no observable read between them is a dead store, and it goes:
+
+```
+; what the source says: D::D() : B() {}      with B::B() empty apart from its vptr
+0x00484546: PUSH 0x48
+0x00484548: CALL operator_new
+0x00484554: MOV dword ptr [EAX],0x4e1d64     ; D's vptr. B's store was here and is gone.
+```
+
+So **a base whose constructor is empty is invisible to every vptr-store route at once**, and the
+class it bases reads as deriving from its *grandparent* — plausibly, consistently, and with every
+gate green. The same elision hits destructors: both classes' scalar deleting destructors restore
+the grandparent's table directly, with no intermediate step, for the same reason.
+
+**The tell is a sibling where the elision did not happen.** The store survives whenever anything
+sits between it and the derived store that the compiler cannot prove non-aliasing — most commonly
+a member-array construction loop:
+
+```
+0x004843ba: MOV dword ptr [EAX],0x4e1c80     ; base vptr -- SURVIVES
+0x004843c0: LEA ECX,[EAX + 0x58]             ; 12 x 104 element loop
+   ...
+0x0048440f: MOV dword ptr [EAX],0x4e1bc4     ; derived vptr
+```
+
+Measured on one 1999 MSVC/x86 binary: of two classes deriving from the same empty base, exactly one
+kept the store — and that one store was the only reason the base was a known node at all. **If a
+hierarchy has an intermediate class with exactly one recorded child, suspect it has more.**
+
+**Recovering the missing edge without the store.** Two artifact-only measures, and you need both:
+
+1. **Slot agreement** — the fraction of the base table's slots the candidate derived table
+   reproduces at the same index. Calibrate it on the base/derived pairs you already have (measured
+   here over 240 pairs: median 0.97, p10 0.85). A real edge scored 0.957 where the grandparent it
+   displaced scored 0.851. **Not a longest-common prefix**: slot 0 is usually the destructor and
+   every derived class overrides it, so a prefix test scores 0 on genuine inheritance.
+2. **A slot target private to the pair** — a body in both tables and in *no other*. Agreement alone
+   is high between cousins in a deep hierarchy; a shared implementation nobody else has is what
+   separates a base from a cousin.
+
+**Witness 2 is only valid if the linker did not fold identical functions**, so measure that before
+you rely on it. Normalise each function's disassembly by rebasing only its *own* self-relative
+branch targets, then group: if identical-but-distinct bodies exist in quantity, `/OPT:ICF` was not
+applied and a shared body means inheritance. Measured here: **82 distinct bodies in two or more
+byte-identical copies, 282 redundant copies**, including the two destructors of the very family
+under investigation. Had that come back zero, witness 2 would have been worthless.
+
+**Fold such an edge as ANCESTRY, never as an immediate base**, and let the existing ranker decide
+immediacy — the elision can hide a link anywhere in a chain, so "B is an ancestor of D" is all the
+evidence supports.
