@@ -1337,3 +1337,31 @@ under investigation. Had that come back zero, witness 2 would have been worthles
 **Fold such an edge as ANCESTRY, never as an immediate base**, and let the existing ranker decide
 immediacy — the elision can hide a link anywhere in a chain, so "B is an ancestor of D" is all the
 evidence supports.
+
+### Orienting an inheritance edge when the slot measures cannot
+
+Slot-agreement and shared-body witnesses are **symmetric in the pair**: they say two vtables are
+related, never which is the base. Two things break the tie, and both are cheap.
+
+- **MEMBER-INITIALISATION ORDER AROUND THE VPTR STORE.** Under MSVC a member initialised *after*
+  a vptr store belongs to the class whose vptr was just installed; one initialised *before* it
+  belongs to a base. Measured on a pair of 47-slot tables identical in 46 slots: the same six
+  dword initialisations fell **after** the vptr store in one constructor and **before** it in the
+  other, which settles the direction outright — and, as a bonus, re-attributes every one of those
+  members, and the serialised record built from them, to the base. Compiler store reordering makes
+  this strong rather than ironclad; corroborate it with allocation sizes where a factory exists.
+- **ALLOCATION SIZE, where both classes have a factory.** A derived class cannot allocate less
+  than its base. Equal sizes for both members of a pair are weak evidence *against* a base/derived
+  relation and *for* two siblings under a shared base.
+
+**A class that is never instantiated has NO VFTABLE AT ALL**, because MSVC emits the vftable with
+the constructor. So an abstract intermediate base is invisible to any hierarchy whose nodes are
+table addresses — by construction, not through any producer's defect — and its member functions
+surface only in its children's tables. When a symmetric pair resists orientation, that is the
+hypothesis to state, and a table-keyed artifact structurally cannot falsify it.
+
+**And a vtable whose only install site sits in bytes the disassembler never reached is invisible
+to every ancestry route at once**, since all of them read a vptr store. Censusing *that* — every
+4-byte occurrence of every table address in the image, decoded, joined against function extents —
+is a complete question with a small answer, and it names exactly which classes the hierarchy
+cannot see and why.

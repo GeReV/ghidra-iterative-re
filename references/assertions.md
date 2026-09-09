@@ -2369,3 +2369,23 @@ is lost", the gate is load-bearing and the round has just found its real subject
 condition to reach a goal is the single easiest way to turn a working check into a decorative one,
 and it never looks like a regression at the time: the round completes, the gate is green, and the
 guarantee is gone.
+
+- **Calibrate on a REPLAYED PRIOR TREE rather than a constructed poison, wherever the project's
+  own history offers one.** A constructed poison shows that a check *can* fire; replaying the
+  state of the world before a known discovery shows that it finds *the thing it exists to find*.
+  Measured: a sweep for missed inheritance edges was graded by removing one known edge from an
+  in-memory copy of the hierarchy — the tree exactly as it stood before the round that found it —
+  and requiring the sweep to rediscover it, with the negative arm that a *recorded* edge must not
+  be reported as a candidate. That pair is stronger than any poison, costs a dict copy, and it
+  stays honest as the project grows because the known answer is real.
+- **Print the INPUT beside the verdict in any decoder you are debugging, or a bad read and a bad
+  rule are indistinguishable.** Measured: an instruction decoder failed, was repaired, and failed
+  again for a *different* reason introduced by the repair — identical symptom both times (every
+  candidate classified "no"). What separated them was one line dumping the raw bytes next to the
+  decision: the second run showed **correct bytes and a wrong answer**, which cannot be a read
+  failure. A bare pass/fail counter would have sent the next hour back to the read.
+- **A fix and a regression can land in the same patch.** In that same repair, guarding an array
+  read with `for st in range(0, lead - 2)` looked like the safe bound and silently excluded
+  `st == lead-2`, which was exactly the commonest case. Rehearse after every patch, not after
+  every *session* of patches; the rehearsal is what attributes a failure to the change that
+  caused it.

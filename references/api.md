@@ -956,3 +956,27 @@ Two consequences for a project that counts `SourceType.AI` symbols as its mutati
 Written down because eleven appliers in one project had created classes this way and the
 invariant had stayed green, which read as "class symbols are counted and ledgered" until a probe
 asked. It was the opposite premise, and it happened to be harmless.
+
+### The JPype boundary: two ways to read bytes wrong
+
+*(Measured on PyGhidra 12.1.2 driving a 32-bit PE. PyGhidra is CPython + JPype; Jython is a
+different runtime and most script recipes on the web are written for it.)*
+
+- **`Memory.getBytes(Address, byte[])` with a PYTHON `bytearray` does not return the program's
+  bytes, and it does not complain.** JPype converts the `bytearray` to a *fresh* Java array for
+  the call, `getBytes` fills that array, and nothing is copied back. No exception, and the return
+  value (the count) looks right. Measured: with a decoder's logic held constant, the `bytearray`
+  form classified **all five** known `MOV r/m32, imm32` vtable-pointer stores as "not a store";
+  swapping in `jpype.JArray(jpype.JByte)(n)` and reading `int(arr[i]) & 0xFF` classified all five
+  correctly. Use a Java array for any out-parameter, or the `FlatProgramAPI` form
+  `getBytes(Address, int)` which **returns** the array. This is the worst shape a tooling defect
+  can have: a complete, plausible, wrong answer feeding a census whose value is its zeros.
+- **`jarray` does not exist.** `from jarray import zeros` is Jython and raises
+  `ModuleNotFoundError` under PyGhidra. Use `jpype.JArray(jpype.JByte)`. This one is loud, so it
+  is the cheap half of the same confusion — but the two travel together in copied code, and a
+  script carrying both fails at the import before its silently-wrong read can matter, which is
+  why the silent one can survive undetected in a file that "obviously doesn't run".
+- **Do not marshal bulk memory across the boundary at all.** Reading 855 KB of `.text` into a
+  buffer was measured at **over 18 minutes** — the marshalling, not the searching. Use
+  `Memory.findBytes` with a Java byte[] pattern (Java-side search) and marshal only the dozen
+  bytes around each hit.

@@ -2499,3 +2499,48 @@ scepticism to a bucket that moved in the good direction as to one that moved in 
 that improves is the one nobody investigates, which is exactly why a metric drifts into meaning
 something other than its definition. Record the mechanism *in the pin's comment*, because the next
 reader has only the two numbers and will otherwise book it as progress.
+
+- **A SWEEP'S REACH IS THE NUMBER THAT DECIDES WHAT ITS SILENCE MEANS — MEASURE IT ON THE
+  POPULATION YOU ALREADY KNOW THE ANSWER FOR, AND PRINT IT ABOVE THE HITS.** A witness can be
+  extremely *specific* and still see almost nothing. Measured: a structural witness for missed
+  inheritance edges (a virtual body shared by exactly two vtables and no other) fired on **18 of
+  92,028** non-edge pairs — decisive-looking — and on only **14 of 288 KNOWN edges, 4.9%**. 270 of
+  the 274 it misses have a base with two or more recorded children, so that base's own bodies
+  appear in three or more tables and are private to no pair; the witness is structurally confined
+  to bases with a single descendant. Nothing in the output hinted at this, and "three candidates,
+  nothing else" reads as closure. The reach cost one loop over the calibration set the sweep
+  already loads. **A count from a sweep whose reach is unmeasured is a fact about the instrument,
+  and the two are only distinguishable after you have measured it.**
+- **THE POPULATION A SWEEP RANGES OVER IS PART OF ITS RULE. Ask which side of the join the thing
+  you are looking for would be on, and whether that side is the restricted one.** Measured: a
+  sweep for *missed* inheritance edges was specified over the hierarchy's 294 known nodes, while
+  the binary has 315 vtables. Widening only the CANDIDATE-BASE side to all 315 added exactly one
+  hit — and it was the only real edge in the entire result. It could not have been otherwise: the
+  defect being hunted **is** the case where the true base is the node no route reached, so
+  restricting candidate bases to nodes the routes already reached excludes the answer by
+  construction.
+- **WHEN A SWEEP IS EXPENSIVE AND ITS REACH IS LOW, LOOK FOR THE INVERTED QUESTION — IT OFTEN HAS
+  A COMPLETE ANSWER.** "Which pairs LOOK like a missed edge" was a 92,028-pair search with 4.9%
+  reach producing candidates. **"Which vtables has the disassembly never seen installed"** was a
+  byte scan of the shipped image with a denominator of 315 producing facts, because every vptr
+  store is a 4-byte literal and every one of the 1,044 occurrences could be accounted for. It
+  returned 312 installed / 3 invisible / 0 never-installed, and the 3 were exactly 3 of the 21
+  tables with no hierarchy row — the *mechanism* for their absence rather than another candidate
+  list. The two instruments intersected on one class, which is the confidence rule; the cheap one
+  carried the round.
+- **A CENSUS WHOSE VALUE IS ITS ZEROS MUST EXPLAIN EVERY ROW, OR ITS ZEROS ARE ITS OWN.** That
+  census's first draft classified each occurrence by matching a hand-listed set of opcode pairs,
+  and reported two classes as **never constructed anywhere in the program** — a spectacular claim,
+  and false. Both stores were `C7 45 00` (`MOV [EBP+0], imm32`), a form the list did not carry.
+  The repair is not a longer list: **decode the ModRM/SIB/disp and require the computed
+  instruction length to land the immediate exactly at the occurrence**, then RAISE on anything
+  still unexplained. The residue bucket is the tell — a census with an "other" pile cannot
+  distinguish a real zero from a decoder gap, and the pile is where the answer hides.
+- **BEFORE PRICING A ROUND ON WHAT AN APPLY WILL UNLOCK, NAME THE CONSUMER AND CHECK IT IS KEYED
+  ON WHAT THE APPLY PRODUCES.** Measured: defining the one constructor in a binary that installs a
+  base class's vtable — the ancestry evidence no other route could see — changed **nothing**
+  downstream. Re-running all four hierarchy-feeding sweeps produced one content-changed artifact,
+  the creation ledger itself. Every route that could *seed* a class into the hierarchy was keyed
+  on the class registry, and this class was neither registered nor named, so the new evidence had
+  no consumer looking at it. The apply was still correct; the round's headline was not. **The
+  check costs one artifact diff and belongs before the apply, not after.**
