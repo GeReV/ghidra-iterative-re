@@ -2544,3 +2544,18 @@ reader has only the two numbers and will otherwise book it as progress.
   on the class registry, and this class was neither registered nor named, so the new evidence had
   no consumer looking at it. The apply was still correct; the round's headline was not. **The
   check costs one artifact diff and belongs before the apply, not after.**
+
+- **A MEASURED ZERO MUST CARRY THE POPULATION IT WAS MEASURED OVER, OR THE CAVEAT EVAPORATES AND
+  THE SENTENCE OUTLIVES IT.** *"No reader was found in the 22 bodies listed under Provenance"* and
+  *"a slot the shipped game does not use"* are different claims — one about the search, one about
+  the binary — and a findings file that writes the second while meaning the first will be read as
+  the second by every later round. Measured: a careful read-only round on one embedded class
+  produced three `no evidence` verdicts and **all three were false**, refuted later by bodies it
+  had not read. Its numbers were right; its scope words were dropped one sentence after they were
+  written. Put the denominator inside the verdict, every time.
+- **A ROUND'S OWN "NOT LOOKED AT" LIST IS A PREDICTION OF WHERE ITS ERRORS ARE — READ THE
+  EXCLUSIONS BEFORE THE FINDINGS.** The same round honestly listed the two owner families it had
+  skipped, and every one of its wrong verdicts came from that list. It was written as a courtesy
+  and never used as what it was: a ranked to-do whose first entry falsifies the weakest
+  conclusions. When re-opening any prior analysis, take its exclusion list and check it against
+  the cells that analysis called empty. Here that was one sweep and it returned three corrections.

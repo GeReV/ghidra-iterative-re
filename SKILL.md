@@ -222,6 +222,17 @@ is worth keeping: **record the identification durably the moment it is made**, i
 constant or a note, even when the apply waits — one living only in the analyst's head does
 not survive the session.
 
+**Applying a type is what makes a population SWEEPABLE, and that is the loop's payoff in the
+direction this file claims it runs.** Measured: an embedded class's unnamed cells could only be
+studied by hand-reading bodies, because nothing rendered them as members — one round read 22
+bodies and got three verdicts wrong. Once the struct was applied, the decompiler spelled every
+access `obj.Render.m_0x40`, and the *entire* program side became one grep over the exported
+decompilation: 147 attributable accesses across seven cells, function by function, in seconds.
+That is what turned a hand-read guess about one cell into a strong measured result (every write
+sets zero, every read is a non-zero test, so the missing writer must be in the other binary). **A
+cell you cannot sweep is a cell whose zero you cannot trust; applying the type is what buys the
+sweep.**
+
 **Apply in certainty order, never convenience order.** Ground truth from the binary
 first, then mechanical derivations from it, then inferences. A round that applies a guess
 before an available certainty has corrupted every round after it.
