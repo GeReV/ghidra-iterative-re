@@ -600,3 +600,31 @@ a standard the finder did not write, which is the whole point of the trust model
 evidence bar then refuses the cell, the refusal is information about the evidence rather than a
 verdict on the finding, and it is recorded where the next round will look. Cost is one literal in
 a sweep; the alternative costs the artifact's meaning.
+
+### Naming what the binary does not name: the provenance needs a GUARD, not a convention
+
+A project can reasonably decide to name fields and functions the binary never spells — a
+recovered mechanism is worth a label even when no symbol supplies one. The danger is not the
+naming; it is that **an invented name reads exactly like a recovered one six months later**, and
+the caveat that distinguished them lives in prose that nobody re-reads. (Measured elsewhere in
+this file's project: three "no evidence" verdicts hardened into claims about the game within
+days, because the scope caveat sat one sentence away from the conclusion.)
+
+So enforce the declaration mechanically, and check it **both ways**:
+
+- a row claiming **invention** must say so in a fixed marker AND cite **at least two distinct
+  addresses**. An invention still has to rest on recovered mechanism; without that floor you have
+  re-admitted the plausible-name-resting-on-a-zero-init failure the witness rule exists to stop;
+- a row claiming a **binary source** must cite a **mangled symbol**, so "the binary spells this"
+  is checkable rather than asserted.
+
+**Put the marker in the PROGRAM as well as the artifact.** A field comment or a symbol comment
+that opens *"NAME APPLIED BY ANALYSIS — NOT FROM THE BINARY"* travels with the thing it labels,
+and if another applier already treats a comment as a prior decision it may not silently overwrite,
+the marker becomes a guard rail rather than a label. An artifact column alone is lost the moment
+somebody reads the struct in the GUI.
+
+**The guard will catch your own census before it catches any poison, and that is the better
+demonstration.** Measured: the first apply attempt was refused because one real citation opened
+with a parenthesis instead of the exact marker. Write the guard so the genuine rows must satisfy
+it, then poison it.

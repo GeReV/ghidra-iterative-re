@@ -2389,3 +2389,22 @@ guarantee is gone.
   `st == lead-2`, which was exactly the commonest case. Rehearse after every patch, not after
   every *session* of patches; the rehearsal is what attributes a failure to the change that
   caused it.
+
+- **A POISON'S PAYLOAD CAN SATISFY THE VERY PREDICATE IT EXISTS TO VIOLATE, AND ONLY RUNNING IT
+  SAYS SO.** Measured: a guard required a "this came from the binary" claim to cite a mangled
+  symbol, i.e. to contain `@@`. Its poison arm asserted the claim with no such citation and its
+  text read *"forced to prove the guard fires, no `@@` here"* — which **contains** `@@`. The arm
+  passed, and the only reason anyone knew was that the script raised `POISON RUN PASSED` instead
+  of silently going green. Two rules follow: write the "did the poison fire?" check as loudly as
+  the guard itself, and **read your poison's payload as data the predicate will see**, not as
+  prose describing what it means.
+- **A GUARD THAT FIRES ON THE REAL CENSUS BEFORE IT FIRES ON ANY POISON IS BETTER EVIDENCE THAN
+  THE POISON.** The same round's provenance guard refused a genuine row whose marker opened with a
+  parenthesis instead of the exact token. A constructed arm proves the branch is reachable; a live
+  refusal proves the guard is calibrated against the data it will actually see. Design the check so
+  the honest rows must satisfy it, and treat the first real refusal as the demonstration.
+- **AN ABSOLUTE BRACKET EARNS ITS KEEP ON ARITHMETIC, NOT ONLY ON COLLATERAL DAMAGE.** Same round:
+  a struct's component count was pinned at 19 from counting the rows of a printed type listing; the
+  struct has 18, because one field is an 8-byte `T[2]` occupying a single component. The guard
+  refused in a dry run and cost a minute. The same slip inside a rename loop shifts every field
+  after that offset, silently.
