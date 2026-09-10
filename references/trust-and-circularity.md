@@ -654,3 +654,41 @@ expensive than a stale finding, because a wrong finding gets refuted the moment 
 it, and a wrong blocker guarantees nobody ever does. In the same way an unrun sweep's *"unknown"*
 reads as an opportunity forever, a decayed blocker reads as a closed door forever — and neither
 carries a timestamp saying when it was last true.
+
+### The AGREEMENT CENSUS is what admits a new witness kind — and its disagreements are the finding
+
+A new witness kind arrives with no track record, and the temptation is to justify it by argument
+(*"a member function writing `this+X` is obviously a field"*) and then measure only what it adds.
+That gets the order wrong. **Grade it first against everything the project already decided by
+other means**, and state the result as a fraction of the cells it graded, not as a count.
+
+The bands worth separating, given committed rows from the other channels:
+
+| band | meaning |
+|---|---|
+| `exact` | same offset, same width as a committed row |
+| `subfield` | wholly inside one committed row — a narrower access into a known field |
+| `new` | no committed row overlaps it: the payoff |
+| `widen` | same offset, wider than the committed row |
+| **`straddle`** | one access crossing a boundary **between two committed rows** |
+
+Measured on a channel admitted this way: 1250 cells over 90 already-decided classes — `exact` 32%,
+`subfield` 52%, `new` 15%, `widen` 0, `straddle` **1**. **85% of what the new instrument said about
+already-decided classes was something a different instrument had already said**, which is what
+licensed believing it about the rest.
+
+**And the one straddle was a real defect in the committed artifact, not in the new channel.** A
+cell held as two 4-byte integers was read by the program as a single 8-byte float; the constructor
+had zeroed it with two dword stores, which is exactly why the initialisation-based producer could
+not tell the difference and why the new channel could. That is the shape to expect: a new witness
+kind's disagreements cluster precisely where the old kinds are structurally blind, so **grade the
+disagreements one at a time before assuming either side is wrong.**
+
+Two rules fall out:
+
+- **Pin the straddle count.** It is the running measure of how much this channel contradicts the
+  rest of the project, and it must be adjudicated when it moves, never re-pinned.
+- **Do not repair the other producer's artifact from inside the new one.** Record the correction
+  with its addresses and let the round that owns that producer make it, with its own census and
+  approval. A channel that both proposes rows and silently rewrites its calibration source has
+  stopped being independent of the thing it is being graded against.

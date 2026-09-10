@@ -2641,3 +2641,42 @@ retype that changes operand rendering re-arms them.
 So grade a candidate fix by whether it depends on the silence. The scope fix adopted here depended
 on neither accident and removed **1052 of 1066 pairs (98.7%)** at once; the shape-filter fix would
 have handled one body and left two loaded.
+
+## The instrument for your biggest gap may already be RUNNING — check who scans the population
+
+A reach number is a statement about one producer's own population, and every producer's reach
+number can be honest while a whole channel is missing. The cheap check is not "can this be
+measured" but **"is something already measuring it and reporting a narrower projection?"**
+
+Measured: a size sweep had been calling the per-body scanner over every class's own member
+functions for a hundred rounds — 1722 bodies, 100% accepted — and keeping only the scalar
+`max(offset)` at six of its seven call sites. The per-offset cells the scanner also returns were
+computed and thrown away on every run. Wiring them into an artifact took one new sweep and moved
+the project's layout-coverage denominator from **79.4% to 87.1%**, with the count of classes
+carrying no field row at all going **62 → 5**.
+
+Nothing was broken. The scan was correct, the sweep's own headline was correct, and the discard
+was deliberate when it was written, because that sweep needed a bound and not a layout. **Before
+building a witness, grep for the population, not for the answer** — who already enumerates these
+bodies, these addresses, these rows? A discarded intermediate is the cheapest evidence in any
+project, because the expensive half is already built and calibrated.
+
+## Classify your producers by the KIND OF BODY they read — the missing channel is then obvious
+
+The same project's five layout producers read, respectively: a copy constructor, a construction
+chain, a subsystem initialiser, a serialisation body, and a registration table. Written out as a
+table, one column wide, the gap is unmissable: **all five are INITIALISATION channels.** A cell
+that is never initialised where a scan can see it and never serialised is invisible to all five
+*at once*, and its missing row reads as *"nobody has looked"* when it means *"no instrument here
+can look."*
+
+That audit costs one column in a table and it is not the same as any per-producer reach number,
+because a producer that has never been able to see a population correctly reports nothing about
+it. Do it whenever several producers feed one denominator:
+
+| producer | artifact | what kind of body does it read? |
+|---|---|---|
+
+The row that repeats is the blind spot. Here the missing kind was the plainest one available —
+**a class's own member functions** — which no producer read because every producer had been built
+to answer a question about construction.

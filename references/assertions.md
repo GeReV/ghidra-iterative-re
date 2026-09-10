@@ -2433,3 +2433,78 @@ Two corollaries worth carrying:
   between them is a green suite with a dead arm and nothing recording that.
 - **A suite that prints per-arm outcomes catches this; one that prints a pass count does not.**
   A quiet arm and a passing arm are the same number.
+
+## A poison written from an EXPECTATION is a hypothesis — run it before you believe the arm
+
+The catalogue above is full of checks that could not fire. This is the cheapest way to avoid
+adding another, and it costs one run: **a poison whose comment says the check "MUST then raise" is
+a claim, and until it has been executed it is exactly as trustworthy as any other unmeasured
+claim.**
+
+Measured: a new sweep's population filter had a poison arm that dropped it, with the header
+asserting the bound calibration would fire. It did not. The arm reported `416 cells over 13
+exactly-sized classes, 0 violations` with the filter both on and off — because those 13 classes,
+the only ones with an independently known size, had **zero** exclusions between them. The poison
+could not reach the calibration's population at all.
+
+The filter was not inert: dropping it added 157 bodies, 329 cells and 51 emitted rows. So the
+situation was the awkward one — **a rule that changes the output and that no check can grade.**
+
+Two responses, and only one of them is honest:
+
+- **Wrong:** hunt for a check the poison does happen to fire, and ship the pair as if the rule
+  were demonstrated. That manufactures a green arm for a rule that remains untested.
+- **Right:** record that the rule is retained **on its argument, not on a demonstration**, name
+  what would close it (here: a class with an independently known size that also has a
+  cross-chain body — currently an empty set), and put it in the blind-spot backlog. The header
+  comment then says the poison raises nothing, so the next reader is not misled by an arm that
+  looks like coverage.
+
+The general form: **a poison tests the check, and a poison that cannot reach the check's
+population tests nothing.** Before writing one, ask which rows the check actually grades, and
+whether your injected defect lands among them.
+
+## A pin carries its POPULATION and its UNIT, or the next person cannot adjudicate it
+
+A pinned count is an adjudication deferred to the future, and it only works if the future can tell
+a real change from a change of unit. Measured: a disagreement count was pinned at **2** from a
+pricing probe that counted per *instruction site*, and the producer built from that probe raised
+at **1**, because it merged its evidence by `(class, offset)` before grading. One disagreement,
+two correct numbers, and the refusal read exactly like a regression.
+
+Re-deriving the pin to 1 was legitimate — the unit changed and that was established *before* the
+number moved — but only because it could be established at all. Write into the constant's comment:
+
+- **what population it is over** ("cells in the own window of classes that already carry committed
+  rows"),
+- **what unit it counts** ("cells, merged across sites — the pricing probe's per-site figure for
+  the same disagreement is 2"),
+- **and what the disagreement actually is**, concretely enough to re-check: the address, the
+  instruction, and which of the two sides is believed wrong.
+
+Then the rule that follows has teeth: **a change in this number is adjudicated in a round, never
+re-pinned to make a run go green.**
+
+## Adding a SOURCE to a union: seed the fixture EMPTY
+
+When a denominator reads a union of artifacts and you add one, the selftest fixture is where the
+round quietly becomes a rewrite. Seed the new source with data and every existing arm's literal
+expectation moves — so the arms that exist to police the denominator all have to be re-derived in
+the same commit that changes it, and afterwards nothing distinguishes a correctly re-derived
+literal from a wrong one.
+
+Seed it **empty** instead: a header row and no data. Every pre-existing arm keeps its exact
+expectation and stays a real test of the change. Then give the new source its own arms on its own
+private fixture — a class that no other artifact lays out, so a row can demonstrably move it out
+of the zero-coverage set — plus:
+
+- a **two-step baseline**: an environment variable that restores the previous source list exactly,
+  so the old numbers are re-derivable from the new binary rather than remembered;
+- a **poison per admission rule** the new source needs (a row of the wrong kind, a key that does
+  not resolve, a duplicate);
+- a **missing-file arm**, if the loader treats a missing artifact as an error rather than as an
+  empty list — this proves the new source is inside that guarantee rather than beside it.
+
+And if the source list is sliced positionally anywhere (`SOURCES[:4]` for an older baseline),
+**append, never insert**, and say so in a comment above the tuple: an insertion silently redefines
+what every earlier baseline means.
