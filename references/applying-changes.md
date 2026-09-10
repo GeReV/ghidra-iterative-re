@@ -843,3 +843,51 @@ same object. Three things make it cheap:
 
 The tell that you are exposed: an apply that constructs a new object from a plan and hands it to a
 replace/swap API, in a codebase where more than one round can touch the same object.
+
+## A WIDTH-PRESERVING type apply is not layout-neutral — ask what it makes DECIDABLE
+
+Everything else on this page is about an apply that moves bytes: a wider field, a collateral
+deletion, a rebuild that drops what was not in the plan. **The apply that needs no width check at
+all is the one with no width story.** Measured: a 64-byte opaque cell was retyped from
+`uint8_t[64]` to `Vec[4]`. Sixty-four bytes before, sixty-four after. Nothing tiled differently, no
+coverage denominator moved, `sizeof` was untouched, and it was the safest-looking write of the
+round.
+
+It had two consequences nobody predicted, and neither is visible to a width- or coverage-based
+check.
+
+**It made a loop LEGIBLE for the first time, and a producer read the new legibility wrong.** A body
+the binary itself names — at a *non*-destructor slot in 32 vtables — walks that array with
+`ADD EBX,0x10` and a literal trip count of 4. Before the retype the element type was illegible and
+the decompiler's simplification decided nothing; the committed artifact holds the near-miss with
+`why=rejected_empty`. After it, `0x10` arrived as a PTRADD element size, and **16 was minted as an
+exact size witness for two classes whose real sizes are 1400 and 1148.** The apply did not create
+the defect; it removed the illegibility that had been *suppressing* it.
+
+**And it left the same cell stale in every flattened copy** — 22 of them, taking two further
+applies, because refreshing a base exposes its descendants and the second wave is larger than the
+first probe reports.
+
+The rule: **before any type apply, enumerate the producers that scan that cell and ask what each
+one can now decide that it could not decide before.** A cell nothing could read is a cell nothing
+could read *wrong*. Retyping it hands every scanner a new operand, and the scanners whose scope was
+never enforced (see `harvesting-traps.md` on a docstring claiming a scope the code lacks) will read
+it at once. Expect the flattened-copy cascade to be larger than predicted, and re-run the drift
+probes after *any* base-struct edit, width-preserving or not.
+
+## A multi-token applier's invariant pin is PER-SESSION, not per-round
+
+The invariant bracket above assumes the BEFORE value was measured before anything in this round
+ran. That assumption breaks the moment one applier has more than one token and the tokens run
+hours apart. Measured: an applier pinned `datatypes` at 1641 and refused its second token, because
+the *first* token of the **same round** had minted two types an hour earlier. The pin was correct
+and the refusal was the bracket working.
+
+Two consequences:
+
+- **A pin derived from a previous round's BEFORE value is stale the moment any sibling token
+  runs.** Two tokens of one applier are not independent inside one session.
+- **Re-pinning is legitimate only with the reason recorded in the file** — "re-pinned to 1643
+  after establishing that the `prebuild` token minted two types", never a silent bump to make a
+  run go green. Write that sentence into the applier's own refusal message, so the next person to
+  hit it is told which of the two things they are doing.

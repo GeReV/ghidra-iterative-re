@@ -156,6 +156,13 @@ Stop after two consecutive rounds produce nothing new — not when you run out o
 | **harvest** | Read evidence back out, **excluding `SourceType.AI`**, into versioned evidence files |
 | **adjudicate** | Turn raw evidence rows into *decided* layout/ownership records: apply the confidence rule (how many structurally independent witness kinds agree), resolve conflicts between witnesses, and **record what you deliberately excluded and why**. This is the step that produces a `confidence` column. Excluded evidence must be written down — a later reader re-deriving from raw rows will otherwise reach a different answer and think yours is wrong. |
 
+**Scoping a witness OUT is not the same as discarding it.** When adjudication narrows a rule and
+rows stop qualifying, those rows are usually still true measurements of *something else* — the
+element size of an embedded member rather than of the class that contains it. Re-label them, keep
+them counted, and name them in the decided row's note. A narrowing that deletes the evidence buys
+a green gate with a smaller denominator, and the next round cannot tell a rejected measurement
+from one that was never taken.
+
 ### Cascade is the stage that gets skipped — build a forcing function
 
 **Measured on this project: an agent that knows this loop still skipped `cascade` on two
@@ -186,6 +193,23 @@ long round should be split across fresh contexts to avoid the naming drift descr
 failure modes. The loop's termination test ("two dry rounds") is about the work, not about
 how long any one agent context lives. Prefer many short executions inside one round over
 one long execution spanning several.
+
+**Parallel investigation buys REFUTATIONS, not just throughput — if the brief says "re-derive
+this yourself".** Measured: five read-only investigations ran at once on an offline corpus, and
+**three refuted their own brief**. Every brief carried the instruction to re-derive the handed-down
+facts rather than trust them, and every refutation came from an agent doing exactly that. The cost
+of a refuted round is one agent; the cost of an applied wrong premise is every round after it. Two
+rules follow, and the second applies to whoever is coordinating:
+
+- **An agent given a rule should test it OUTSIDE the set it was drawn from.** A coordinator handed
+  down *"a `.Layer` component implies the 16-byte vector; X/Y/Z alone implies the 12-byte one"*. It
+  calibrates 3 of 3 on the decided members — and one class registers X/Y/Z with no `.Layer` and
+  measures **16**, by an exact serialisation record. The agent measured the rule instead of
+  applying it, and reported the refutation. **A rule that only ever meets its calibration set has
+  not been tested, and the coordinator's rules are not exempt from that.**
+- **Spot-check each agent's load-bearing claim yourself.** One adjudication in the same wave rested
+  on numbers the producing tool itself prints a warning against believing, and it reached a code
+  comment before anyone caught it.
 
 **Quantify every round.** Emit a metrics row per checkpoint into an **append-only** file,
 with internal-consistency checks that **raise, not warn** (counts that must sum, sets that

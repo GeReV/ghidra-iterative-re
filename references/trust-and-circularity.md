@@ -628,3 +628,29 @@ somebody reads the struct in the GUI.
 demonstration.** Measured: the first apply attempt was refused because one real citation opened
 with a parenthesis instead of the exact marker. Write the guard so the genuine rows must satisfy
 it, then poison it.
+
+### A queued item's stated BLOCKER is an untested premise, and it decays faster than its evidence
+
+A premise recorded in a notes file is a claim with a provenance tier like any other — but a
+**blocker** decays differently from the evidence beside it, and worse. Measured across five queued
+items in one project: **four had the wrong blocker**, and in every case the *evidence* had survived
+while the reason-it-could-not-be-done had not.
+
+The four failure shapes are worth recognising by name:
+
+- **The blocker names a missing channel that has existed for rounds.** *"There is no channel for a
+  nameless type correction"* — the upgrades artifact is exactly that channel and already held five
+  rows for the very class.
+- **The blocker is true of a tool and irrelevant to the route.** *"The apply script excludes
+  width-changing retypes"* — true of that script, which is a drift-repair tool for 4-byte scalars
+  and not the path a layout decision travels.
+- **The blocker is true and means the opposite of what it looks like.** *"Fails at HEAD"* was
+  accurate and was the finding, not the obstacle.
+- **The blocker names a real hazard that is not the dominant one.** See the vptr-store case in
+  `harvesting-traps.md`: the named hazard explained 1 of 21 orphans.
+
+**Price the BLOCKER before pricing the round; it costs one artifact read.** A stale blocker is more
+expensive than a stale finding, because a wrong finding gets refuted the moment somebody works on
+it, and a wrong blocker guarantees nobody ever does. In the same way an unrun sweep's *"unknown"*
+reads as an opportunity forever, a decayed blocker reads as a closed door forever — and neither
+carries a timestamp saying when it was last true.

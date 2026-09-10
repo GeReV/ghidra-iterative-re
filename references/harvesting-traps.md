@@ -2559,3 +2559,85 @@ reader has only the two numbers and will otherwise book it as progress.
   and never used as what it was: a ranked to-do whose first entry falsifies the weakest
   conclusions. When re-opening any prior analysis, take its exclusion list and check it against
   the cells that analysis called empty. Here that was one sweep and it returned three corrections.
+
+## A producer that ALREADY covers a cell and reports `no_evidence` is not "not yet tried"
+
+The false-zero trap has a face that survives every guard on this page, because the zero is
+genuinely the producer's own measured output. Measured: a queued item read *"widen the ctype sweep
+to track class `X` and add offset `+0x40` to its candidate cells"*. The sweep already tracked `X`.
+Its candidate list already carried `(X, 0x40)`. Its committed answer was `no_evidence`, and
+applying the queued patch **reproduces that zero into the artifact** — for a cell the binary writes
+as a float 45 times.
+
+The gap was never the candidate list; it was **reach**. The sweep's population is export-keyed, the
+class is embedded rather than exported, a float is proven only by an x87 mnemonic, and **0 of the 7
+x87 bodies is an export** — so the instrument sees 2 of 102 accesses and correctly reports nothing.
+
+**Before widening a producer, check whether it already has the row.** If it does, its zero is a
+statement about its own reach and not about the binary, and re-running it converts *"this
+instrument cannot look here"* into *"nobody has looked"* — with a fresh timestamp on it. The check
+is one grep of the producer's own candidate list against the queued item's text.
+
+## The dominant error in a sweep is rarely the one the brief warns about
+
+A brief that names a hazard buys a rule against that hazard and nothing else. Measured: a sweep
+reading consecutive vtable-pointer stores was briefed to fail on **destructor inversion** (the
+store order reverses in a destructor). It does — and that hazard accounted for exactly **one** of
+the twenty-one orphans it was built to explain.
+
+The real error was structural and unnamed: **157 of 985 in-function stores (16%) install an
+EMBEDDED MEMBER's vptr at a non-zero offset.** A flat read proposes 126 edges, 84 of them new, with
+one table deriving from **18 different bases** — a shape that is obviously wrong only once you look
+at the distribution. The intra-body dataflow fixpoint that attributes each store to an
+`(object, offset)` proposes 68, of which **60 are already in the recorded ancestry with zero
+contradictions.**
+
+That re-derivation, not any per-edge witness count, is what licensed the 8 new edges. **A
+calibration against everything you already know is worth more than a rule against the failure you
+predicted** — it prices every error mode at once, including the ones nobody thought to name, and it
+tells you the sweep's accuracy in the same run that produces its output.
+
+## A docstring claiming a SCOPE the code never enforced, holding only by accident
+
+Measured: a check's comment said it was *"scoped to the destructor slot on purpose"* and even
+named the four shared-member slots a wider check would fire on constantly. **The code scanned all
+1066 `(table, slot)` pairs.** The scope was real only because no non-destructor-slot row had ever
+*decided* — and one width-preserving type apply (see `applying-changes.md`) removed the accident,
+at which point the comment became visibly false and the check began firing.
+
+**A comment describing a restriction the code does not implement is worse than no comment: it is
+read as evidence that the case was considered.** When auditing a producer, grep its prose for scope
+claims and check each against the loop bounds — a claim this specific (it named the slots!) reads
+as a measurement and is not one.
+
+## When a rule has three homes, the HEALTHY copy names the fix
+
+Same incident. The rule *"one array-stride witness per class"* lived in three places: two encoded
+it over every slot, one carried a local `DTOR_SLOT_FULL = 38` constant. **That third copy is why
+that sweep ran clean on the pass where the other two raised.**
+
+Two things follow, and the second is the one usually missed:
+
+- **The copy that did not fire is evidence, not noise.** It tells you what the rule *should* have
+  been, derived from whoever wrote it while thinking about the population rather than about the
+  loop. Consolidating to the strictest surviving copy is cheaper than deriving the rule again.
+- **A file can hold the precision and throw it away one screen later.** The healthy copy's own
+  downstream read was a LAST-ROW-WINS dict over the same rows, which would have made its
+  calibration gate print `expected 16 got 1400 MISMATCH` on correct data. Fixing the rule's home
+  is not finished until every consumer reads it through that home.
+
+## Sweep for the SIBLINGS THAT DID NOT FIRE — silence for accidental reasons is a fuse
+
+The instance-vs-pattern rule in `SKILL.md` says sweep the pattern. This is the sharper form: when a
+producer misreads one body, find the bodies with the same shape that **stayed quiet**, and ask
+*why* they were quiet.
+
+Measured: three bodies in one class family walk an embedded array, and only one passed the sweep's
+shape filters — because in the other two **the object pointer never appears as an operand-0 memory
+base.** That is register allocation, not a rule. A fix that relied on those two staying silent
+would have been luck with a two-year fuse: any recompilation, any decompiler improvement, any
+retype that changes operand rendering re-arms them.
+
+So grade a candidate fix by whether it depends on the silence. The scope fix adopted here depended
+on neither accident and removed **1052 of 1066 pairs (98.7%)** at once; the shape-filter fix would
+have handled one body and left two loaded.

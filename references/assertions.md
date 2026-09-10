@@ -2408,3 +2408,28 @@ guarantee is gone.
   struct has 18, because one field is an 8-byte `T[2]` occupying a single component. The guard
   refused in a dry run and cost a minute. The same slip inside a rename loop shifts every field
   after that offset, silently.
+
+## A NARROWING can silently kill a poison — the first unfireable check caused by a FIX
+
+Every other entry in this catalogue describes a check that was never able to fire, or that went
+inert through drift. This one was made unfireable **by a correct repair**, in the same commit that
+made the check right.
+
+Measured: a probe's population was narrowed from all `(table, slot)` pairs to the class's own
+destructor slot — a fix that removed 98.7% of the pairs and was demonstrably right. Its poison arm
+injected the contradiction at slot **999**, chosen precisely because no real row lives there. The
+new scope filters slot 999 out. **The arm went QUIET: it did not fail, it stopped being able to
+fail**, and the suite stayed green.
+
+The rule: **whenever a check's population is narrowed, re-run every poison that depended on the
+width you removed.** A poison is a claim about the check's *reach* as much as about its predicate,
+and a narrowing invalidates reach claims by construction. Repair the arm by injecting inside the
+new scope — here, at the class's own destructor slot — so the poison rides the same filter as the
+data.
+
+Two corollaries worth carrying:
+
+- **The narrowing and its poison repair belong in one commit.** Split across two, the interval
+  between them is a green suite with a dead arm and nothing recording that.
+- **A suite that prints per-arm outcomes catches this; one that prints a pass count does not.**
+  A quiet arm and a passing arm are the same number.
