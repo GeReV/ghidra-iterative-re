@@ -219,6 +219,18 @@ rules follow, and the second applies to whoever is coordinating:
 - **Spot-check each agent's load-bearing claim yourself.** One adjudication in the same wave rested
   on numbers the producing tool itself prints a warning against believing, and it reached a code
   comment before anyone caught it.
+- **Give ONE agent the job of testing the BRIEF, not a question inside it.** Every brief carries a
+  framing, and an agent working inside that framing answers its own question correctly and reports
+  success no matter how wrong the framing is. Measured: three investigations ran on a brief whose
+  headline was *"this denominator moves for one artifact row"*. Two answered their assigned questions
+  well; the third, whose whole job was the join the headline assumed, found the row moves **nothing**
+  — the consuming tool never consults that map. Without it the round would have shipped a no-op and
+  called it a result. The cheapest form of this is one line in one brief: *"the claim in the first
+  paragraph is the thing to test; report it refuted if it is."*
+- **And check the brief against the record it quotes.** In the same wave an agent correctly reported a
+  quoted table as inconsistent — because the coordinator had re-ordered the rows when writing the
+  brief. The source record was right. A refutation of your paraphrase is not a refutation of the
+  evidence, and recording it as one corrupts the file the next round reads.
 
 **Quantify every round.** Emit a metrics row per checkpoint into an **append-only** file,
 with internal-consistency checks that **raise, not warn** (counts that must sum, sets that

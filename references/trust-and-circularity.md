@@ -757,3 +757,29 @@ Two habits follow:
 - **When you repair the library, fold the overrides back in and say so.** Leaving them is how the
   repaired behaviour gets disabled again at three call sites nobody is looking at, and the next
   measurement of the defect reads as a regression.
+
+---
+
+## Two witnesses that trace to the same fact are ONE witness
+
+A confidence column counts corroborating witnesses, so the question that decides the column is not
+"how many rules agreed" but "how many independent FACTS did they read". Rules phrased differently,
+run by different tools, against different artifacts, can still rest on one measurement.
+
+Measured: a class's size had two upper-bound routes that looked independent —
+
+1. a derived class places its first own member at offset `0x64`, and the compiler puts the first
+   derived member at `roundup(sizeof(base), align)`;
+2. a separately-initialised 4-byte static sits at `instance + 0x64`, and two distinct static objects
+   cannot overlap.
+
+Route 2 is what an *earlier round of the same project* had already used to set that size, expressed
+against an artifact column (`art_slot - descriptor == 0x64`) rather than against the disassembly.
+Same offset, same object, same fact, arrived at from the other side. Only route 1 was new.
+
+Counting both would have recorded a corroborated size resting on one witness, and — because route 2
+traces back to this project's own earlier apply — would also have re-imported a number the round was
+supposed to be testing independently. **Trace each witness to the concrete fact in the binary it
+rests on, and dedupe on the FACT, not on the rule.** When two routes reach the same offset by
+different arguments, say which byte each one read; if it is the same byte, you have one witness and a
+cross-check, which is worth recording as exactly that.

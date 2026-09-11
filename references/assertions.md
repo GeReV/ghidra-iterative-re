@@ -2608,3 +2608,51 @@ The reason to record it is not bookkeeping. A stability check hands you a list o
 and an entry nobody explained is **indistinguishable from damage** — so the next person either
 re-derives it from scratch or, worse, learns to skim the list. *"It looked harmless"* is not a record;
 *"column X only, N rows, no verdict moved"* is, and it costs one line.
+
+---
+
+## A raise can be RIGHT while the claim behind it is WRONG — and that is the only way a mis-stated assertion gets found
+
+The failure this file mostly guards is the assertion that cannot fire. There is an inverse, and it
+is worth writing an assertion tightly enough to meet it.
+
+Measured: an arm of a read-only census was written to assert a specific predicted defect — *"this
+class pins at 96 under the current scanner and 100 with the proposed change"* — and it **raised on
+the first run against the real program.** The prediction came from reading ONE constructor and
+assuming it was *the* constructor. There were four, and one of them wrote the class's last field
+directly, so the class-level maximum concealed the defect entirely.
+
+The assertion was not wrong about the program. It was reporting that **the specification was wrong**,
+and rewriting the arm to measure what was actually there — that the decided size depended on *which
+overload* a route happened to name, giving 32, 60, 96 or 100 — produced a sharper defect than the one
+predicted, and one nobody was looking for.
+
+Two rules follow:
+
+- **State the mechanism in the assertion's own message, not just the threshold.** The message that
+  fired named the two numbers it expected and the body it had read them from, which is what made the
+  diagnosis one function-read long. A message saying only *"expected a difference, found none"* would
+  have been read as noise and the arm loosened.
+- **When an arm fires on a state you believe is healthy, suspect the specification before loosening
+  the arm.** The cheap move is to widen the tolerance until it passes; the arm then measures nothing
+  and the finding is gone. Ask instead what the program is doing that the assertion did not
+  anticipate — that difference is the result.
+
+## Prefer an already-DECIDED population over a constructed poison
+
+Before writing a poison, look for rows some other channel has already decided, and check whether the
+new rule's output is *bounded* by them. It usually is, and the test is then free.
+
+Measured: a newly proposed constructor-discovery route reached 27 classes, and **21 of them already
+carried a decided size from an unrelated allocation-site witness.** A constructor's write extent is a
+LOWER bound on its class's size, so `extent <= sizeof` is an immediate test on every one — and 7 of
+the 17 it could grade failed it, refuting the route before a single row was written. The same
+population then graded the accepted repair *positively*: under the fix, a class reproduced the exact
+size the other channel had decided; without the fix it decided nothing.
+
+This is strictly better than a poison in three ways: it is real data rather than constructed input,
+it grades in both directions (refutation and confirmation), and it cannot be satisfied by the rule
+under test because the rule had no access to it. Keep the poisons for the raises that no existing
+population can exercise. And state the graded count as a fraction of the calibration population —
+"0 violations over 12 graded" and "0 violations over 17 graded" are different results, and a
+narrowing that clears the calibration by *shrinking* it has not cleared anything.

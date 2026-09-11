@@ -2857,3 +2857,84 @@ finding rather than a surprise.
 And adjudicate the inert ones anyway. A column that changes without changing a decision still has to
 be written down, because an unexplained entry in a regeneration diff is indistinguishable from
 damage, and *"it looked harmless"* is not a record.
+
+---
+
+## When several sources feed one index, ask what they have in COMMON before believing the reach
+
+An index built from four different artifacts reads like breadth, and the count of sources is the
+thing everyone quotes. Measured on one project: a class-size sweep resolved a constructor through
+four separate sources — a hierarchy edge table, an attribution table, a widget table, a subsystem
+table — and **every one of them keyed on a FACTORY or an ALLOCATION site.** They do not fail
+independently; they fail together, on exactly the shape none of them can see: a class whose every
+instance is a static built from the C-runtime initializer table, with an immediate `this` and no
+allocation anywhere.
+
+**39 of 76 classes in that tier carried no constructor row**, and 25 of the 39 were named by no
+source at all. In the artifact that reads as *"nothing to measure here"*. It means *"no route
+reaches here"* — the distinction this whole file exists for, arriving through the index rather than
+through the sweep.
+
+The tell was available without any new measurement, and was missed for two rounds: a previous round
+had **added two sources to that index and the reach for this population did not move**, because the
+new sources shared the first one's assumption. **Adding a source that shares the existing blind spot
+widens a count and closes nothing.** Before adding the fifth, write down the one sentence every
+existing source's key satisfies, and check whether the population you are trying to reach satisfies
+it. If it does not, the fifth source of the same kind will not help either.
+
+## A discipline sentence is inherited by the next consumer, and usually should not be
+
+A sweep printed, for a call it could not resolve inside a constructor:
+
+    this-call 0x... unresolved (left out -- lower bound discipline: absence proves nothing)
+
+That is **correct about the question it was written for** — base-class edges, where an unresolved
+call genuinely proves nothing. It is **wrong about the second thing the same scan feeds**: the
+constructor's write extent. The callee writes through the *same object*, so dropping it understates
+a LOWER bound — and a separate rule then subtracts that bound from a derived class's first own write
+to produce an UPPER bound. Understate the lower and the upper comes out below the true size; the two
+meet, and the row is recorded as an exactly-pinned size that is wrong, with every check green.
+
+The comment is what made the omission durable. It reads as a considered decision, so nobody re-derives
+it. **When a second consumer starts reading a scan's output, re-derive every "deliberately left out"
+line for that consumer**, and say which consumer each one is about.
+
+## A rule's soundness is a property of the rule AND its population — moving the population reopens it
+
+An acceptance test can be correct for years because its candidates arrive pre-filtered, and fail
+immediately when you point it at raw bytes.
+
+Measured: *"a body whose LAST store of a known vtable through a `this`-register installs this class's
+own table is this class's constructor"* had never been wrong. Its candidates came from factory
+artifacts that had already been screened. Re-sourced from **every occurrence of the table address in
+`.text`**, the identical test admitted **7 calibration violations of 17 graded** — because a
+constructor that builds an *embedded* instance of the base through a second register looks exactly
+like one that *is* the base. The embedded-member channel that exists for precisely this case only
+sees the store while the alias tracker still holds a delta for that register, and linear tracking can
+lose the register while the `this`-set still contains it.
+
+So: **when you change where a population comes from, the acceptance test is a new claim, not an
+inherited one.** Re-calibrate it against whatever independently-decided rows you already have, and
+report the narrowing table — candidate narrowings against violations-cleared and target-population-kept
+— rather than a single chosen rule. The narrowing that survives is a finding; the one you would have
+guessed usually is not. (In that run, the narrowing aimed squarely at the mechanism —
+"reject bodies that store a table at a non-zero offset" — cleared **nothing**, because the whole
+defect was that the store was never recorded there.)
+
+## One class, one constructor is an ASSUMPTION, and C++ overloads break it
+
+A sweep stored one constructor body per class and **raised if a second was found**, with the comment
+*"one class, one construction body is the assumption every write_max row rests on"*. The raise makes
+the assumption look defended. It only makes a violation loud in the one route that happened to find
+two — and it never fires for a class the index reaches through a single source.
+
+Measured: one class had **four** constructor bodies, whose write extents were **100, 96, 60 and 32**.
+Whichever body a route names decides the class. Because a second rule converts that extent into an
+upper bound, three of the four produced an exactly-pinned size that was wrong.
+
+**The fix is not to pick the right body. It is to make the measurement independent of the pick.**
+Here, all four constructors handed the object to one shared initializer with the `this` register
+unchanged, and folding that callee's write extent into each caller's made all four measure 100 — and,
+graded against a class whose size another channel had already decided, reproduced that size exactly
+where the unfolded scan reproduced nothing. When a per-class quantity varies by which member function
+you happen to read, the quantity is under-specified, not the reading.
