@@ -891,3 +891,22 @@ Two consequences:
   after establishing that the `prebuild` token minted two types", never a silent bump to make a
   run go green. Write that sentence into the applier's own refusal message, so the next person to
   hit it is told which of the two things they are doing.
+
+## A repair WIDER than its census is an unapproved apply wearing an approved one's write-up
+
+When a census licenses a repair, it licenses a blast radius, and the radius is whatever the census
+actually measured — not whatever the defect touches.
+
+Measured. A scanner replaced its object-alias tracker on every allocator call, and the same
+replacement governed four distinct outputs: the per-offset cell list, the two access maxima, the set
+of registers treated as holding the object, and the call receivers derived from that set. The census
+diffed the **first two**. Repairing all four was one variable away and would have changed class
+hierarchy derivation and class attribution — with no census at all, in the same commit, under the
+same write-up.
+
+So the repair touched the two channels the census covered and left the others alone, with the reason
+in the code. The remaining half became its own queued round with its own differential.
+
+The test to apply before widening a fix: **for each output the defect touches, did the census measure
+it?** If not, the honest move is two rounds. It feels like hesitation and it is the difference between
+a change somebody approved and a change that merely shipped next to one.

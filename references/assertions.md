@@ -2578,3 +2578,33 @@ The practical form: prefer corroboration across **witness KINDS** (a constructor
 serialisation record and an accessor) over corroboration across **sites of one kind**, and when you
 do count sites, record the kind beside the count so a later round can tell which sort of agreement it
 is looking at.
+
+## A lost WITNESS is graded by the direction it bounds, not by its absence
+
+A repair to a producer will delete evidence as well as add it, and the reflex — find out why each row
+went — is usually the wrong spend. Measured: repairing a scanner removed five rows of one witness
+kind from a size-evidence artifact. The kind was an **upper** bound derived from exactly the data the
+defect had corrupted, so its disappearance was the repair working; reading five constructors to
+confirm that would have explained a witness that decided nothing.
+
+The question that settles it in one join is **"did anything get worse?"**, asked of the decisions the
+witness feeds:
+
+- was any decided value LOST (a class that had a size and now has none)?
+- did any bound move the WRONG way (an upper bound up, a lower bound down)?
+- did any confidence DOWNGRADE?
+
+Three zeroes and the loss is recorded and dropped. One non-zero and it is the round's headline.
+Grade the consequence, not the row — and say in the write-up that you did, so the next reader knows
+the five were counted rather than missed.
+
+## An INERT diff is still an adjudication
+
+A regeneration that changes an artifact without changing any decision still has to be written down.
+Measured: five rows of one file moved in a single column that records how far a scan reached; every
+one of those rows carried a refusal verdict for an unrelated reason, and not one verdict moved.
+
+The reason to record it is not bookkeeping. A stability check hands you a list of files that differ,
+and an entry nobody explained is **indistinguishable from damage** — so the next person either
+re-derives it from scratch or, worse, learns to skim the list. *"It looked harmless"* is not a record;
+*"column X only, N rows, no verdict moved"* is, and it costs one line.

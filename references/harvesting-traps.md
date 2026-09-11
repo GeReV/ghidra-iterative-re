@@ -2810,3 +2810,50 @@ library or the rows.
 
 Report the whole chain. A round that publishes only the first number will be believed, and a round
 that publishes only the last one looks like it got lucky.
+
+## A PREDICTION made with the broken instrument inherits the break
+
+The sharpest form of measuring-with-the-thing-you-are-testing, and it hides because the measurement
+is *correct* when it is taken.
+
+Measured. A scanner's alias tracker was destroyed whenever the body called an allocator, so a census
+of the damage used this proxy: *a cell whose instruction sits after an allocator call was measured
+from the allocation, not from the object.* The proxy was **exact** — precisely because the defect had
+destroyed the object's tracker, every post-allocator access necessarily came from the allocation. The
+census predicted that repairing the scanner would remove **7** rows from a committed artifact and
+change **3** artifacts.
+
+The repair removed **5** rows and changed **8** artifacts. The two surviving rows are now witnessed
+*after* an allocator call by the object's tracker, which is the entire point of the repair — so the
+proxy that made the census exact is the thing the repair invalidates. Worse, the same proxy was
+re-asserted as a post-repair "contract" and reported **39 violations, every one of them the repair
+working**, including a cell the census itself had listed as lost.
+
+Two rules:
+
+- **Before carrying a defect-era measurement forward as a prediction, name what the proxy depends on
+  and ask whether the repair removes it.** A proxy whose exactness comes from the defect predicts
+  nothing about the fix. You can still use it as the BASELINE — keep a flag that restores the old
+  behaviour and pin its numbers — but not as the forecast.
+- **Grade a repair with instruments that do not share its assumption.** Here the verdict came from
+  calibrations the round did not write: a member-body arm that raises if any body touches past its
+  class's known size went from 7 to **8 exact hits** over 263 bodies, a derived-floor arm lost only
+  its non-exact comparison, and no producer raised anywhere in the pass. None of that could be
+  confused with the repair grading itself.
+
+## A census over a CHANNEL is not a census over the artifacts that consume it
+
+The same round's second miss. The census diffed one scanner output — the per-offset cell list and its
+two maxima — over three body populations, and named the three artifacts it knew about. The repair
+changed **eight**: two more size artifacts, two more layout artifacts, and one unrelated file where a
+single column moved without any verdict changing.
+
+Nothing was harmed, which is the point: the under-count cost nothing *this time*, and a census is
+supposed to be the thing that tells you when it would. **Enumerate the channel's consumers, not just
+its rows** — one `grep` for the function name across the producers, which is the same check the
+configuration trap above needs. Then the census names artifacts, and a diff outside that list is a
+finding rather than a surprise.
+
+And adjudicate the inert ones anyway. A column that changes without changing a decision still has to
+be written down, because an unexplained entry in a regeneration diff is indistinguishable from
+damage, and *"it looked harmless"* is not a record.
