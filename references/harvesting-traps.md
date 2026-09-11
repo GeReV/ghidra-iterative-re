@@ -2938,3 +2938,80 @@ unchanged, and folding that callee's write extent into each caller's made all fo
 graded against a class whose size another channel had already decided, reproduced that size exactly
 where the unfolded scan reproduced nothing. When a per-class quantity varies by which member function
 you happen to read, the quantity is under-specified, not the reading.
+
+---
+
+## A VACUOUS value is harmless in the channel it was measured in and dangerous in the one that CONSUMES it
+
+Calibrate a new witness the obvious way and you grade it against what it claims. A lower bound
+claims `value <= truth`, so you check it against independently decided truths, and 0 violations
+means the witness is sound. **That check cannot see what a second rule does with the number.**
+
+Measured: a new constructor-extent witness passed its calibration cleanly, and **7 of its 19 rows
+carried the value 4** — the bare vtable-pointer store, a constructor that initialises nothing else.
+As lower bounds those rows are correct and cost nothing; every one of those classes was already
+sized by another channel. But a *different* rule used that number as a THRESHOLD — *"the lowest
+offset a derived constructor writes AT OR ABOVE the base's extent is where the derived's own
+members begin"* — and `offset >= 4` excludes nothing, so the rule returned the derived's first
+write, which is an inherited cell. One class produced an **upper bound of 188 against a class
+already decided at 208**, and only the adjudicator's own containment raise stopped it.
+
+**Before shipping a witness, enumerate every rule that consumes its VALUE, and ask what each does
+with the weakest value the witness can legitimately produce.** A lower bound's weakest legitimate
+value is its floor; a rule that SUBTRACTS it turns that floor into a confidently wrong answer in
+the opposite direction. The calibration and the consumer are different questions and only one of
+them was being asked.
+
+And when you add the guard, **write the one that states the mechanism, not the one that happens to
+correlate.** Three refusals went in: *the narrowing refused a candidate so the accepted set is
+incomplete* (caught the incident, but only because that class happened to have refusals), *the
+threshold is the bare vptr width so it excludes nothing* (the actual mechanism), and *the result
+contradicts an independently decided size* (the soundness condition itself, and vacuous on current
+data — which is said in the code beside it, because an assertion nobody notices cannot fire is the
+failure `references/assertions.md` exists for).
+
+## A fixture that HAND-INJECTS the answer cannot predict the producer
+
+Copying the evidence directory, editing the cells you expect a round to produce, and running the
+denominator tool over the copy is a genuinely useful measurement — of *"if these cells were
+decided, what would the numbers be"*. It is **not** a prediction of the round, and the two get
+written down in the same sentence.
+
+Measured: a census predicted a denominator would fall from 10 to 6 on the strength of a fixture
+that wrote six sizes into a copy. The real adjudicator produced **one**, and the denominator fell
+to 9 — because the other five needed an inference rule that did not exist. The census's own PROSE
+said so, in the same paragraph as the number.
+
+**State what a fixture perturbs and what it is silent about, in the sentence that quotes it.** The
+fixture answers the consumer's arithmetic; the producer's behaviour is a separate question and
+needs the producer. Where the two appear together in a round record, the one derived from the
+actual producer wins, and a disagreement between the prose and the number in the same paragraph is
+a finding rather than a typo.
+
+## A census is SPENT by the repair it licenses — re-base it, do not excuse it
+
+A pre-round census defines its population by the defect it measures: *"the classes no route
+reaches"*, *"the descriptors that are unnamed"*. The round then fixes that, and the census's
+population is **empty by construction**. Its vacuity raise fires on the next verification pass, and
+it is RIGHT: a census whose defect has vanished is stale, not passed.
+
+The cheap response is an excuse list, and projects accumulate them. The better one costs a few
+lines: **reconstruct the pre-round state from the committed artifact.** If the repair's own rows
+are distinguishable — a `route=` tag in a detail column, a provenance field — exclude them and the
+original population comes back exactly. Guard the reconstruction with a raise on an empty exclusion
+set, or a later spelling change silently turns the population back into the post-repair one and the
+census reads as clean while measuring nothing.
+
+Measured: doing this recovered every one of the census's numbers unchanged (37 of 76, 39, 27, and
+seven pinned values), and kept alive the question *"what does this route buy and is it sound"* for
+every future round that touches the producer. An excuse would have retired it.
+
+**Watch for the second circularity while you are there.** The repair had DECIDED one size using the
+new route, so the census's calibration — which read every size artifact including the pipeline's own
+output — would have graded the route against itself. The first fix was too broad: excluding every
+class the route emitted a row for collapsed the graded population from 17 to 5, because most of
+those classes had an independently decided size all along and only one came from the route. **The
+correct exclusion is by SOURCE, not by class:** read the artifacts that DECIDE sizes and never the
+one this pipeline writes. And say the denominator moved — a narrowing that clears a calibration by
+shrinking it has not cleared anything, and a rule that newly "passes" on 7 rows where it failed on
+11 has not improved.

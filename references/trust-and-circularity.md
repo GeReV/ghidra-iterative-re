@@ -783,3 +783,34 @@ supposed to be testing independently. **Trace each witness to the concrete fact 
 rests on, and dedupe on the FACT, not on the rule.** When two routes reach the same offset by
 different arguments, say which byte each one read; if it is the same byte, you have one witness and a
 cross-check, which is worth recording as exactly that.
+
+---
+
+## Before adding a route to a witness kind, grep the file that CONSUMES the artifact, not just the one that produces it
+
+A census of *"what does this witness reach"* naturally reads the producer. The second
+implementation is usually not there.
+
+Measured: a harvest sweep gained a new route to an existing witness kind, and the ADJUDICATOR that
+consumes its output had carried its own version of the same idea for several rounds — scoped to a
+hand-approved literal of exactly one class, with its own reach print and its own raises. The census
+had read the sweep and never opened the decider, so the collision was invisible until the decider
+refused the run outright: *"already carries a row — a second row for one class is what the reader
+raises on"*.
+
+**The resolution is the reusable part, and it is not deletion.** The older route YIELDS to the
+harvest and becomes a CROSS-CHECK. A hand-approved, body-level census from an earlier round is the
+strongest calibration a general rule can have — it was approved against the binary by a human, it
+names an address and a value, and the general rule had no access to it. Asserted rather than
+deleted, it reported **exact agreement, 1 of 1**, on the same body and the same number.
+
+Two details that make the assert real rather than decorative:
+
+- **State the DIRECTION the two may differ in.** Both were lower bounds from the same body, and the
+  harvest folded strictly more writes in, so the harvested value may be LARGER and may never be
+  smaller. That is a one-sided check and it catches a regression in either route.
+- **Fix the messages the older route prints.** Its reach line described the overlap as *"already
+  carry a row from <the old route>"*, which stopped being true the moment a second producer existed,
+  and it printed an unexplained `DISAGREE` that was simply the difference the new route exists to
+  create. **A false statement in a gate's own output is a defect even when no number moves** — the
+  next reader will treat it as a contradiction between two routes that are not the two named.
