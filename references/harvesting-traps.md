@@ -2761,3 +2761,52 @@ Two corollaries worth carrying:
   object, its offsets get attributed to the original object. Losing a cell leaves a bound open;
   gaining one closes it **wrongly**, and no conservation check sees that. In this codebase one
   consumer of the scanner was guarded against the unwanted re-seed and three were not.
+
+## A DIFFERENTIAL is only as honest as its configuration, and the configuration belongs to the CONSUMER
+
+When a library takes a flag that disables the behaviour you suspect, a differential is the right
+instrument: run it both ways over the real population and diff. It beats re-deriving the "true"
+answer by hand, because a disagreement between your implementation and the library's is
+unattributable, while a diff is attributable by construction.
+
+The trap is running a configuration nobody uses. Measured: a scanner re-seeds its alias tracker when
+the body calls an allocator, and the probe was built to measure the damage. Its first draft scanned
+every population in one mode and reported **190 of 218** bodies damaged. That number measured the
+probe. For one of the three populations — factory bodies — the object *is* the allocation, and the
+producer scans those in the other mode precisely so the first re-seed is the *wanted* one; disabling
+it there does not repair anything, it deletes the object (one class's extent went from 1232 to
+`None`). Resolving the mode per row from the artifact that records it cut the damaged population to
+**45 of 1961**.
+
+So before the diff: **find every call site of the thing under test and record which configuration
+each consumer passes.** One `grep` for the function name across the producers. And if the
+configuration varies per row, resolve it per row from a committed artifact rather than picking the
+common case — that is the difference between a measurement and an average over two different
+questions.
+
+## The NARROWING CHAIN, and when to stop
+
+A mechanism suggests a population; the population is not the damage. Each question below was one
+pass over the same data, and each one changed the answer by an order of magnitude:
+
+| question | answer |
+|---|---|
+| how many bodies exhibit the mechanism? | 218 |
+| how many are in a configuration where it is WRONG? | 45 |
+| how many wrong cells does that produce? | 254 |
+| how many of those reached a committed artifact? | 130 |
+| how many artifact rows have **no other** witness? | **7 of 1681 (0.42%)** |
+
+**The stopping rule is not "the number is small enough". It is "there is no further question that
+changes what a repair would do".** Here the chain stopped at 7 because the repair removes exactly
+those rows; every other suspect row is also witnessed by a body that never exhibits the mechanism, so
+the repair leaves it untouched.
+
+Two things this buys beyond accuracy. The last row is a list somebody can check by hand, which a
+percentage never is. And the intermediate rows are the honest reach statement: *"254 cells are wrong
+and 7 rows move"* is a different and far more useful sentence than either number alone — it says the
+instrument is noisy and the artifact is nearly clean, which is what decides whether to repair the
+library or the rows.
+
+Report the whole chain. A round that publishes only the first number will be believed, and a round
+that publishes only the last one looks like it got lucky.

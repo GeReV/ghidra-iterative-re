@@ -736,3 +736,24 @@ Build the comparison in where you can: a census that reports a subpopulation of 
 denominator should assert it is no larger than that denominator, and name both producers in the
 message. A check that reads *"family total 971 exceeds D1 946 — these two populations are not the
 same population"* turns a fortnight into a run.
+
+### A local override is an undocumented bug report — and it carries a date
+
+When you confirm a defect in a shared library, grep for the parameter that disables it before you
+write anything. Measured: a scanner had a known-bad behaviour behind an `allocators` argument, and
+one consumer in the tree was already passing the empty set at three call sites. Somebody had hit
+exactly this defect, worked out the override, fixed it for their own consumer, and left the library
+and its four other consumers alone.
+
+That override is evidence at its own provenance tier: it establishes that the defect is real, that it
+was reachable in practice, and — from the commit that introduced it — roughly when somebody knew. It
+is also the strongest argument for repairing the library rather than the rows, because a workaround
+applied per consumer is a rule with copies, and the copies will diverge.
+
+Two habits follow:
+
+- **On confirming a defect, grep for its disable flag, its magic constant, and its name.** An
+  existing override names the defect, the consumer that noticed, and the date.
+- **When you repair the library, fold the overrides back in and say so.** Leaving them is how the
+  repaired behaviour gets disabled again at three call sites nobody is looking at, and the next
+  measurement of the defect reads as a regression.

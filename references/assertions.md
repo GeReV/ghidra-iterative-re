@@ -2552,3 +2552,29 @@ is about.** "Is this function a copy of that helper?" is a question about every 
 enough to be one, not about the ones that happened to survive an unrelated eligibility filter.
 Build the classification index separately, and if that means a second pass, take the second pass.
 The tell is a test whose population is defined by an earlier `continue`.
+
+## A witness COUNT is corroboration only if the witnesses are independent of the same defect
+
+A confidence column that promotes a row from `single_witness` to `corroborated` on the strength of
+*how many* witnesses agree is measuring agreement, not independence. A systematic error produces
+agreement for free.
+
+Measured: a scanner misattributed the first fields of a freshly allocated object to the enclosing
+class. Seven sibling member bodies of that class each allocate and initialise such an object, so the
+same wrong cells appeared **seven times** — and would have been recorded as well-corroborated rather
+than as one defect seen seven ways. The repetition came from the compiler emitting the same idiom in
+seven places, which is exactly the thing that makes a false row look strong.
+
+So when defining corroboration, say what the witnesses must be independent OF:
+
+- **not the same instruction** (the trivial case most projects already guard);
+- **not the same body**, if the rule can fire twice in one function;
+- **not the same idiom in sibling bodies**, when the population is a family the compiler generated
+  from one source pattern;
+- and **not the same instrument defect** — two witnesses produced by one scanner sharing one bug are
+  one witness.
+
+The practical form: prefer corroboration across **witness KINDS** (a constructor write and a
+serialisation record and an accessor) over corroboration across **sites of one kind**, and when you
+do count sites, record the kind beside the count so a later round can tell which sort of agreement it
+is looking at.

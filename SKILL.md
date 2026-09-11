@@ -163,6 +163,15 @@ them counted, and name them in the decided row's note. A narrowing that deletes 
 a green gate with a smaller denominator, and the next round cannot tell a rejected measurement
 from one that was never taken.
 
+**A CENSUS IS WHAT LICENSES A REPAIR — so when a round finds a defect, write the census and stop.**
+The rule above ("a mutation is approved against a census, to the row") cuts both ways: a round that
+discovers a defect and repairs it in the same breath has destroyed its own approval, because the
+only record of what the repair was supposed to do is the repair. Measured: a library defect was
+found, and the honest scope was a read-only probe that counted the consequences — 16 witness rows
+affected, 7 artifact rows with no other witness, one newly-decidable class size — registered as a
+gate so the repair round has to come back through it and cannot drift. Finding and fixing feels like
+one unit of work and is two, and the second one needs the first one's numbers to be checkable.
+
 ### Cascade is the stage that gets skipped — build a forcing function
 
 **Measured on this project: an agent that knows this loop still skipped `cascade` on two
