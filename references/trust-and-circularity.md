@@ -692,3 +692,47 @@ Two rules fall out:
   with its addresses and let the round that owns that producer make it, with its own census and
   approval. A channel that both proposes rows and silently rewrites its calibration source has
   stopped being independent of the thing it is being graded against.
+
+### The anti-circularity name filter is correct for EVIDENCE and wrong as a measure of WORK
+
+The rule at the top of this file — a harvester must exclude the names your own project applied —
+is usually implemented as one helper: *"give me this function's name, treating anything we applied
+as no name at all."* That helper is right, and it is the reason the trust model holds at scale.
+
+**Then someone prints its result under the heading `named` and reads the complement as a to-do
+list.** Those are different questions, and the gap between them can be enormous. Measured: a
+small-body shape census reported six families as *"wholly unnamed … the naming rounds waiting"*,
+totalling 1,266 functions. Of those, **1,174 (92.7%) already carried a name the project had
+applied** and **92 (7.3%) carried none at all**; five of the six families were at 100% already
+named. The headline item — *"769 of 769, one naming rule away from 769 names"* — was worth **zero**.
+The entry sat in the project's own backlog, quoting a producer that was faithfully answering a
+different question, and it **overstated the available work 13.8x**.
+
+**The fix is three columns, not a better sentence.** Any census that reports naming coverage should
+separate:
+
+| column | meaning | is it work? |
+|---|---|---|
+| `binary` | the binary itself names it (a mangled export, a debug symbol) | no — and it is usable as evidence |
+| `ours` | this project applied the name; it is the AI tier, excluded from evidence BY DESIGN | **no** |
+| `nameless` | no name from any source | **yes** — this is the naming round |
+
+And derive `ours` from the **ledger by address**, not from the program: a symbol's provenance tier
+is exactly what the evidence helper already consumed, so re-deriving it from the tier reproduces
+the conflation.
+
+### A population that exceeds its own denominator is not a subtle signal
+
+The same incident had a one-line tell that sat unread for a fortnight. The project's
+"functions with no name" denominator was **946**. The two largest "wholly unnamed" families alone
+were **971**.
+
+A subset cannot be larger than the set. When two numbers about the same population cannot both be
+true, that is not a rounding disagreement to note and move past — it means **the two numbers answer
+different questions**, and finding out which is usually one read of each producer's predicate. Here
+it took two reads and refuted a queued round.
+
+Build the comparison in where you can: a census that reports a subpopulation of a tracked
+denominator should assert it is no larger than that denominator, and name both producers in the
+message. A check that reads *"family total 971 exceeds D1 946 — these two populations are not the
+same population"* turns a fortnight into a run.

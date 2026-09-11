@@ -2680,3 +2680,84 @@ it. Do it whenever several producers feed one denominator:
 The row that repeats is the blind spot. Here the missing kind was the plainest one available —
 **a class's own member functions** — which no producer read because every producer had been built
 to answer a question about construction.
+
+## Before implementing a QUEUED FIX, read the known positive
+
+A queued item usually carries a prescription as well as a diagnosis, and the prescription decays
+the same way the blocker does — except it reads as finished work, so nobody re-derives it. Measured:
+a broken inlined-helper detector had been queued for rounds with the fix written out —
+*"normalise operands the way part A's shape-key machinery already does"* — and **two reads of the
+known positive refuted it.**
+
+The first read was of the detector's own candidate filter: the known positive's body contains a
+`CALL`, and the filter dropped any body containing one, so it **never reached the matcher**. The
+assertion's message said *"shows NO inline occurrences"* — a **skipped** candidate reported as a
+measured zero, inside the text of the check that existed to catch exactly that.
+
+The second read was of the real occurrence. The helper's body is four instructions; at the site it
+is **two**, because the compiler inlined it *and constant-folded its argument*, so one instruction
+vanished and a register operand became an immediate. No byte match, no shape key and no register
+normalisation relates those sequences — and the prescribed machinery preserves register names
+anyway, so it would not have closed even the smaller problem.
+
+**So: open the known positive before writing code against the prescription.** Both refutations were
+one corpus read each. And note what made the prescription plausible: it named a real mechanism
+(re-encoded registers) that would matter in some other binary. A fix can be a correct general idea
+and still be the wrong fix here.
+
+## Match what SURVIVES the transformation, not the encoding
+
+When a compiler transformation is what hid your population, ask what the transformation cannot
+change. Inlining rewrites the instruction sequence freely — register allocation, argument folding,
+instruction count — but it does not change **what the code is about**: the member displacements it
+touches and the absolute addresses it calls. Those are the same constants at every site.
+
+So the signature to match is the ordered sequence of **invariants**, not bytes and not a normalised
+mnemonic shape:
+
+- a memory operand's displacement, where the base register is not the stack pointer or frame
+  pointer (a stack slot is not an object's invariant), and the displacement is either large enough
+  not to be noise or is itself an absolute address;
+- an absolute call or jump target.
+
+An occurrence is then a contiguous run of the same invariants within a span. Measured: 0 hits for
+the known positive under a byte matcher, **76** under this one — and a second helper nobody had
+flagged, with **51 inline sites against 3 surviving call sites**, i.e. 94% of its usage invisible to
+any call-keyed census.
+
+Three things keep it honest, because this matcher is weaker than a byte match:
+
+- **A distinctiveness floor, in the code and counted.** Two invariants minimum, at least one of
+  them rare by construction (an absolute target or a global address). Two small displacements match
+  half the binary; refuse those and print how many were refused.
+- **Reach above the hits.** Here 14 of 5,649 functions (0.25%) had a usable signature, with the
+  five refusal reasons enumerated. A silence from an instrument with that reach closes nothing.
+- **Grade against an independently measured number, as a BAND.** A different instrument had counted
+  96 sites for the known positive; this one finds 76, and the span and contiguity limits can only
+  lose sites, so the count is a floor. Pin the band, report the floor, and name the two unmeasured
+  causes of the gap rather than explaining it away.
+
+## Prefer the mechanism that predicts EVERY case to the one that explains the headline
+
+A plausible mechanism that accounts for the case you noticed is not the mechanism. Measured: a size
+witness was known to under-report, and the offered explanation was a control-flow edge clearing the
+analysis state early. It was refuted by reading the code — the clear exists but is paired with a
+restore that round-trips correctly — and the real cause was three lines elsewhere: on a call to a
+recognised allocator the scanner **replaced** its alias tracker with a fresh one, destroying the
+`object` alias the prologue had established.
+
+The way to tell them apart is to demand prediction across the whole population, not agreement on
+the headline. The replacement rule — *"the reported value is the maximum cell before the first
+allocator call"* — predicted **11 of 11** committed values, and the predictions that matter are the
+ones that do not look like the headline: the headline cases all reported the same small number, and
+a hunt keyed on that number found only 7 of the 11. Four more had values of 188, 204, 212 and 1180,
+and each was exactly the last cell before the allocator call.
+
+Two corollaries worth carrying:
+
+- **A population defined by the symptom's value is the wrong population.** Key it on the mechanism.
+- **Check which direction the defect runs, because the other direction is usually worse.** The same
+  re-seed that loses cells can also *gain* them: once the tracker points at a freshly allocated
+  object, its offsets get attributed to the original object. Losing a cell leaves a bound open;
+  gaining one closes it **wrongly**, and no conservation check sees that. In this codebase one
+  consumer of the scanner was guarded against the unwanted re-seed and three were not.

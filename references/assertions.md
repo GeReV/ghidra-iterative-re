@@ -2508,3 +2508,47 @@ of the zero-coverage set — plus:
 And if the source list is sliced positionally anywhere (`SOURCES[:4]` for an older baseline),
 **append, never insert**, and say so in a comment above the tuple: an insertion silently redefines
 what every earlier baseline means.
+
+## An OPT-IN part is an unexercised part — and cost is what puts the switch there
+
+A check can be unfireable because of its predicate, because of drift, or because of a repair (all
+catalogued above). This is the fourth way, and it is the easiest to rationalise: **the part that
+holds the check is behind a flag, because running it is expensive.**
+
+Measured: a census carried five calibrations. One of them was the only arm grading its
+inlined-helper detector, and that detector lived in a part that was **opt-in**, because its
+byte-search matcher rescanned from every hit and a default run had been cancelled at 18, 6 and 13
+minutes. So the switch went in for a good reason, and the arm went quiet for the same reason. The
+detector then could not find its own known positive *at all* — two independent defects — and nobody
+learned, because the arm that would have said so only ran when someone typed an extra word. The
+census as a whole was in no gate list either, so the default run asserted four things and the fifth
+was simply never asked.
+
+Two rules, and the second is the one that actually fixes it:
+
+- **A flag that gates a calibration is a calibration that does not exist.** If a part must be
+  optional, its arms must still run — on a sample, on a fixture, on one known positive — or the
+  suite must report the arm as NOT EXERCISED in its headline, loudly enough that a reader does not
+  count it.
+- **Fix the cost, not the coverage.** The expensive algorithm here was a byte search; the question
+  it answered did not need one, and a single linear pass made the part cheap enough to run by
+  default. Reaching for the flag is the reflex; asking why the check is expensive is the repair.
+  A part that runs every time is worth more than a part that is thorough when invoked.
+
+## A scope test keyed on the CANDIDATE SET silently inherits the candidate filters
+
+The mirror image of the docstring-scope lesson above. There the comment claimed a restriction the
+code did not implement; here the code's restriction was real but **derived from something
+unrelated**, so it moved whenever that other thing moved.
+
+Measured: a detector classified each hit as *"inside a sibling copy of this helper"* by asking
+whether the function containing the hit was itself a **candidate** with the same signature. The
+helper had **six** compiled copies; the sixth was two instructions longer than the rest, fell
+outside the candidate size filter, and so was not recognised as a copy — its own body was counted
+as an **inline site** of the other five. Nothing was wrong with either filter on its own.
+
+The rule: **a classification test must be keyed on the property it is about, over the population it
+is about.** "Is this function a copy of that helper?" is a question about every function small
+enough to be one, not about the ones that happened to survive an unrelated eligibility filter.
+Build the classification index separately, and if that means a second pass, take the second pass.
+The tell is a test whose population is defined by an earlier `continue`.
