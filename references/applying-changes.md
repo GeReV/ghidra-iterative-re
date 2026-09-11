@@ -910,3 +910,26 @@ in the code. The remaining half became its own queued round with its own differe
 The test to apply before widening a fix: **for each output the defect touches, did the census measure
 it?** If not, the honest move is two rounds. It feels like hesitation and it is the difference between
 a change somebody approved and a change that merely shipped next to one.
+
+---
+
+## A `note` COLUMN IS PROSE AND ROTS LIKE PROSE — no check reads it
+
+Evidence artifacts grow a human-readable `note` or `reason` column, written once when the rule
+had one branch. It is the line a reader of the CSV actually sees, and **nothing joins against
+it**, so it is the least defended text in the repository.
+
+Measured. Every pinned row of a size artifact said *"is within alignment of the descendant alloc
+floor"*. Over the 27 pinned rows at the time of the audit: **17 were true**, **5 had been false
+for twenty-four rounds** — since a second witness became a possible source of that bound — and 5
+more would have been false from the round doing the audit. The round that introduced the second
+source had fixed the adjacent *raise* to name its source, with the reasoning *"a raise that
+misattributes its own evidence sends the next reader to the wrong artifact"*, and left the note
+untouched.
+
+- **When a value can come from more than one witness, the note must name the witness**, not a
+  category the value used to belong to. Interpolate the source variable; do not restate it.
+- **Audit notes when you add a producer of an existing quantity.** The same sweep that greps for
+  messages naming the old producer as the only one should grep the note templates.
+- Accept that this cannot be gated cheaply, and prefer notes that are *derived* from the same
+  variable the decision used, so a wrong note requires a wrong decision.

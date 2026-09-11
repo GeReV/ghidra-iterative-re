@@ -2656,3 +2656,51 @@ under test because the rule had no access to it. Keep the poisons for the raises
 population can exercise. And state the graded count as a fraction of the calibration population —
 "0 violations over 12 graded" and "0 violations over 17 graded" are different results, and a
 narrowing that clears the calibration by *shrinking* it has not cleared anything.
+
+---
+
+## REWRITING A CHECK DATES ITS POISON — and the abort is silent about what it takes down
+
+A poison arm names the check it breaks, usually by matching a substring of that check's message.
+**Changing the message is changing the poison's subject**, exactly as changing code dates a
+comment, and it is easy to do while believing you have improved the check.
+
+Measured. A round replaced a raise (*"this hub already carries a call-edge row"*) with a
+different one guarding a different property, and did not revisit the arm that poisoned it. The
+arm went on firing — **on the new check, under the old marker** — so the harness correctly
+reported `fired on the WRONG check` and **aborted the whole run**. Five further arms after it
+never executed. The suite exited 1 for three rounds with nothing reading it, and its output said
+only that *one* arm had failed: **nothing announced that six of eleven arms had gone dark.**
+
+Two rules follow:
+
+- **When you rewrite a raise, grep for its message text before you finish.** The poison that
+  names it is usually the only other place the sentence appears.
+- **A harness that aborts on a mis-fired arm must say how many arms it did not reach.**
+  `FAIL ... fired on the WRONG check` reads like one failure and was six. Print
+  `ran N of M declared` and derive M from the source rather than a literal, so the gap is
+  visible without anyone counting.
+
+## A SELF-CHECK NOTHING INVOKES IS INDISTINGUISHABLE FROM ONE THAT DOES NOT EXIST — second instance
+
+This file already records the pattern. Here is what it cost the second time: **two** test
+harnesses were exiting 1 simultaneously, for three consecutive rounds, while every declared gate
+stayed green and two of those rounds regenerated the very artifact the suites check.
+
+The instructive half is the *other* harness, because it was working perfectly. Its check asserts
+a SET of class names rather than a count — written that way on purpose, with a comment saying a
+count going stale is exactly how the check had stopped meaning anything, since a fifth class
+appearing and a listed one vanishing would still read as "4". It caught a legitimate new member
+of that set **in the round that added it**, and reported it three rounds later, because nobody
+ran the file. **A check's quality is bounded by its invocation, not by its design**, and the
+repair is never another check: it is adding the existing one to whatever list a round is
+actually required to run.
+
+## GRADE A POISON ON THE POPULATION THE RULE FIRES ON, NOT THE ONE YOU HAVE HANDY
+
+A poison that runs against the wrong population passes vacuously and certifies nothing.
+Measured: a guard was demonstrated load-bearing on a 98-pair calibration population (5
+mispredictions without it) and **entirely vacuous** on the 44-edge population the adjudicator
+actually iterates — dropping it there changed nothing at all. Both facts are true; only one of
+them is about the code that ships. State which population an arm graded on, and when a rule has
+two populations (one it is calibrated on, one it fires on) give it an arm on each.

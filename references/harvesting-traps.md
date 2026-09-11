@@ -3015,3 +3015,81 @@ correct exclusion is by SOURCE, not by class:** read the artifacts that DECIDE s
 one this pipeline writes. And say the denominator moved — a narrowing that clears a calibration by
 shrinking it has not cleared anything, and a rule that newly "passes" on 7 rows where it failed on
 11 has not improved.
+
+---
+
+## A CALIBRATION IS SPENT BY THE ROUND THAT RUNS BEFORE IT — not only by the repair it licenses
+
+This file already records that *a census is spent by the repair it licenses*. The corollary is
+sharper and was paid for separately: **a queued rule's calibration is a measurement of the tree
+it was taken on, and the round that ships between is enough to invalidate it.**
+
+Measured. A round was queued with the most complete design its project's backlog had carried —
+a stated rule, a narrowing, **42 of 42 clean** against committed ground truth, a base-rate check
+proving the narrowing did not pre-select the answer, a named poison, and three implementation
+hazards. All of it was computed one commit before the round that immediately preceded it. That
+round added 19 rows of the very witness kind the rule thresholds on. Re-derived against the tree
+the work would actually run on:
+
+| | as queued | at the tree it would ship on |
+|---|---|---|
+| population | 146 of 296 pairs | **175 of 296** |
+| fires | 98 | **119** |
+| narrowed, clean | **42 of 42** | **51 of 58** |
+| error inside the narrowing | 0% | **12.1%** |
+| error outside it | — | **8.2%** |
+
+The narrowing was not merely unprotective, it was **anti-protective**, and the base-rate check
+the design leaned on *still passed* — so the narrowing was honest in the sense the design tested
+and useless in the sense the design needed. **Re-derive every load-bearing number in a queued
+design against the tree you are standing on, before writing a line of it.** A design document is
+a set of untested claims wearing a table.
+
+**And the caveat a design disarms with a zero is the one to open first.** The same design
+recorded its own worry honestly: *"this configuration occurs **0 of N times** in the calibration
+population while all the targets sit exactly there — a gap in the reassuring direction with no
+exemplar."* At the shipping tree it occurred **14 of 175**, and one was wrong against ground
+truth. **A measured zero that a later round can turn non-zero is not a reassurance, it is an
+unrun test.** Read "no exemplar" as *"this rule has never been tested where it is about to be
+used"*, which is a stop rather than a footnote.
+
+## A CONSTRUCTOR EXTENT MEASURES WHICH INSTRUCTIONS THE SCANNER SAW, NOT WHICH MEMBERS EXIST
+
+Any rule of the form *"this body writes nothing above offset X, therefore the object has nothing
+above X"* inherits two failures, and both are on the side the rule usually does not constrain.
+
+1. **A sub-object constructor called at a non-zero offset is invisible.**
+   `LEA ECX,[ESI+0x268]; CALL CFogOfWar::CFogOfWar` builds an embedded member, contributes
+   nothing to the enclosing body's write extent, and makes a 672-byte class read as 616 — the
+   exact figure the base's own extent gives, so it lands precisely on the boundary the rule was
+   least tested at. Ground truth was the allocator immediate three instructions earlier
+   (`PUSH 0x2a0`), and six sibling classes with the same base allocate the smaller size and are
+   predicted correctly.
+2. **A constructor is not obliged to touch every member.** A class that allocates 144 and whose
+   entire own constructor body is one vtable store has 16 real bytes that nothing initialises
+   where the scan can see them; the serialiser writes them.
+
+Neither failure is detectable by tightening the *other* side of the comparison, which is what a
+narrowing on the base's extent does. If you must ship such a rule, grade it against an
+ALLOCATION witness — an `operator new` immediate is the object's size by contract, and it is
+independent of every construction-scan artifact.
+
+## PREFER A NARROW WITNESS WITH A CHECKABLE FAILURE MODE TO A BROAD ONE WHOSE ERRORS ARE INVISIBLE
+
+The witness that replaced the refuted rule above reaches **7 of 304 classes (2.3%)** and decided
+**five** sizes where the broad rule claimed three. Two properties bought that:
+
+- **It is arithmetic, not inference.** For an object the linker placed at a fixed address, the
+  nearest address above it that the program treats as a `this` belongs to another object, so the
+  instance cannot reach it. No premise about how the compiler lays out members.
+- **Its single failure mode is checkable.** It can only be wrong by naming a neighbour that lies
+  *inside* the object — and the object's own construction extent is an independent LOWER bound,
+  so exactly that case makes lower exceed upper and the tool refuses instead of reporting. The
+  poison is the rule anyone would first write (*"the next absolute address referenced above the
+  instance"*), it fires on real data, and it fires because a static object's own members are
+  reached by absolute address too.
+
+**Say the reach as a fraction, above the rows, and say whether the population is a SAMPLE or a
+COMPLETE ENUMERATION.** Here it was an enumeration — the program heap-allocates almost
+everything — so a silence from the witness closes nothing, and the tool prints that sentence
+itself rather than leaving a reader to infer coverage from a healthy-looking count.
