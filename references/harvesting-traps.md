@@ -3093,3 +3093,54 @@ The witness that replaced the refuted rule above reaches **7 of 304 classes (2.3
 COMPLETE ENUMERATION.** Here it was an enumeration — the program heap-allocates almost
 everything — so a silence from the witness closes nothing, and the tool prints that sentence
 itself rather than leaving a reader to infer coverage from a healthy-looking count.
+
+---
+
+## "A WRONG X MISATTRIBUTES A WHOLE CLASS" IS A CLAIM ABOUT CONSEQUENCE — sweep the artifacts before pricing it
+
+A backlog carried an item as its highest-value work for two rounds, on the strength of one read
+instruction showing a scanner attributing another object's vtable store to the body under scan.
+The mechanism was real and reproduced exactly. The consequence, measured across **all 145
+committed artifacts, column by column: zero wrong rows.**
+
+Two things made it harmless, and both are the kind of fact you only get by looking:
+
+- **The corruption is total rather than partial, which is safer.** The scanner REPLACED its
+  notion of "where the object is" wholesale on an allocation and nothing ever restored the
+  callee-saved copy, so **no clean record ever followed a contaminated one** (measured 0). Any
+  consumer comparing against an independently known answer is then immune for the *whole* list,
+  not merely its last element. A partial corruption would have been far worse.
+- **Most of the population was not the defect at all.** Of 231 bodies carrying a re-seeded
+  record, **218 were factory-shaped** — the allocation genuinely IS the object there, and the
+  re-seed is what makes the answer right. Only 13 had the true defect shape. A census that
+  counted "bodies with a re-seeded record" would have reported an 18× exaggeration.
+
+**Price a defect by what a consumer does with the value, not by how wrong the value is**, and
+state the artifact sweep as a fraction with its denominator. "Latent" and "live" are different
+rounds.
+
+## A PROBE'S POPULATION MUST BE THE DANGEROUS CONSUMER'S SCAN SET, NOT THE ARTIFACT'S FEED SET
+
+The first draft of that census covered the three populations that feed committed artifacts and
+reported 18 records over 17 bodies. The consumer that mattered most walked a **depth-4 callee
+closure** that none of the three contained — and *its stopping condition was the very list under
+test*, so the defect steered the walk itself. Adding that population gave **70 records over 29
+bodies**, and the worked instruction the backlog had cited for two rounds appeared **only** there.
+
+Before believing a census, ask which bodies the dangerous consumer actually scans — not which
+bodies feed the artifact. The two sets differ exactly where a recursive resolver is involved, and
+that is also where the defect compounds.
+
+## A DEFECT FIXED IN A CONSUMER WILL BE RE-FOUND — the second and third fixes are evidence, not cure
+
+Of 24 files reading one library's output, three filtered the marker that distinguishes a bad
+record; nine took the record with no test at all, one of them **inside the library itself**. One
+of the three said so in its own comment: *"the same defect fixed for [the other field], one
+artifact further downstream."*
+
+So the rule had been written down, the marker existed, and the fix had been applied — three
+separate times, in three separate consumers, and never in the producer. **When you patch a shared
+library's output at a call site, write down which library invariant was missing, not just what you
+did about it**; and when you meet a defect in a shared scanner, grep for an earlier patch of it
+before building anything. A second consumer-side fix is the signal that the first one was in the
+wrong place.

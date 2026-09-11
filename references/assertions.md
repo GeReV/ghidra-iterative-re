@@ -2704,3 +2704,51 @@ mispredictions without it) and **entirely vacuous** on the 44-edge population th
 actually iterates — dropping it there changed nothing at all. Both facts are true; only one of
 them is about the code that ships. State which population an arm graded on, and when a rule has
 two populations (one it is calibrated on, one it fires on) give it an arm on each.
+
+---
+
+## A GUARD THAT PROTECTS ONE LIST CAN MAKE A CHECK THAT READS BOTH GO VACUOUS
+
+Measured. A scanner produced two parallel lists of the same events under different rules: a
+strict one and a permissive one. The permissive list carried a guard excluding records reached
+through a call return; the strict list carried no equivalent. A downstream trust check read
+**both**: it took its anchor from the last record of the strict list, then quantified over the
+permissive list's entries at or after that anchor.
+
+On a contaminated body the guard had already removed exactly those entries, so the quantifier ran
+over an **empty set** and the check returned True — while its anchor named the wrong class
+entirely. The alternative, stricter rule refused correctly.
+
+Neither guard is wrong in isolation. **When two collections are filtered by different rules and
+one check reads both, the check's real population is the intersection, and the intersection can be
+empty on precisely the inputs the check exists for.** Write the arm that pins that population
+non-empty, and put the count in the output.
+
+## A CHECK THAT COMPARES A FILTER'S LENGTH TO ITS SOURCE CANNOT FIRE
+
+Caught in this document's own author's code before it was believed: `if len(filtered) > len(source)`
+where `filtered` was built by filtering `source`. True by construction, therefore never a check.
+
+The replacement was the real precondition — every record's epoch label must be one of the events
+the same scan recorded, so an unrecognised label makes the classification unsupported rather than
+merely unusual — and it is demonstrated by a poison that rewrites one label to a value no event
+has.
+
+**The tell is that the poison is hard to write.** If you cannot construct an input that breaks the
+check, it is not a check. Reach for that test *while* writing the assertion, not afterwards.
+
+## AN EXCLUSION IS A CLAIM ABOUT THE WORLD AND IS CHECKED LIKE ONE
+
+A stability harness re-runs every producer and byte-compares its output, with a registry of
+artifacts excused from that comparison and a reason for each. A new census artifact was registered
+as excused on the reasoning that regenerating it would repeat an expensive scan.
+
+The confirming pass **refused**: the probe that produces it was already registered to run every
+pass, so the file was written *during* the pass, and the harness's own words for the exclusion
+were *"a comment claiming otherwise."* It was right, and the entry was deleted — a probe that
+emits an artifact puts that artifact in the comparison for free, so the cost the exclusion was
+avoiding did not exist.
+
+Build the arm that checks whether each excused artifact is in fact still unregenerated. An
+exclusion that has quietly become false is worse than no exclusion: it reads as a considered
+decision while hiding a comparison nobody is making.

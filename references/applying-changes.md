@@ -933,3 +933,30 @@ untouched.
   messages naming the old producer as the only one should grep the note templates.
 - Accept that this cannot be gated cheaply, and prefer notes that are *derived* from the same
   variable the decision used, so a wrong note requires a wrong decision.
+
+---
+
+## A COMMENT THAT NAMES A CAUSE IS A MEASUREMENT, AND IT DECAYS LIKE ONE
+
+The note-column entry above is about prose inside artifacts. This is the same failure one layer
+up, in the code comments a reader trusts *more*, and it is worse there because the comment usually
+names a **culprit**.
+
+Two measured cases from one round, both attached to guards that are still correct:
+
+- A sweep refuses a class because a scan returns the wrong table, and the comment records the
+  cause as *"[this artifact]'s column is a join, not ground truth."* Re-measured: the artifact's
+  row is **right**, and the scan is wrong. The class had been losing a recovery route to an
+  innocent artifact's reputation, and any later round reading that comment would have gone to
+  audit the wrong file.
+- A narrowing was justified by *"the constructor builds an EMBEDDED member through a second
+  register, and the tracker had lost that register's delta."* Re-measured: the register holds a
+  **fresh heap allocation** three instructions after the allocator call, its size immediate
+  matching the allocated class's own construction extent to the byte. There was no delta to lose,
+  because the pointer is not relative to the object at all.
+
+Both narrowings survived; both stated reasons were wrong, and each pointed the next reader
+somewhere useless. **A comment that says WHY is an empirical claim with a date on it.** When a
+round measures one of them false, correct it in the same commit even if no behaviour changes —
+and prefer comments that cite a re-derivable command or artifact over ones that assert a
+mechanism, so the claim can be re-run rather than re-believed.
