@@ -2872,3 +2872,23 @@ Two guards, because one is a single point of failure: register the producing scr
 is regenerated every pass, **and** stamp the artifact with the program version and refuse when it
 disagrees with the project's state record. Check the filter's scope whenever you add an artifact in
 a new format — the sweep looks universal and is not.
+
+
+## NO GATE COMPARES TWO ARTIFACTS THAT CLAIM THE SAME QUANTITY
+
+Two committed artifacts in one project disagreed about one class at one program version: an
+allocation census recorded its size as **28**, and the size pipeline recorded a lower bound of
+**1268** for the same class. Both files were regenerated every pass, both were byte-stable, and
+every gate was green — because each gate grades an artifact against **its own producer** or
+against the program, and none grades one artifact against another that claims the same thing.
+
+That is a whole class of check nobody writes. The cost of the missing one is precise: the correct
+number was sitting in the tree, committed, for as long as the wrong number was, and the round that
+found the wrong number found the right one in a different file five minutes later.
+
+**Enumerate the quantities more than one artifact claims, and write one join per quantity.** Sizes,
+offsets, ownership, addresses. The join is usually ten lines and it fires on data you already have,
+which makes it the cheapest kind of gate to demonstrate failing — it fails on the committed tree
+the day you write it. This is the same shape as a check that compares rows *sharing a name* within
+one artifact, one level up: the defect always lives in the gap between two checks that are each
+correct about their own question.

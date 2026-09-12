@@ -1365,3 +1365,31 @@ to every ancestry route at once**, since all of them read a vptr store. Censusin
 4-byte occurrence of every table address in the image, decoded, joined against function extents —
 is a complete question with a small answer, and it names exactly which classes the hierarchy
 cannot see and why.
+
+
+## CONSTRUCTORS AND DESTRUCTORS STORE VPTRS IN OPPOSITE ORDER, AND EVERY PRODUCER THAT SCREENS ON "THE LAST STORE" NEEDS THAT FACT
+
+In the MSVC single-inheritance layout a constructor installs the base table first and the object's
+own table last; a destructor installs its own table on entry and **restores the base's on exit**,
+before the conditional `operator delete`. So "the body whose last vptr store is class C's table"
+identifies a constructor of C *and* a destructor of any class derived from C, and the two are
+indistinguishable by that test alone.
+
+Measured consequence on one project: a size harvester used exactly that screen, with no
+constructor-versus-destructor test, and accepted a derived class's destructor as the base's
+constructor. It then credited the base with the derived's construction extent — a **lower bound of
+1268 bytes on a class whose allocation is 28**, wrong by 1240, committed, and green under every
+gate for as long as the row existed. All three bodies that screen accepted for that class were
+destructors.
+
+The screen itself is cheap and checkable: a body is a destructor when the last table it stores is a
+strict **ancestor** of the first. It calibrates against ground truth rather than a poison — on that
+binary, the export table's own `C::C` and `C::~C` names classified **12 of 12** correctly in both
+directions, and inverting the hierarchy made 12 of 12 wrong.
+
+**The transferable rule is about producers, not about MSVC.** One file in that project documented
+the store-order inversion as load-bearing for its own witness. A second tier, written later, made
+the same "last store wins" assumption without it, and a third module implemented the screen
+properly and was connected to neither. **When a rule is documented as load-bearing in one
+producer, the question is never whether it is written down — it is which other producers make the
+same assumption without it.** Grep for the assumption, not for the sentence.

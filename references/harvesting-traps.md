@@ -3164,3 +3164,65 @@ built for, and then the reach was read as value. **Before scheduling a repair, j
 population against what the artifacts already decide** — the difference between "this evidence is
 missing" and "this evidence is missing and nothing else supplies it" is the entire payoff, and it
 is one join.
+
+
+## A LINEAR DISASSEMBLY SWEEP HALTS AT THE FIRST UNDECODABLE BYTE, AND THE LOSS IS SILENT AND STABLE
+
+A harvester that decodes a whole code section in one pass — `list(md.disasm(section_bytes,
+section_va))` with capstone, and the same shape in other engines — stops at the first byte it
+cannot decode and does **not** resynchronise. Compiled code sections are full of such bytes:
+jump tables, alignment padding, data the compiler interleaved.
+
+Measured on a 1999 MSVC/x86 retail binary: the sweep decoded 102,680 instructions and stopped
+partway through a 0xd1000-byte `.text`. **4,110 of 5,649 known function starts — 72.8% — were
+never decoded**, along with 208 of 569 allocator call sites. The producer's own "body too long"
+counter read 0 and its census carried no entry for the loss, because nothing in the pipeline
+knows the difference between *"this function decoded to nothing"* and *"this function was never
+reached"*.
+
+Three properties make it worse than an ordinary bug:
+
+- **It presents as a measured zero.** The artifact says a class has no allocation. That reads as
+  evidence about the binary and is evidence about where the decoder stopped.
+- **A stability harness cannot see it.** Regenerate and byte-compare, and *both sides* of the
+  comparison come from the same halted decoder. A 72.8% blind spot is perfectly stable, so it
+  reads as perfect health.
+- **It is invisible to review.** The five-line constructor that builds the index is the least
+  interesting code in the file.
+
+**The guard is one assertion and it does not exist in most projects: a producer that decodes a
+section linearly must assert that its decode reached the section end, or that its decoded-start
+set covers the committed function table.** Either one turns a silent 72.8% loss into a refusal.
+Then sweep the pattern rather than the instance — in that project only 2 of 7 callers of the
+disassembler used the whole-section shape, and the other one turned out to be measurably
+unaffected (0 of 153 addresses of interest lay past the halt), which is a result worth recording
+rather than a worry to carry.
+
+## A ROUTE'S SILENCE IS EVIDENCE ABOUT THE INSTRUMENT, AND THE REASON FOR IT IS OFTEN THE LEAD
+
+A project had a witness that bounds an object's size by the address of whatever the linker placed
+after it. It was silent on every one of four open classes, and correctly so: a complete
+enumeration showed **0 of 11** vtable stores for those classes had an absolute destination, so
+none has a statically placed instance.
+
+The round nearly stopped there. But *why* the witness is silent is that all four objects are
+built by an allocator — and the allocation size immediate is sitting in the same body as the
+vtable store, three instructions away. Three of the four sizes were recoverable exactly.
+
+**When a witness returns a clean measured zero, ask what shape of object produces that zero.**
+That shape almost always has a witness of its own, and the zero is the pointer to it. Read the
+zero as "this instrument cannot look here", never as "there is nothing here" — and note that the
+artifact's own `confidence=none` spells the first as the second.
+
+## A MEASUREMENT WORTH RECORDING IS WORTH A PRODUCER, OR SAY SO IN THE SAME BREATH
+
+Two of the three sizes that round recovered had **already been measured**, correctly, in earlier
+rounds: one findings file recorded both allocation immediates in a table, and another named the
+exact instruction of the third and the reason the sweep missed it. Both were right. Both were
+inert for months, because a number in a prose table or a `note` column is not re-derivable, cannot
+be swept, and is read by nothing.
+
+This is the same failure as a decided value living only in a script literal, and it has the same
+fix. When a round measures something it is not going to fold, the honest close is either a
+producer that re-derives it or an explicit line saying *this is recorded and nothing consumes it*
+— otherwise the next round pays to measure it again, and will not know it is the second time.
