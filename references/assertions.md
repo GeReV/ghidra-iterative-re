@@ -2812,3 +2812,63 @@ one whole mode is waiting for the next input that needs it. The order is what ma
 Reversing steps 3 and 4 makes the final green indistinguishable from having changed nothing at
 all. **The differential is the licence; the tree comparison is the confirmation.** Keep the old
 behaviour reachable as the differential's legacy arm afterwards.
+
+---
+
+## A TEST HARNESS THAT FAKES THE DISASSEMBLER IS A SECOND IMPLEMENTATION — calibrate it or the arms are fiction
+
+A shared scan library sat behind twelve producers with four behaviour switches and **no test file
+at all**, because it takes a live program object. The fix is a fake: the library touches a small,
+bounded slice of the API — a function's instructions, and per instruction an address, a mnemonic,
+operand text, scalars, a flow type, flow targets, written registers and p-code. Fifteen methods.
+Fed the same rendered text the disassembly stream already carries, a real body replays verbatim
+and the PRODUCTION code runs against it.
+
+**The scanner is then not the risk; the fake is.** Measured: **all eighteen arms passed while the
+fake reproduced only 65 of 252 real bodies — 25.8%.** One method was wrong. `getResultObjects()`
+returned operand 0 for every form, so `TEST reg,reg` — the null check emitted after every
+allocation — was reported as *writing* that register, and the alias tracker destroyed the alias
+the allocation had just established. Every factory-shaped body lost its cell channel from that
+instruction on. After the fix: 252 of 252.
+
+Note what the fake's p-code method is: a hand-written mnemonic list answering "does this
+instruction write memory" — **exactly** the thing the library under test records having tried and
+abandoned, because it *"disagreed with the spec on 70 of 2221 cases"*. The list is admissible only
+with a replay bounding it.
+
+So: **capture real outputs for real inputs, replay them through the fake, and state the agreement
+as a fraction.** Treat a passing arm as evidence about the arm and never about the fake. And make
+the fidelity check impossible to skip — a missing fixture should be a refusal, not a pass, because
+a silently skipped calibration is how the fake stops being calibrated.
+
+**Span the configurations by REFUSAL.** Have the capture script raise when the fixture covers only
+one seed mode / one calling convention / one branch of the thing that forks. A fixture of only
+one shape leaves the other uncalibrated forever, and nothing downstream can tell.
+
+## MUTATE THE SOURCE, NOT A FIXTURE — and expect the first run to find the arm you did not write
+
+Every arm must be demonstrated failing, and the cheap way to demonstrate a whole suite at once is
+to break a rule **in the production source**, reload the module, and require that at least one arm
+notices. A poison built inside the test file tests the test file.
+
+The value is not the mutations that fire. It is the one that does not. Measured, first run of such
+a harness: forcing a mode constant to a fixed value — the rule that decides which allocation a
+factory body's object *is* — **broke no arm at all**, because every arm exercising that rule ran in
+the mode where the constant already had that value, so the mutation was invisible. Seventeen arms,
+and the rule whose absence had cost an earlier round a full investigation was untested. One arm was
+added for it.
+
+Report it as `N of M mutations made at least one arm fail`, and treat a shortfall as a missing arm
+rather than a mutation to delete.
+
+## AN ARTIFACT OUTSIDE THE STABILITY HARNESS'S FILE-TYPE FILTER IS OUTSIDE THE HARNESS
+
+A stability harness that regenerates producers and byte-compares their output is usually scoped by
+a filename pattern — here, `symbols/*.csv`. A new fixture was JSON, so **nothing compared it**, and
+a stale one would have *agreed* with the fake it calibrates, because both sides replay the same
+aged disassembly. A green for the wrong reason.
+
+Two guards, because one is a single point of failure: register the producing script so the artifact
+is regenerated every pass, **and** stamp the artifact with the program version and refuse when it
+disagrees with the project's state record. Check the filter's scope whenever you add an artifact in
+a new format — the sweep looks universal and is not.
