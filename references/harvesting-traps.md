@@ -3411,3 +3411,49 @@ Both numbers are correct about their own question, and the cheap one is worth fi
 building: it is the right way to decide whether to build at all. It is the wrong number to report
 afterwards, and the gap between the two is not a defect — it is what the tool's own rules cost,
 which is exactly what the reach line above the results is for.
+
+## AN UNCOVERED DENOMINATOR IS WHAT THE ARTIFACTS DO NOT COVER, NOT WHAT NOBODY HAS LOOKED AT
+
+A coverage denominator is computed over the project's own evidence files, so a class reported as
+`0% covered` means *"no artifact records these bytes"* — which reads as *"nobody has looked"* and
+need not be. Measured: the class holding **27% of a project's entire remaining layout gap** had its
+layout read, decided and applied to the program **three rounds earlier**. The decompiler was
+already spelling the missing member by name. The round queued against it had been priced as *"the
+gap is a different shape and needs a different witness"*, and the whole of it was one absent row in
+one CSV.
+
+The test costs one command, and it belongs before any witness is designed for a class's uncovered
+bytes: **ask the database what it already calls them.** Read the class's own constructor and
+destructor out of the exported decompilation and look at the member names. Applying a type is what
+makes a population sweepable — and it is also what makes a previous round's reading invisible to a
+denominator computed from files, because the program and the files are different stores.
+
+The general shape, worth checking on any project with both: **a derived number computed from
+artifacts cannot see anything that lives only in the database.** State the gap as *"no artifact
+records"*, never as *"unknown"*, so the next reader is not told the wrong thing by the column name.
+
+## A REFUSAL DOCUMENTED WITH ITS REASON IS A QUEUED ROUND WITH NO OWNER UNTIL SOMEBODY PRICES IT
+
+The applier that made those decisions is exemplary about the refusal it walked into: its header
+names the two lines of the library that reject its classes, quotes both messages, and carries a
+standing assertion that the channel *still* refuses them — so the day the rule changes, the script
+fires and says the record must move. None of that got the repair scheduled. What did was one
+arithmetic run: **+1640 bytes, 39.9% of the remaining gap.**
+
+A documented limitation competes for a round only once it carries a denominator. **Write the price
+beside the reason**, or the reason is the only half anyone reads — and a reason, however careful,
+sorts to the bottom of every queue against an item with a number on it.
+
+## A LINEAR `this` TRACKER OVER A *BACKWARD* LOOP RECORDS THE LAST ELEMENT, NOT THE FIRST
+
+A tracker that carries the object pointer linearly through a body records first-iteration offsets —
+already a known trap. Its mirror image is not: a destructor that unwinds an array **downward** from
+one-past-the-end (`LEA ESI,[obj + sizeof]` … `SUB ESI,stride`) makes the first iteration the *last*
+element, so the harvested offsets land near the top of the object.
+
+Measured on one class: twelve identical 104-byte records, the constructor-side rows clustered at
+element 0 and the destructor-side rows clustered at element 11, and 22 harvested rows reading as 22
+distinct fields covering 144 bytes of 1264. **The signature is two tight clusters of offsets, far
+apart, whose intra-cluster spacing matches.** Where that appears, suspect one array rather than two
+regions — and note the rows are not wrong, they are *aliases of each other* that the artifact has no
+way to say so.

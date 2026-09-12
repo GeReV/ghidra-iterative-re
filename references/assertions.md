@@ -2952,3 +2952,35 @@ Two distinct properties, and a harness usually only advertises one: *is this art
 (regeneration) and *did this artifact change* (comparison). The honest headline is `149 of the 150
 committed artifacts`, because a count without its denominator cannot say which of the two it
 means.
+
+## TWO CONSUMERS OF ONE ARTIFACT ROW CAN DISAGREE ABOUT IT, EACH INTERNALLY CONSISTENT
+
+The known version of this trap is *"no check compares two artifacts that claim the same quantity"*.
+One level in is worse, because it leaves no two files to compare: **one artifact row, spent by one
+consumer and rejected by another.**
+
+Measured. A base class's size sits in a size census at `72` under a confidence label the layout
+channel's allowlist deliberately excludes. The completion tool reads that same `72` as the lower
+bound of the very class's own window — every coverage percentage it reports for that class rests on
+it — while the layout library refuses the class outright because the size is not in the file it
+trusts. Both are right by their own rule. Nothing in the repository can see the disagreement,
+because a consistency check compares *files*, and here there is only one file.
+
+The check that would catch it is not a diff. It is a join over **consumers**: for each artifact
+column that more than one tool reads, does every reader admit the same rows? A reader that filters
+by a `confidence` column while another reader ignores that column is the shape to look for, and the
+grep is for the column name, not for the value.
+
+## A CONFIDENCE LABEL NAMES THE RULE THAT EMITTED A ROW, NOT THE STRENGTH OF WHAT STANDS BEHIND IT
+
+The row above is labelled by the *weakest* rule that could have produced it, and an allowlist keyed
+on that label reads the label as a grade. Its own note already recorded that an independent floor
+met the exact upper bound — two structurally independent legs closing to a point, which is what the
+admitted grade means — and the label still said otherwise, because labels are assigned where a row
+is written and evidence accumulates afterwards.
+
+Two consequences. **Read the witness columns before believing a confidence column** — the strength
+is in the witnesses, the label is in the emitter. And when a gate refuses on a label, the fix may be
+at the emitter rather than at the gate; check which change has the smaller blast radius first,
+because re-labelling at source silently re-qualifies the row for *every* other rule keyed on that
+column, including the ones that mutate the program.
