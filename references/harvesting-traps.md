@@ -3144,3 +3144,23 @@ library's output at a call site, write down which library invariant was missing,
 did about it**; and when you meet a defect in a shared scanner, grep for an earlier patch of it
 before building anything. A second consumer-side fix is the signal that the first one was in the
 wrong place.
+
+---
+
+## A CENSUS THAT LICENSES A REPAIR DOES NOT PRICE IT
+
+This file already says a census is spent by the repair it licenses. Here is the other half, paid
+for separately: **a census establishes that a defect exists and how far it reaches; it says
+nothing about what fixing it is worth.**
+
+Measured. A census recorded twelve classes *"whose bodies prove extents of 192-317 while six carry
+a recorded extent of 4 and six carry no row"*, and the queue treated that as the round's payoff.
+Checked against the artifacts one round later: **all twelve already had a decided size** from an
+independent channel. The repair moves no decision at all, and its real remaining value is one
+class where a vacuous value blocks a downstream rule.
+
+Nothing in the census was wrong. It measured what the defect touches, which is the question it was
+built for, and then the reach was read as value. **Before scheduling a repair, join its named
+population against what the artifacts already decide** — the difference between "this evidence is
+missing" and "this evidence is missing and nothing else supplies it" is the entire payoff, and it
+is one join.

@@ -2752,3 +2752,63 @@ avoiding did not exist.
 Build the arm that checks whether each excused artifact is in fact still unregenerated. An
 exclusion that has quietly become false is worse than no exclusion: it reads as a considered
 decision while hiding a comparison nobody is making.
+
+---
+
+## A DIFFERENTIAL THAT TAKES ONE ARM FROM A DEFAULT IS DELETED BY THE NEXT DEFAULT CHANGE
+
+A probe compared a scanner's behaviour with a new flag on and off:
+
+```
+a = scan_body(...)                              # the old behaviour, via the default
+b = scan_body(..., new_flag=True)               # the new behaviour
+```
+
+Correct, readable, and it measured the thing. Then the same round used that measurement to license
+**flipping the default** — at which point both arms became the new behaviour, the probe compared
+an arm against itself, and it would have kept printing `202 of 202 identical` **forever**. A green
+that can never go red again, installed by the very change it was meant to license, and nothing
+anywhere would have reported it.
+
+**Pin every arm of a differential to a literal, never to a default**, and treat "the default is
+about to change" as the routine case rather than the exotic one — a successful differential is
+precisely the thing that causes a default to change, so the two events are correlated, not
+independent.
+
+## WHEN THE FINDING IS AN ABSENCE, THE FIXTURE MUST COME FROM SOMEWHERE THE PRESENCE IS KNOWN
+
+A probe whose entire output is a zero is the easiest result for a dead instrument to produce, and
+the population under test cannot supply the fixture — the population is *where the answer is zero*.
+Two arms are needed, and both must raise rather than print:
+
+- **A reach denominator.** State how many of the compared units actually exercise the mechanism.
+  Measured here: the tracker under test is constructed only *by* an allocator call, so a body
+  calling none never reaches the flag at all; folding those into "identical under both arms" would
+  report **vacuity as coverage**. 202 of 202 did call one, so the equality was coverage. Zero
+  raises.
+- **A positive control on a DIFFERENT unit.** Find a case the documentation or an earlier round
+  records as exhibiting the effect, and show the same comparison shape detects it. Here the
+  module's own documented worked case yields **9** sub-object calls with the rule and **7**
+  without — the two loops that rule was written to recover. A non-positive difference raises,
+  because it means the comparison cannot see the effect it is reporting absent.
+
+With both, "we measured zero" becomes a claim about the binary. Without them it is a claim about
+the probe, and the two are indistinguishable in the output.
+
+## LAND A LATENT REPAIR WHOSE NO-OP IS PROVEN — but in this order
+
+A defect can be real in the code and have zero consequence in the artifact you happen to be
+working on. That is not a reason to leave it: a documented module-wide switch silently disabled for
+one whole mode is waiting for the next input that needs it. The order is what makes it safe:
+
+1. Add the behaviour as a parameter **defaulting to the existing behaviour**, so every caller is
+   byte-identical *by construction* rather than by a diff someone has to read.
+2. Run the differential over the real population, with the reach denominator and positive control
+   above.
+3. Only then flip the default.
+4. Only then run the whole-tree comparison, which now means something — it is confirming a
+   prediction rather than observing that nothing happened.
+
+Reversing steps 3 and 4 makes the final green indistinguishable from having changed nothing at
+all. **The differential is the licence; the tree comparison is the confirmation.** Keep the old
+behaviour reachable as the differential's legacy arm afterwards.
