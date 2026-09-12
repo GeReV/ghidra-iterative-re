@@ -2984,3 +2984,34 @@ is in the witnesses, the label is in the emitter. And when a gate refuses on a l
 at the emitter rather than at the gate; check which change has the smaller blast radius first,
 because re-labelling at source silently re-qualifies the row for *every* other rule keyed on that
 column, including the ones that mutate the program.
+
+## A TRIPWIRE THAT RESTATES THE RULE IT WATCHES CANNOT FIRE WHEN THE RULE CHANGES
+
+A guard written to notice "the day this policy admits X" must ask the policy, never a copy of
+it. Measured: an applier kept a layout in its own literal because a library function refused two
+classes, and carried a guard that would fire "the day a size row lands" so the record would move.
+The guard re-implemented the refusal by hand. The change that actually came was to the RULE -- a
+third size file admitted, a new base tier -- not to a size row, and the hand copy, evaluated on
+the post-change artifacts, still read "refused" for both classes while the real function admitted
+both. The one event the guard existed for was the one event it structurally could not see,
+because the copy is exactly the thing a policy change leaves untouched. Call the function.
+
+## A RAISE ARM WRITTEN FOR A RULE CHANGE ALSO RAISES UNDER THE OLD RULE -- FOR THE WRONG REASON
+
+When a rule is WIDENED, its old version refuses the new cases outright, so every new "must still
+refuse this narrower thing" arm raises against the old code too. Measured on nine new arms: with
+the library reverted, five of the six raise arms passed on an unrelated refusal, and the positive
+arms were the only ones that failed. Demonstrating an arm against the pre-change source is what
+exposes this; requiring each arm's own message fragment is what fixes it. A refusal is a claim
+about WHY, and an arm that accepts any exception tests only that something went wrong.
+
+## A CALIBRATION THAT GRADES A PROPERTY THE RULE NEVER CLAIMS PASSES BY COINCIDENCE
+
+A join typed a cell only from a COMPLETE group of registered components, but its calibration
+graded the implied type of PARTIAL groups as well. One partial known answer matched the default
+by chance and served for months as the rule's only negative control; a second partial group with
+the same shape and the opposite answer failed the calibration the moment another round decided
+it. The rule was fine and the calibration was wrong: grade exactly what the rule claims. And
+check what the poison actually fires on -- this one fired only on the coincidental pair, so fixing
+the calibration made the poison unfireable, and it had to be rebuilt on the cases the claim branch
+really uses.

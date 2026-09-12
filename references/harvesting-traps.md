@@ -3457,3 +3457,24 @@ distinct fields covering 144 bytes of 1264. **The signature is two tight cluster
 apart, whose intra-cluster spacing matches.** Where that appears, suspect one array rather than two
 regions — and note the rows are not wrong, they are *aliases of each other* that the artifact has no
 way to say so.
+
+## WIDENING A CHANNEL IS ALSO A CHANGE TO EVERY CONSUMER THAT DEFERS TO IT
+
+Pricing a repair against the denominator it moves is not pricing the repair. Measured: admitting
+two classes to a layout channel landed exactly the predicted coverage, and four other consumers
+changed with it -- a second layout producer that defers to the first dropped the class and its
+one corroborated record; an attribution tool reopened a cell it had called decided; a structural
+witness lost three pairs into a type no artifact sizes; and a serialisation check REFUSED, because
+laying a class out byte-for-byte makes every serialised offset inside it checkable. The last one
+turned an artifact-only round into a program mutation. List the READERS of every file the change
+touches before scoping it, and expect the ones that defer ("skip classes already laid out") to
+move in the opposite direction.
+
+## RE-RUNNING EXCLUDED PRODUCERS FOR ATTRIBUTION FINDS STALE ARTIFACTS -- REGENERATE AT BOTH ENDS
+
+A stability canary that excludes WSL-side or expensive producers never notices them drifting. The
+cheap way to find out, and the only honest way to attribute a round's diff to that round: run the
+producer at the pre-round commit and at the working tree. Identical output means any difference
+from the committed file predates the round -- stale, not caused. Measured in one round: four
+excluded artifacts stale, one with a failing self-calibration nobody had run. Revert what is not
+yours, queue it with numbers, and do not fold it into the round's commit.
