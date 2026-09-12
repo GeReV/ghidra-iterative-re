@@ -3276,3 +3276,69 @@ covers the producers you know you touched. The pass covers the ones you did not 
 is the entire reason it exists — and its finding is as likely to be a consequence you should keep
 as a regression you should revert. Adjudicate it; never re-baseline it silently; and correct the
 record rather than the measurement.
+
+
+## A QUEUED ROUTE IS A CLAIM ABOUT A PRODUCER THAT STILL RUNS
+
+A backlog item said to fold a recovered value through an artifact that already carried it. The
+artifact did. Its producer **could not run at all**: a disjointness check at the top of it refused
+on 723 rows, because the project's naming had progressed and the population the artifact describes
+is no longer the population its rule defines. Confirmed by running the *committed* script
+unmodified, so it was not something the round introduced — and the artifact was stale in
+membership besides, 51 rows describing a set that had become 58, with 12 of the 51 no longer
+qualifying.
+
+An earlier lesson here says to re-derive a queued design's **numbers** against the tree you are
+standing on. This adds the other half: **re-run its producer.** An artifact is a claim its
+producer could once make; whether it can still make it is a separate fact, and for a producer
+nothing regenerates, nobody has checked.
+
+## BEFORE BUILDING A WITNESS, CHECK WHETHER A PRODUCER ALREADY COMPUTES IT AND MERELY DECLINES TO WRITE IT DOWN
+
+With the queued route dead, the obvious move was a new sweep: its own decoder, its own dataflow,
+its own calibration. It was unnecessary. An existing producer's fixpoint already recorded every
+allocation's size and every vtable stored into it, for the whole binary. What was scoped was the
+**emit** — its artifacts covered 45 tables of a particular kind, by design and correctly, and the
+rest of the computation was simply discarded at write time.
+
+The round became one new artifact from the same run and the same attribution rule with the filter
+removed, inheriting that producer's existing calibration against an independent artifact. **Scoping
+lives in the emit far more often than in the rule, and changing an emit is a much smaller claim
+than changing a rule.** Read the producer before proposing its replacement.
+
+## A WITNESS THAT AGREES IS CORROBORATION AND MUST BE ADDED, NEVER SUBSTITUTED
+
+Folded unconditionally, the new witness took over three classes another artifact had already
+decided. The sizes were identical to the byte — and each row lost the witness that had done the
+deciding, and the note recording *how*. Nothing failed. The diff is what showed it.
+
+Two rules follow. **Fold a new witness only for the population nothing else decides**, and print
+the agreements separately as corroboration. And **assert the agreement where two sources speak**:
+they are usually the same rule over nested populations, so a disagreement is a defect in one of
+them rather than a judgement call, and it should raise instead of silently picking a side.
+
+Note where this defect lived. A ratchet that refuses named attributions becoming empty could not
+see it, because the vacating happened inside a **fold** rather than an edit. A guard scoped to one
+mechanism does not cover the same damage arriving through another.
+
+## CALIBRATE A NEW WITNESS AGAINST THE TIERS IT DOES NOT FEED, AND POISON THE UNGRADABLE CASE
+
+Grade a new size or layout witness against independently decided values — and specifically **not**
+against the artifact that consumes it, which would let the witness confirm itself one hop away.
+Here: 16 of 68 rows graded against four upstream artifacts, 0 disagreements.
+
+The arm worth copying is the third one. A check that greps for disagreements passes trivially when
+**nothing is gradable**, printing a healthy row count the whole time. So poison the empty
+*intersection*, not just the empty population: an uncalibrated witness whose grading set is empty
+is the failure this catches, and it is invisible to the other two arms.
+
+## A PERCENTAGE IS THE WRONG HEADLINE FOR A MEASURE WHOSE DENOMINATOR THE WORK ITSELF GROWS
+
+A coverage figure fell from 86.9% to 83.6% in a round where nothing became less covered: the
+numerator rose, and the denominator grew more, because deciding a class's size is what puts that
+class's bytes into the coverage denominator in the first place.
+
+So a size round makes a layout-coverage fraction fall **by construction**, and the gate that
+tracks numerator and denominator separately was right to pass it. State both numbers. A single
+percentage in a round summary reads as a regression to anyone scanning it, including the next
+session.
