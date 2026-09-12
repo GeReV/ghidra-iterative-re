@@ -3342,3 +3342,72 @@ So a size round makes a layout-coverage fraction fall **by construction**, and t
 tracks numerator and denominator separately was right to pass it. State both numbers. A single
 percentage in a round summary reads as a regression to anyone scanning it, including the next
 session.
+
+
+## A WITNESS'S BLIND SPOT LIVES IN ITS OPERAND PARSER, AND THE ARTIFACT NEVER SAYS SO
+
+A coverage measure would not move for one class, and every sweep that should have moved it was
+healthy. The cause was one sentence in the operand parser those sweeps share: *"scaled-index
+operands are deliberately not matched, because an indexed access says nothing about a fixed field
+offset."* Correct for the question that parser answers, and it means an **array member** was
+uncoverable by the entire channel — not unmeasured, *unmeasurable*.
+
+The artifact reported those bytes as uncovered, which reads as "nobody has looked" and meant "this
+instrument cannot look". Same confusion as an honest `confidence=none`, one level further down.
+
+**When a denominator will not move for a population, read the PARSER of the witness that should
+have moved it, not only the sweep.** A sweep's population is visible in its output; its parser's
+refusals are not visible anywhere.
+
+## A STRENGTH-REDUCED ADDRESS COMPUTATION MEANS THE OPERAND IS ONLY THE LAST STEP
+
+Two traps in reading an array access off x86, both of which a first implementation hit and only a
+hand-reading calibration caught:
+
+- **The rendered scale is not the element stride.** MSVC turns `n * 68` into
+  `MOV EDX,EAX; SHL EDX,0x4; ADD EDX,EAX` (= 17n) and then addresses `[ECX + EDX*0x4 + 0x2cc]`.
+  Read the scale off the operand and you get 4; the tool duly reported an array of **136**
+  elements where the truth is **8**, wrong by exactly the factor the compiler reduced out, and
+  wrong with a healthy-looking row. The stride is a property of the whole arithmetic chain, so the
+  index register's multiplier has to be resolved within the body.
+- **The object is not always the base operand.** `LEA EAX,[EAX + ECX*0x1 + 0x2c]` addresses
+  `this + 80n + 0x2c` with the object in the **index** slot at scale 1 and the scaled offset in the
+  base. A scan requiring `base == this` misses the array entirely.
+
+Both belong in any tool that reads indexed accesses, on any compiler that strength-reduces
+multiplies — which is all of them at `-O1` and above.
+
+## A DEGENERATE CASE THAT SATISFIES EVERY RULE IS STILL WRONG
+
+Five of eleven first-run rows were "arrays" one element long — a scalar that happened to be
+addressed through an index, from a loop that runs once or an index the tracker cannot see is zero.
+The clearest: a 4-byte class whose only member is its vptr, reported as an array of one because its
+vector destructor indexes the object itself.
+
+Every rule was satisfied. The rows were still false, they would have claimed members that do not
+exist, and they overlapped rows another witness already had. **Add the degeneracy check — n ≥ 2, a
+span wider than one stride, a set of more than one element — and count the refusals.** It costs one
+comparison and it is the difference between a witness and a noise source.
+
+## THE CONSTANT THE CODE ALREADY CONTAINS IS A SECOND WITNESS, FOR FREE
+
+A bounded loop over a fixed-size array compares its index against the capacity as an immediate:
+`CMP EAX,0x40` above one store, `CMP ECX,0x9` above another. That number owes nothing to whatever
+arithmetic the tool used to derive the extent, so where both exist they are **two independent
+witnesses** — and a disagreement is a defect in one of them rather than a judgement call, so it
+should refuse the row rather than pick a side.
+
+Two of six capacities corroborated that way, zero disagreements. **Before deriving a quantity a
+second way, look for the one the binary already spells out.**
+
+## A REACH CEILING AND A REACH MEASUREMENT ARE DIFFERENT NUMBERS, AND THE CHEAP ONE IS THE CEILING
+
+Pricing a witness before building it asked *"do this population's bodies contain the instruction
+shape at all?"* — 74% of the classes, holding 95% of the bytes in question. The finished tool asks
+*"is the access through the object, with a resolvable multiplier?"* — **6.0% of classes**. A
+twelfth of the estimate.
+
+Both numbers are correct about their own question, and the cheap one is worth five minutes before
+building: it is the right way to decide whether to build at all. It is the wrong number to report
+afterwards, and the gap between the two is not a defect — it is what the tool's own rules cost,
+which is exactly what the reach line above the results is for.
