@@ -3226,3 +3226,53 @@ This is the same failure as a decided value living only in a script literal, and
 fix. When a round measures something it is not going to fold, the honest close is either a
 producer that re-derives it or an explicit line saying *this is recorded and nothing consumes it*
 — otherwise the next round pays to measure it again, and will not know it is the second time.
+
+
+## THE FIX FOR A HALTING LINEAR SWEEP IS TO DECODE PER FUNCTION, AND THE GUARD IS COVERAGE OF AN INDEPENDENT INDEX
+
+The halting-sweep trap above says what goes wrong. This is what to do about it, measured on the
+same binary.
+
+**Decode each known function separately, bounded by the next function start.** Consumers of a
+disassembly index almost always read *from a function start*, so nothing between functions is ever
+consulted; decoding per function means an undecodable byte costs that one function's tail instead
+of the rest of the section. Coverage went from 1,539 of 5,649 known starts to **5,649 of 5,649**,
+and the residual became a list: 19 functions (0.34%) stopping short, 1,520 bytes or 0.18% of the
+section, fourteen of them one-to-eight-byte alignment tails.
+
+**State the guard against an independently recorded index, never against the decoder.** Do not ask
+the decoder whether it finished — ask whether every entry in the function table you already have
+decoded to at least one instruction. That is checkable without trusting the thing being checked,
+and it is set arithmetic over two things the producer already holds.
+
+**A lookup that can mean both "empty" and "never reached" needs a counter at the call site.** The
+scanner here opened `body = index.body(f); if not body: return`. That single line is why a 72.8%
+loss produced no symptom: nothing distinguished a function with nothing in it from a function the
+decoder never got to, so no counter moved and the producer's fifteen self-checks all passed.
+
+**And the baseline arm must FAIL the new check.** When you keep the old behaviour behind a flag for
+a differential diff, invert the new guard under that flag so the arm has to *find* the defect. An
+arm that quietly started working would otherwise pass silently, and the differential would compare
+two identical things while reporting success.
+
+**Where to look for the next one: the producers nothing regenerates.** This defect survived because
+the producer was deliberately excluded from the stability harness — for a correct reason, since it
+needed files the harness's host could not reach — so nothing had re-run it since the day it was
+written. An exclusion is a correct engineering decision and simultaneously the condition under
+which a silent loss can live forever. Audit the excluded set first.
+
+## A ROUND'S OWN DIFF IS WHAT IT THOUGHT IT CHANGED; THE STABILITY PASS IS WHAT IT ACTUALLY CHANGED
+
+A repair to one producer was diffed carefully: three artifacts, three rows, each adjudicated. The
+confirming stability pass then refused the round over a **fourth** artifact, from a producer the
+round had not touched — one added row, downstream of a class that had just become sized for the
+first time.
+
+It was a gain, and it moved a second denominator the round had not claimed. But the round had
+already written "three artifacts moved" into its own record, and that sentence was wrong.
+
+**Run the stability pass before writing the round's numbers down, not after.** The diff you compute
+covers the producers you know you touched. The pass covers the ones you did not think about, which
+is the entire reason it exists — and its finding is as likely to be a consequence you should keep
+as a regression you should revert. Adjudicate it; never re-baseline it silently; and correct the
+record rather than the measurement.
