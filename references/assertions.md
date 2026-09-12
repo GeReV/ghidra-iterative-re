@@ -2892,3 +2892,63 @@ which makes it the cheapest kind of gate to demonstrate failing — it fails on 
 the day you write it. This is the same shape as a check that compares rows *sharing a name* within
 one artifact, one level up: the defect always lives in the gap between two checks that are each
 correct about their own question.
+
+
+## A CENSUS MUST BE TAKEN OVER THE SET THE REPAIR SCANS, NOT THE SET THE DEFECT SURFACED IN
+
+A round found a producer crediting one class with another's construction extent, censused the
+damage by joining every committed artifact against the bodies with the offending shape, and found
+**one** row. The repair — a screen inside the producer — was approved against that number, with a
+literal naming the one body it was allowed to refuse and a join that raises both ways.
+
+On its first live run the screen refused **two**, and the join refused the run.
+
+Both numbers are correct and they count different things. The artifact join counts rows that
+*reached an artifact*; the screen acts on **candidates**, and only a candidate that wins its
+producer's `max` ever becomes a row. The census answered a real question precisely — it was just
+not the question that prices a screen.
+
+**Before approving a repair against a number, name the exact set the repaired code will iterate**,
+and take the census over that. The two sets coincide often enough that the difference is invisible
+until a both-ways join makes it visible, which is the argument for writing the join at the same
+time as the literal rather than after the first clean run.
+
+## WHERE A NEW FILTER SITS IN AN EXISTING CHAIN DECIDES WHETHER IT IS A REPAIR OR A RULE CHANGE
+
+The same screen was first placed at the front of its producer's candidate filter, before an
+existing narrowing. It then claimed four bodies instead of two, and two of those had been feeding
+a *counter* — the number of candidates the old narrowing refused — that a completely different
+rule downstream reads as a soundness signal. The repair silently changed an input to a rule it had
+nothing to do with.
+
+Moved behind the existing narrowing, it refuses two, every other counter in the producer is
+byte-identical, and it can only ever remove a body that would otherwise have been **accepted**.
+Same rule, same bodies, entirely different blast radius.
+
+**When inserting a filter into a pipeline, ask what each existing stage COUNTS, not only what it
+passes.** A stage that merely drops things can be reordered freely; a stage whose reject count is
+read by something else cannot.
+
+## A POISON THAT DOUBLES AS THE DIFFERENTIAL BASELINE CANNOT DEMONSTRATE THE CHECK IT DISABLES
+
+A producer change needs two different things from a switch: an arm that reproduces the OLD
+behaviour byte-for-byte (the two-step diff's baseline, which must not raise), and a poison showing
+the new check can fire. One switch tried to be both. Turning the screen off also turned off the
+join that validates the screen's fired population, so the join's *missing-entry* direction had
+never been seen to fire — an unfireable arm hiding inside a demonstrated one.
+
+The fix is a second switch that disables the mechanism and **keeps** the check, which then raises.
+Two arms, because one of them has a job that forbids raising.
+
+## REGENERATION IS NOT COMPARISON
+
+A stability harness reported `all 149 committed artifacts byte-identical` in the same pass that
+changed a 150th. The artifact sweep was scoped by a filename pattern (`*.csv`); the changed file
+was JSON. The project had already found that hole once and patched it by registering the file's
+producer so every pass **regenerates** it — which is what kept the file current, and is not the
+same as checking it.
+
+Two distinct properties, and a harness usually only advertises one: *is this artifact current*
+(regeneration) and *did this artifact change* (comparison). The honest headline is `149 of the 150
+committed artifacts`, because a count without its denominator cannot say which of the two it
+means.
