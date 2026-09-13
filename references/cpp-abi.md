@@ -566,7 +566,11 @@ Ghidra auto-associates with a struct of the same name.
 Ghidra's official recipe (from `improvingDisassemblyAndDecompilation.pdf`):
 
 1. Create a **`FunctionDefinitionDataType`** per virtual method, calling convention
-   `__thiscall`.
+   `__thiscall` — **with `this` as an explicit first parameter.** A function definition has no
+   class to supply one, so a definition built from a method's signature minus `this` puts the
+   first real parameter in ECX and under-states the callee's stack cleanup at every call site:
+   silently wrong C (measured, and the fix check, in `applying-changes.md`, "Type vftable
+   struct components").
 2. Create a **`<Class>_vftable` structure** whose fields are those function definitions
    **in slot order**, each field **named** after its method.
 3. Make the **class struct's first field a pointer** to that vftable struct.

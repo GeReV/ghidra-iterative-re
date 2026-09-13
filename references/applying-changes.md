@@ -68,6 +68,24 @@ types, or decide which apply is worth the round.
   blast radius is confined to decompilation. The slots you cannot type are usually the
   compiler-generated destructor thunks, which have no export by construction — leave them
   bare rather than inventing a signature.
+
+  **CORRECTION, measured 170 program versions later: the apply described above produced
+  SILENTLY WRONG C, and the reason is `this`.** Each definition was built from its target's
+  signature with `this` left out, and kept `__thiscall`. A `FunctionDefinitionDataType` has no
+  class to supply an automatic `this`, so the decompiler put the FIRST DECLARED parameter in
+  ECX — measured from call renders: the first rendered argument is the dispatch object itself
+  in 1146 of 1153 calls, e.g. `(*this->vftable->GetRender)((int)this)` for a method whose
+  mangled name takes one `int` and whose body is `RET 4`. The decompiler therefore believes
+  the callee pops four bytes fewer than it does, and **every later `[ESP+N]` read in the
+  caller is off by four**: a pushed parameter is replaced by an unrelated stack slot holding a
+  constant, the branch that tested it is folded away, and the only symptom is a generic
+  `Removing unreachable block` warning. A related failure: a slot declared `void` whose body
+  returns on the x87 stack renders its callers' use as `extraout_ST0`. **Build each definition
+  with an explicit `this` pointer as its first parameter, and before trusting any typed slot,
+  compare its declared stack cleanup against the target body's `RET n`** — a check no
+  per-function signature audit performs, because it compares a function against itself, never
+  against the prototype its call sites are typed with. The improvement in readability above was
+  real, which is exactly why nobody looked for damage.
 - **Struct layouts.** Field accesses become named. Can *change* signatures as a side
   effect: a large struct returned by value switches to the hidden return-storage-pointer
   convention, so `T Func(this)` becomes `T * Func(this, T *__return_storage_ptr__)`.
