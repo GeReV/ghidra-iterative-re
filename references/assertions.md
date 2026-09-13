@@ -3015,3 +3015,16 @@ it. The rule was fine and the calibration was wrong: grade exactly what the rule
 check what the poison actually fires on -- this one fired only on the coincidental pair, so fixing
 the calibration made the poison unfireable, and it had to be rebuilt on the cases the claim branch
 really uses.
+
+## A GRADER THAT KEEPS ITS OWN COPY OF A VOCABULARY GOES STALE WHEN THE VOCABULARY GROWS
+
+Three independent graders in one project failed the same way within one audit: one hand-typed the
+confidence labels that count as an exact size and misgraded every label added later; one excluded an
+input only when a column was ABSENT, and a new input with the column present and empty turned every
+untyped cell into a contradiction; one keyed on a field that was blank only because of a parser bug,
+so fixing the parser emptied its population. Each check stayed green or failed with a message that
+pointed elsewhere, because the vocabulary it compared against was its own. Derive the vocabulary from
+the thing that owns it (the deciders' constants, the mangling code, the cell's width), and add an arm
+that fails when a value exists upstream that the grader does not classify. When a vacuity check fires,
+its message must name BOTH sides of the join -- one that lists only the reference set sends the reader
+to "the reference set shrank" when the other side went to zero.
