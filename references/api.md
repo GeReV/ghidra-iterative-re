@@ -309,6 +309,14 @@ getAnalyzer(name); cancelQueuedTasks(); getAnalysisTool()
 
 Tell it precisely what changed, then `analyzeChanges` — not `analyzeAll`.
 
+**These take an `Address` or an `AddressSetView`, never the `Function` object.**
+`functionSignatureChanged(f)` raises `TypeError: No matching overloads found` under PyGhidra.
+Measured: an applier wrote exactly that from memory, dry-ran clean (the dry run stops before
+the mutation, so it never reached the line), and on `apply` raised one line AFTER
+`updateFunction` — leaving the new signature applied with no cascade and no ledger row. Pass
+`f.getEntryPoint()`. And give a mutating script an undo for the state its own crash leaves,
+not only a revert of its success.
+
 Ghidra's course warns of the **Decompiler Parameter ID** analyzer: run it "too early or
 before fixing problems" and you "propagate bad information all over the program." *(doc)*
 

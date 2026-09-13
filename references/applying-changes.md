@@ -86,6 +86,18 @@ types, or decide which apply is worth the round.
   per-function signature audit performs, because it compares a function against itself, never
   against the prototype its call sites are typed with. The improvement in readability above was
   real, which is exactly why nobody looked for damage.
+
+  **And the repair has its own trap: census the call sites that reach a definition by OVERRUN.**
+  When an object is typed as a base class whose vftable struct is SHORTER than the slot being
+  called, the decompiler indexes the table as an array (`vftable[1].IsTargetHit`) and borrows
+  whatever definition sits at that position — an unrelated method. Measured on the same
+  project: ~195 such call sites in 97 functions rendered the wrong method before the repair and
+  after it; making the definitions correct changed 131 of them and turned 2 from plausible to
+  catastrophic (one function lost 15 of its blocks), because the borrowed prototype had been
+  wrong by four bytes in a direction that happened to look right. The repair still paid for
+  itself many times over, but the two were foreseeable: grep the decompiled output for
+  `vftable\[\d+\]` BEFORE applying, and treat the dispatching object's type, not the definition,
+  as the defect at those sites.
 - **Struct layouts.** Field accesses become named. Can *change* signatures as a side
   effect: a large struct returned by value switches to the hidden return-storage-pointer
   convention, so `T Func(this)` becomes `T * Func(this, T *__return_storage_ptr__)`.

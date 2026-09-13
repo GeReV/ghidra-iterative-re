@@ -322,6 +322,14 @@ just fired and you are deciding what it means.
   added a second loop.
 ### What an apply invalidates
 
+- **A calibration anchored on a LIVE defect becomes unfireable the moment the defect is
+  repaired.** Measured: two detectors calibrated by firing on real bodies (an `ftol` whose x87
+  input was lost; a vtable slot under-stating cleanup) both failed their own self-tests the day
+  the repair landed — correctly, because no body left in the program showed either defect. The
+  tempting fix, relaxing the arm, would have left a detector nothing tests. **Pin a VERBATIM
+  fixture of the pre-repair shape, with its provenance (program version, address), and keep a
+  live NEGATIVE arm on the repaired record.** A detector's calibration has to outlive the defect
+  it was built to find, or the next regression of that defect meets an untested detector.
 - **A decided-artifact RENAME can disable the witness that corroborated it — whenever
   you rename a component, a field or a type, ask which witnesses match on that spelling
   and re-run them in the same round.** The worst version of "re-validate a witness after
