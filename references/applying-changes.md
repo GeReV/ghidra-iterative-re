@@ -1013,3 +1013,17 @@ Two changes close it, and the second must be exercised, not assumed:
 
 Origin: re-metal-fatigue §421 (`notes/LESSONS.md`); the same "a dry run cannot test the code after
 the mutation" failure had been recorded one round earlier, and recording it did not prevent it.
+
+## A NEW APPLIER INHERITS NONE OF THE REFUSALS THE OLD APPLIERS OF ITS KIND CARRY
+
+A project policy that lives as a refusal inside each applier -- "a member name under a placeholder
+class cannot be applied", enforced separately by a namespace-move applier, a slot-reconciliation
+census and a citation verifier -- is invisible to the next applier written for a different reason. In
+one project a census tool licensed four named functions into placeholder-class namespaces, the user
+approved it, and only the post-apply witness run's citation verifier refused them; they were reverted
+at the cost of a program version. The census re-derived the physics (conventions, liveness, stack
+purge) from first principles and none of the policy.
+
+Before writing an applier that moves names, namespaces or signatures, **search the existing appliers
+and censuses of that kind for the rows they refuse, and give the new census every refusal it should
+share** -- as a rule in the producer with a demonstrated arm, not a note. Origin: re-metal-fatigue §422.
