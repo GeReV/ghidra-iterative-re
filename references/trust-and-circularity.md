@@ -814,3 +814,17 @@ Two details that make the assert real rather than decorative:
   and it printed an unexplained `DISAGREE` that was simply the difference the new route exists to
   create. **A false statement in a gate's own output is a defect even when no number moves** — the
   next reader will treat it as a contradiction between two routes that are not the two named.
+
+## A namespace move on a DEFAULT symbol stays DEFAULT — a provenance channel no SourceType tier marks
+
+Read from Ghidra 12.1.2's `SymbolDB.setNameAndNamespace` (SoftwareModeling-src.zip): when a symbol's
+source is `DEFAULT`, a namespace change clears the stored name, keeps the dynamic `FUN_` name, and
+**keeps the source `DEFAULT`**. So moving an unnamed function under a class -- the way its `__thiscall`
+auto-`this` gets typed -- leaves no `SourceType.AI` mark. A gate that grades AI-sourced names sees
+neither the move nor an analyzer moving it back. The same path is taken by a **name withdrawal**: a
+name set back to DEFAULT keeps whatever namespace it had.
+
+Give these moves their own ledger and a both-directions gate over *DEFAULT-named functions in a
+non-global namespace*. Measured on its first run in one project: 17 already present, 3 of them
+withdrawn names that had kept their class namespace, the rest library namespaces whose origin
+nobody had recorded. Origin: re-metal-fatigue §421.

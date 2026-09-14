@@ -990,3 +990,26 @@ somewhere useless. **A comment that says WHY is an empirical claim with a date o
 round measures one of them false, correct it in the same commit even if no behaviour changes —
 and prefer comments that cite a re-derivable command or artifact over ones that assert a
 mechanism, so the claim can be re-run rather than re-believed.
+
+## A RAISED SCRIPT COMMITS WHAT RAN BEFORE THE RAISE — rehearse past the first mutation, and roll back on raise
+
+Measured on one 1999 MSVC/x86 binary, Ghidra 12.1.2 through PyGhidra: an applier dry-ran clean
+against every live guard and three poison arms, then raised in its second stage on an API call written
+from memory -- a line no dry run reached, because the dry run stops before the first mutation. The
+script manager **committed** the first stage anyway: a read-back probe found 249 of 249 function
+signatures changed, a partial type build, no cascade, no ledger rows, an **empty undo stack** and
+`isChanged()` true. An undo-last-transaction recovery had nothing to undo; the only exact way back was
+closing the program without saving and re-measuring the saved version.
+
+Two changes close it, and the second must be exercised, not assumed:
+
+- **Rehearse the post-mutation code in the dry run.** `StructureDataType(...)`, `FunctionDefinitionDataType(f, False)`
+  and `PointerDataType(...)` build types in memory without touching the DataTypeManager, so a dry run
+  can assemble every planned type and execute the API calls the apply will make. A dry run that only
+  runs guards tests the guards.
+- **Wrap the whole mutation section in `try: ... except: end(False); raise`.** `end(False)` aborts the
+  script's own transaction. Demonstrate it with a mode that performs the real first stage and raises
+  on purpose, then read the program back: every changed row must be in its pre-state.
+
+Origin: re-metal-fatigue §421 (`notes/LESSONS.md`); the same "a dry run cannot test the code after
+the mutation" failure had been recorded one round earlier, and recording it did not prevent it.
