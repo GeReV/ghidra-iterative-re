@@ -845,3 +845,26 @@ that rule, not the note.**
 Related, same round: **a probe's "undecided" bounds the probe.** A register-liveness probe abstained at an
 indirect jump; reading the jump table from the PE and each case's first instructions settled it in
 minutes, cited per deciding instruction.
+
+## A VERDICT ANSWERS A QUESTION — record the question beside it, or the verdict becomes a property of the thing
+
+The previous section is about a note that was false. This one is about a note that was TRUE and still
+misled, because it was read at a wider scope than it was written at.
+
+Measured on the same binary: a round classifying struct designs for a re-flattening sweep wrote that
+structs modelling their base as one opaque member are *"a third design and never a repair target"* --
+correct for that sweep, which has nothing to refresh inside an opaque member. Three rounds later a
+different question reached the same structs: a class whose own vtable is longer than the one its
+embedded base reaches needs its own vtable struct at offset 0, and an embedded base member owns offset
+0. The queued item now read as a *reversal of a decision*, and was priced as one, when the design had
+simply met a question the earlier round never asked. Nothing in the earlier round was wrong; its verdict
+had lost its question on the way into the notes.
+
+- **Write the question into the sentence that carries the verdict** -- *"never a repair target FOR THE
+  RE-FLATTENER"* costs four words and turns a later reversal into a routine round.
+- **When a queued item says a round would "reverse" an earlier decision, first find the question the
+  earlier round was answering.** If it is a different question, there is nothing to reverse, and the
+  write-up should say so rather than record a reversal that never happened.
+- The census still had to be run: pricing found the affected population was 26 classes and not the 2 the
+  item named, of which 24 bought nothing observable. The value of the census was the split, and the
+  user chose the smallest option. Origin: re-metal-fatigue §425.
