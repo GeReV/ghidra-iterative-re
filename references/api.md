@@ -64,6 +64,12 @@ surface, and several are actively unsafe through a mutating one.
 | Walk the program's version history | `getVersionHistory()` / `getReadOnlyDomainObject` | "Version control and checkpointing" |
 | Anything needing a Java interface implementation | `@JImplements` from PyGhidra | "PyGhidra / JPype interop" |
 
+**Submitted scripts run CONCURRENTLY, not queued.** Measured through GhidrAssistMCP's `scripts run`: a
+read-only gate submitted alongside an applier's in-transaction rehearsal read the rehearsal's
+UNCOMMITTED changes and failed on retypes that were about to roll back. Read-only jobs together are
+harmless; any pair where one writes -- a rehearsal counts -- is not. Submit, read the task status, then
+submit the next. Origin: re-metal-fatigue §423.
+
 The converse is worth stating too: **MCP is right for orientation** — `get_binary_info`,
 `analysis_options` (which analyzers ran, and at what settings), `get_strings`, `xrefs`,
 `get_function_statistics`. One `analysis_options` call answered "were the function-start

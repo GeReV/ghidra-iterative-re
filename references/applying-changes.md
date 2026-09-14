@@ -1027,3 +1027,37 @@ purge) from first principles and none of the policy.
 Before writing an applier that moves names, namespaces or signatures, **search the existing appliers
 and censuses of that kind for the rows they refuse, and give the new census every refusal it should
 share** -- as a rule in the producer with a demonstrated arm, not a note. Origin: re-metal-fatigue §422.
+
+## REHEARSE THE MUTATION TO PRICE IT — and give every API you write through for the first time its own gate
+
+**A rehearsal is a census the decompiler grades.** Measured on one 1999 MSVC/x86 binary, Ghidra 12.1.2:
+an applier's `rehearse` mode performed every retype inside the script transaction, re-decompiled the
+functions it should change plus a control set it should not (bodies naming none of the classes
+involved), printed the payoff, and called `end(False)`. The table the user approved -- overrun renders
+64 -> 34, removed "unreachable" blocks 18 -> 0, 40 of 40 controls byte-identical -- was the decompiler's
+own output, and the apply reproduced it row for row. Verify each rehearsal's rollback with the NEXT run
+(`references/api.md`: the rollback lands when the outer transaction closes). Four rehearsals cost about
+ten minutes and exposed three defects in the applier before approval, where they are cheapest. Dump the
+C, not only counts: a count reaching 0 can be a raw `(*(code *)...)` render standing in for the defect.
+
+**Retyping a decompiler local creates a provenance channel no symbol-based gate reads.**
+`HighFunctionDBUtil.updateDBVariable(highSymbol, None, dt, SourceType.AI)` -- the call Ghidra's own
+Retype Variable action makes -- commits a database variable tagged AI, and it also commits the
+decompiler's current NAME with that source. The variable is NOT in `SymbolTable.getAllSymbols(True)`:
+AI symbols by symbol type were identical before and after 14 commits. A ledger gate keyed on AI symbols
+therefore cannot see a local appear off the books, vanish under re-analysis, or be retyped. Enumerate
+`Function.getLocalVariables()` filtered on `getSource() == AI` against a ledger, both directions and by
+type -- and demonstrate all three arms on a poisoned ledger copy.
+
+**A parameter type change does not move the SIGNATURE source.** `updateDBVariable` on a parameter symbol
+took the new type and `Function.getSignatureSource()` stayed ANALYSIS -- ungraded by a signature ledger
+keyed on AI, and tied in priority with every analyzer that may rewrite it. Set it explicitly
+(`setSignatureSource(SourceType.AI)`) and ledger the prototype.
+
+**Re-assert the thing written, not the path that found it.** The applier located each object by tracing
+the call site's CALLIND back through its first argument and the vtable-pointer load; after the commit the
+same trace stopped resolving to a symbol at 16 of 22 sites, in functions whose renders had gone to 0. A
+re-assert on that trace reports a working change as lost. Check the variable by name and the committed
+database row.
+
+Origin: re-metal-fatigue §423 (`notes/phase4-object-retypes.md`).
