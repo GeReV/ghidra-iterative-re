@@ -828,3 +828,20 @@ Give these moves their own ledger and a both-directions gate over *DEFAULT-named
 non-global namespace*. Measured on its first run in one project: 17 already present, 3 of them
 withdrawn names that had kept their class namespace, the rest library namespaces whose origin
 nobody had recorded. Origin: re-metal-fatigue §421.
+
+## A NOTE THAT SAYS "CLOSED" IS A CLAIM ABOUT A DECISION RULE — open the rule before building on it
+
+Measured on one 1999 MSVC/x86 binary: a round recorded a pointer cell's refinement (base class ->
+derived class) as "closed by an export-typed chain", on the strength of ONE caller passing an exported
+getter's typed return to the setter that fills the cell. The next round, asked to teach the producing
+sweep that chain, first read the sweep's decision rule (a refinement needs two independent BODIES) and
+every call site of the setter: the export typing held at 1 of 5 non-NULL callers; another caller merged
+a typed return with an untyped handle-table load. Nothing contradicted the refinement, but "closed" was
+false and had already reached a backlog item and a round record. The fix was a user decision to relax
+the bar deliberately (two typings through different exports at different sites, over a supertype that
+already clears the bar), not a rule bent to fit. **"Closed" names the decision rule's verdict; read
+that rule, not the note.**
+
+Related, same round: **a probe's "undecided" bounds the probe.** A register-liveness probe abstained at an
+indirect jump; reading the jump table from the PE and each case's first instructions settled it in
+minutes, cited per deciding instruction.

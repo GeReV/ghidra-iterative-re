@@ -1061,3 +1061,20 @@ re-assert on that trace reports a working change as lost. Check the variable by 
 database row.
 
 Origin: re-metal-fatigue §423 (`notes/phase4-object-retypes.md`).
+
+## TYPE THE CELL A LOCAL IS LOADED FROM BEFORE TYPING THE LOCAL — and a struct cannot fix a call on an under-typed object
+
+Measured on one 1999 MSVC/x86 binary (Ghidra 12.1.2), two consequences of how virtual-call renders
+repair:
+
+- **A field retype propagates into the locals loaded from it.** A local living in hash (unique) storage,
+  which a site-trace resolver could not reach, rendered correctly once the struct member it was cached
+  from was retyped -- along with two more renders in another function. Rehearse the field first and
+  count what propagation fixes before writing local rows for it.
+- **Building a class's vtable struct does not repair a call on an object DECLARED as an ancestor.** The
+  call keeps borrowing the ancestor struct's definition for that slot; when that borrowed definition has
+  no parameters, the CALLIND has no `this` input at all, so a resolver keyed on the first argument cannot
+  find the object even after the struct exists. The vtable-pointer load is then the only witness of the
+  dispatching object. The prediction that the struct alone would fix it was wrong.
+
+Origin: re-metal-fatigue §424 (`notes/phase4-object-retypes-2.md`).
