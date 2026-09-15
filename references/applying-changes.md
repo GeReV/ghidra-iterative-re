@@ -1078,3 +1078,27 @@ repair:
   dispatching object. The prediction that the struct alone would fix it was wrong.
 
 Origin: re-metal-fatigue §424 (`notes/phase4-object-retypes-2.md`).
+
+## A DRY RUN THAT WRITES AN ARTIFACT IS A MUTATION — diff what it writes the first time its population changes
+
+A dry run is supposed to be free. It is free for the *program*; an applier that also emits a
+worklist or census artifact from its current plans is mutating the *repo*, and that write is only
+harmless while every run plans the same population.
+
+Measured on one project: a struct applier rewrote its "structs built from an ancestor" worklist on
+every run, dry or not. For 30 program versions every run planned the same classes, so the file never
+changed and its canary excuse read *"dry run regenerates it"*. The first run with a new population arm
+planned four other classes and wrote **0 rows over the 21 committed** — the rebuild-is-a-deletion
+shape, in a recovery artifact, from a dry run nobody expected to touch anything. It was caught by a
+`git status` before staging, not by any gate: the artifact was excused from the stability canary
+precisely because the dry run "regenerates" it.
+
+- **When a producer's population rule changes, list the artifacts it WRITES and diff them after the
+  first dry run**, not after the first apply.
+- **A worklist or record artifact is merged, never overwritten**: rows for the things planned this
+  run are replaced; every other committed row is carried verbatim; the run prints what the old rule
+  would have written (the two-step diff, baked in).
+- A canary excuse of the form *"the producer regenerates it"* is a claim that the producer's
+  population is stable. Re-read it whenever that population gains an arm.
+
+Origin: re-metal-fatigue §426.
