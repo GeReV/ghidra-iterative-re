@@ -3036,3 +3036,20 @@ the thing that owns it (the deciders' constants, the mangling code, the cell's w
 that fails when a value exists upstream that the grader does not classify. When a vacuity check fires,
 its message must name BOTH sides of the join -- one that lists only the reference set sends the reader
 to "the reference set shrank" when the other side went to zero.
+
+## A GUARD THAT ENUMERATES THE ROUNDS IT PROTECTS PROTECTS NO ROUND ADDED AFTER IT
+
+A multi-round applier carried its rollback test as `if MODE == "rollbacktest" and TOKEN in ("421",
+"426"): raise`, with a second arm for the rounds that have no step 1. A new round's token matched
+neither, so the "rollback test" would have run the cascade, passed the post-cascade re-assert and
+written three ledgers -- a real apply, performed by the mode whose only purpose is to prove nothing is
+written, and every count would have closed afterwards. It was found by reading the mode arms before
+running them; no gate could have seen it, because the outcome is indistinguishable from a correct
+apply. The same file had the opposite defect in a poison: `plan_classes[0] = poisoned` on an empty
+step-2 plan is an `IndexError` far from the guard it poisons, and a traceback reads as a broken
+harness rather than as the measured fact "this guard has no population in this round". Two rules.
+Key a guard on the SHAPE of the round the code can observe (`step1 and not plan_classes`), or make an
+unknown token a refusal -- never a silent fall-through into the mutating path. And a poison whose
+population is empty must `raise` with that sentence, in the words a round record can quote; the
+neighbouring poison in the same file already did, which is how such a gap survives: the pattern was
+present and not applied. (Origin: re-metal-fatigue §428.)
