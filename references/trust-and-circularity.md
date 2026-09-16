@@ -868,3 +868,22 @@ had lost its question on the way into the notes.
 - The census still had to be run: pricing found the affected population was 26 classes and not the 2 the
   item named, of which 24 bought nothing observable. The value of the census was the split, and the
   user chose the smallest option. Origin: re-metal-fatigue §425.
+
+## When two witnesses disagree, look for the one neither produced — and check provenance markers in both directions
+
+A width convention from GUI registration strings ("X/Y/Z without a `.Layer` component means a 12-byte
+vector") disagreed with a 16-byte serialisation record for one member, and the project correctly carried it
+as an unresolved contradiction for rounds: neither channel could outvote the other from inside. A third
+witness from outside both settled it in one artifact join: the virtual methods the class overrides sit at
+slots whose exported mangled signatures take and return `const CLVector &`, the override block-copies four
+dwords into the member, and an unrelated exported function takes the same member by that reference. The
+resolution changed the RULE (a missing component decides nothing about width), measured first to un-type
+nothing that rule had already claimed. The general form: a declared signature at a shared virtual slot is
+an independent type witness for every override, and a contradiction between two inference channels is a
+prompt to search for it, not a tie to break.
+
+The same round wrote a false "name not from the binary" marker onto a name the binary spells, because the
+post-apply check asserted only that invented names KEEP the marker, never that spelled names do not GAIN
+it. A provenance assertion that runs in one direction certifies half the claim. (Origin: re-metal-fatigue
+§430.)
+
