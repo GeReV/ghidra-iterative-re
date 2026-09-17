@@ -887,3 +887,21 @@ post-apply check asserted only that invented names KEEP the marker, never that s
 it. A provenance assertion that runs in one direction certifies half the claim. (Origin: re-metal-fatigue
 §430.)
 
+
+## A calibration set the licensed repair shrinks is a countdown, not a calibration
+
+A structural detector was calibrated on the rows whose answer the binary states independently
+(demangled export prototypes the analyzer under-modelled), and the repair the detector licenses
+rewrites each such row in the project's own tier -- so every repair removed a calibration row: 25,
+then 20, then, worked to the end, only the rows the detector must NOT fire on. The floor moved with
+the set each round and every gate stayed green, because a floor pinned to a shrinking population is
+consistent by construction. The obvious replacement -- the project's own ledger of repaired rows,
+each "proven" by several witnesses -- is the self-harvest trap in a new coat: the detector is one of
+those witnesses, so it would grade itself on its own verdicts. What works is a population nothing
+in the loop can reach: the export table's by-value returns, fixed by the linker and read from an
+artifact the program cannot influence, which kept every repaired row exactly as it kept the
+unrepaired ones (6 of 6 repaired, all detected). Two rules. **Ask of a calibration population "what
+moves it?" -- if the answer is "the repair it licenses", the number tracks the work's progress, not
+the rule's truth.** And a one-sided calibration (every row is a positive) still needs its negatives
+from somewhere; here they are exactly the rows no repair ever removes, so that arm does not consume
+itself either. (Origin: re-metal-fatigue §436.)
