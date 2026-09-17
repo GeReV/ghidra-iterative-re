@@ -3053,3 +3053,24 @@ unknown token a refusal -- never a silent fall-through into the mutating path. A
 population is empty must `raise` with that sentence, in the words a round record can quote; the
 neighbouring poison in the same file already did, which is how such a gap survives: the pattern was
 present and not applied. (Origin: re-metal-fatigue §428.)
+
+## A gate's MEMORY must be held to the gate's own rule, and a GENERATED file is stale the round after it is regenerated
+
+Two shapes of the same defect, both measured with every gate green. **First:** a completion gate
+refused to grade a denominator that was measured in the previous ledger row and is NOT MEASURED now
+(its artifact left stale by a version bump) -- and the *recorder* that writes that ledger had no such
+rule, so it wrote a row with the cell blank, and the next gate run graded against that row and passed.
+The read side and the write side of one append-only record had different rules; the hole was
+permanent until read by eye. The repair is one function used by both modes, and the strongest arm is
+the real situation replayed against a copy of the artifacts: the recorder refuses, exit 1, nothing
+written. Rule: whatever a gate refuses to READ, its recorder must refuse to WRITE; a check that grades
+against its own history is only as good as what the history was allowed to contain. **Second:** two
+generated C headers were found 13 and ~95 program versions stale and regenerated; the check built the
+next round found one stale AGAIN, one round later, by a single typed cell. Regeneration repairs the
+instance; the join repairs the pattern. The join that works is the one already used for excused
+artifacts: give the generator an output-directory option (~10 lines each), run it into scratch,
+byte-compare, and key the population on a directory LISTING joined both ways -- every file is
+regenerated or excused with a reason, every row names a file that exists, an empty listing refuses,
+and a non-CSV difference is reported by its first differing line so a stale header names the member
+that moved. Ask of every committed derived file *"what re-derives this and compares?"*; if the answer
+is "someone runs the generator", it is already stale. (Origin: re-metal-fatigue §435.)
