@@ -823,6 +823,39 @@ justified in writing before the ceiling moved. At 73 it would have been silent.
   the distance between the ceiling and the current value. If that distance is not zero, the gate is
   measuring nothing until the backlog grows past the gap.
 
+## A check added BESIDE a gated check inherits no poison
+
+When a new floor, arm or population is pinned next to an existing gated one — typically as the
+replacement the existing one will eventually hand over to — the record tends to say *"poison: the same
+one"*. Check which DIRECTION that poison exercises. Measured: a probe's positive floor was replaced by a
+second floor over a population the work could not shrink, and the only poison on file made the detector
+fire MORE, which the negative arm catches first; nothing had ever made the detector fire LESS on the real
+program and watched the new floor catch it. The first act of the round that retired the old floor was to
+write that poison (blind the detector's seed entirely), run it, and see the new floor raise at `0 of 39` —
+because removing the old floor is only safe once something demonstrably guards the direction it guarded.
+
+- **Every gate has two directions. Name the poison for each, not the poison for the gate.**
+- **A hand-over between checks is a mutation of the assertion set**, and the rule that a changed condition
+  is an undemonstrated assertion applies to the check that stays as much as to the one that goes.
+
+## A poison arm that draws its SUBJECT from a shrinking population goes inert without a sound
+
+An arm that picks *"the first candidate with verdict X"* is correct until the work removes the last
+such row, and then it raises `LookupError` — which a selftest runner counts as a failure only if
+somebody reads that selftest. Measured: 14 of 72 arms in a gate library had been inert for three rounds
+because a three-row apply had emptied both populations they drew subjects from; among them was the poison
+for the very check being retired, so that check had been undemonstrated for exactly as long. The library's
+*consumer* ran its own 44-arm selftest, green throughout, and did not run these.
+
+- **Before editing a selftest, run the COMMITTED copy** (stash, run, restore byte-identical). It is the
+  one measurement that turns *"13 failures after my edit"* into *"14 before it, minus the arm I replaced."*
+- **Arms that test a check reached BEFORE the subject's own verdict can take any subject**; a wrong-reason
+  refusal still fails the arm if the arm requires the reason text. Arms that need the verdict itself need a
+  synthetic subject, and building one re-adjudicates what the arm means — queue it with the count rather
+  than delete it.
+- **A selftest nothing runs is the same shape as a gate nothing runs.** Either the consumer's gate runs it
+  or its count is pinned somewhere a gate reads.
+
 ## A poison that cannot REACH its guard is not a poison
 
 A population guard was written inside a per-class loop, *after* the filter that selects the classes
