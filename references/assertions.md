@@ -3074,3 +3074,17 @@ regenerated or excused with a reason, every row names a file that exists, an emp
 and a non-CSV difference is reported by its first differing line so a stale header names the member
 that moved. Ask of every committed derived file *"what re-derives this and compares?"*; if the answer
 is "someone runs the generator", it is already stale. (Origin: re-metal-fatigue §435.)
+
+## The file a tool is forbidden to touch is the file it never looks at — ratchet every append-only record against its committed copy
+
+A project's lessons file (append-only, never generated, ~16,000 lines) was replaced by one round's
+21-line block -- a whole-file write where an append was meant -- and the next three rounds appended
+to the stub. Every gate stayed green: no gate read the file, and the bookkeeping tool's own contract
+("this file is byte-identical across an apply") was exactly why it never inspected it. The index tool
+printed the denominator on every query -- "0 of 3 blocks" -- and it was read as a zero, not as a 3.
+Two rules. **Every append-only record needs a ratchet against its own committed copy (HEAD through
+git), placed in the tool every round already runs, refusing when the count falls and refusing when
+HEAD cannot be read.** And **a denominator printed beside a zero is a measurement**: a count far
+below what you know the file holds is the finding, however healthy the zero beside it looks. The
+strongest arm is the history itself (the truncating commit against its parent: 1 heading vs 279),
+not a constructed poison. (Origin: re-metal-fatigue §439.)
