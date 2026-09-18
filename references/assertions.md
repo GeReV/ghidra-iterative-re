@@ -856,6 +856,27 @@ for the very check being retired, so that check had been undemonstrated for exac
 - **A selftest nothing runs is the same shape as a gate nothing runs.** Either the consumer's gate runs it
   or its count is pinned somewhere a gate reads.
 
+## A control population is built by SUBTRACTING the treatment, not by listing sources
+
+An applier's post-cascade control set was "every census row not in the plan, plus every caller of a
+planned row" — and the callers were added without the subtraction. It held for two rounds because
+no planned row happened to call another. The first wave large enough to be interesting had four
+rows that call each other; the cascade rewrote them exactly as planned, the control check read that
+as collateral damage, and the whole apply rolled itself back. Correct behaviour of the guard, wrong
+construction of its population. Build controls as (every source) MINUS (the plan), then prove the
+rollback held before re-running: a dry run in which every prior prototype still matches is that proof.
+
+## A witness's false-positive rate is per SHAPE of negative, never the average
+
+A caller-side witness (the last push before the call is the address of a caller local) measured 39
+of 39 on the positive set and 27 of 2,987 (0.9%) on a negative set drawn outside it. Reported like
+that it would have licensed rows on its own. Broken down by the negative's shape it was 0 of 2,494
+on `char *` sites and **24 of 98 (24.5%) on `const Class &` sites** — a setter takes a local's
+address exactly as a by-value-return caller does. The witness is therefore bound to its partner (the
+callee's body must FILL and RETURN that address) and licenses nothing alone; the applier encodes that,
+and the tool prints the per-shape table so the average cannot be read as the rate. **When a negative
+set mixes shapes, the average is the theatre; print the worst shape and name it.**
+
 ## A poison that cannot REACH its guard is not a poison
 
 A population guard was written inside a per-class loop, *after* the filter that selects the classes
