@@ -877,6 +877,31 @@ callee's body must FILL and RETURN that address) and licenses nothing alone; the
 and the tool prints the per-shape table so the average cannot be read as the rate. **When a negative
 set mixes shapes, the average is the theatre; print the worst shape and name it.**
 
+## When a check grows a SECOND BRANCH, its existing poison covers the first one only
+
+A structural check was extended with a second form for a case the first could not express. The
+poison that had demonstrated it for three rounds was assumed to cover both. Measured: it reaches
+only the original branch — the poison perturbs an index, and the new branch asks whether an index
+EXISTS, so perturbing it leaves the answer true. Every row graded by the new branch PASSED the
+poisoned run, and the arm still read as demonstrated because the run raised **on the other rows**.
+
+- **Read WHICH rows a poison refused, never that the run raised.** A poison over a mixed population
+  reports a single verdict for the whole run, and that verdict is satisfied by any subset.
+- A new branch needs its own poison, and the one that works is usually the branch's own precondition
+  inverted: here, forcing the declarer branch onto a body known to be an override.
+
+## A rule about an INHERITANCE relation stated FOR ALL is almost always meant to be THERE EXISTS
+
+"This body declares its slot" was written as *"no table holding it has an ancestor with that slot"*.
+But a declared slot is INHERITED into every descendant table, so the body is also bound at that index
+in tables whose ancestors do have it — which is what inheritance means, not a counterexample. The
+universal form refused exactly the base-class rows, the ones most obviously correct. The right form is
+*"SOME table INTRODUCES the slot holding this body"*.
+
+**Grade the base class first.** A quantifier error on an inheritance relation shows up there before
+anywhere else, and it shows up as a refusal of the row you are most confident about — which is the
+cheapest possible signal, provided the round is reading refusals rather than counting them.
+
 ## A poison that cannot REACH its guard is not a poison
 
 A population guard was written inside a per-class loop, *after* the filter that selects the classes
