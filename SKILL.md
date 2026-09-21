@@ -483,6 +483,51 @@ scripting rules: `references/api.md`.**
   **(c) bound the remaining surface as a LIST WITH A DENOMINATOR, not as a worry** —
   "6 open intervals out of 261 classes, here they are" is a backlog item somebody can
   finish; "other classes might be affected" is not.
+- **Banking a find that WORKS.** The entry above is the *defect* direction of one rule; this is
+  the *success* direction, and it is the half that gets skipped — because a find that works
+  **feels finished**, where a defect nags. The instance is never the unit of work; the pattern
+  is. Before a round closes, every find owes two follow-ups, both cheap because the instrument
+  that produced the find already exists:
+
+  **(a) GENERALIZE** — does the realization name a broader pattern with more instances? Sweep
+  for them and close with a denominator. A measured zero is worth having: it stops the next
+  round re-asking.
+  **(b) MUTATE WITHOUT GENERALIZING** — vary exactly ONE term of the pattern and re-run.
+  `p->cell + 0x10` found something; ask for `p->cell + N` over every N. Then vary the
+  *operator*, the *witness kind*, the *artifact*, the *spelling of "unknown"*. The neighbouring
+  variant is routinely a separate population the original query could not see, and asking is
+  nearly free.
+
+  Measured in one session. A round found two cells whose type had been *read and written down
+  and never applied* — one with the answer sitting in the layout artifact's own `note` column
+  while its `ctype` stayed opaque. **Generalizing** it (join every artifact's `note` against
+  what is actually applied) returned **3 of 635**: small, honest, and now closed. **Mutating**
+  it instead paid better three times over — vary the *artifact*, and a sibling layout artifact
+  turned out to carry a pointer-dereference witness the first one's producer lacks (same
+  question, two artifacts, one rule, never compared); vary the *spelling of opacity*, and 3
+  candidate cells became **98 opaque blocks over 9,354 bytes**; then ask which of those repeat
+  at a constant stride, and a contiguous equal-width run exposes a **6-element array of a
+  372-byte record** that no query had been shaped to ask about. None of those was a
+  generalization of the original find. Each was one term changed.
+
+  Two traps while doing it.
+
+  **A mutation is a new query, so its result is a new claim**, not an extension of the find's
+  credibility. Calibrate it on its own — `references/assertions.md` and
+  `references/harvesting-traps.md` — or a confident sweep inherits authority it never earned.
+
+  **And the mutation space is combinatorial, so it needs DISCRETION, not enumeration.** A
+  disassembler will happily match `p->cell + N` for every immediate, and then `p->cell + reg`,
+  `p->cell + [reg]`, `p->cell + reg*scale`, the value copied to a local first, the value passed
+  as an argument and dereferenced in the callee. Enumerating that blindly buys noise and a large
+  bill. Pick the variants a *mechanism* predicts — if the find was "the cell is a pointer", the
+  variants worth asking for are the ones a pointer would produce — and say which you did not ask
+  for. The same combinatorics are why a *narrow* pattern is the more common failure: measured in
+  the same session, a hand-written regex for dereferences matched only `cell->` and cast forms,
+  so it found **1 witness body where the value-tracing witness found 161**, because the code
+  copies the cell to a local first. That near-refuted a correct finding. **Before a sweep's zero
+  is believed, ask which spellings it cannot see** — the instrument's "cannot look here" reads
+  exactly like the binary's "nothing here."
 - **Context rot** across long runs, producing inconsistent naming between functions
   analyzed early and late. Short scoped executions beat one monolithic session.
 - **A reproducible error is not evidence for your theory about its cause.** It is evidence
