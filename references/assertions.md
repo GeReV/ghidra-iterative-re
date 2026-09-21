@@ -188,6 +188,25 @@ just fired and you are deciding what it means.
   Do not fix such a check by enlarging the evidence it grades: widening the narrow mode's
   population would have made it pass, and would have changed the population of the route
   that produced an already-applied type.
+- **A COUNT-BASED witness bar can be unsatisfiable by the SHAPE of the evidence, not by the
+  population — and then it parks a settled fact forever while looking like healthy caution.**
+  The bar above was a population problem; this one is about what the evidence *is*. Measured: a
+  layout sweep parked any cell whose type was carried by fewer than two distinct function
+  bodies — a good rule, because a cell touched by 90 bodies where exactly one carries a provable
+  type is a one-witness claim in a 90-witness costume. But the cell in question is written by a
+  SETTER: ten instructions storing the two parameters an exported, mangled signature *declares*
+  into two members. **A setter is written once by construction**, so no second body can ever
+  exist, and the cell parked across three rounds while the answer sat in the export's own name.
+  The bar was counting the wrong thing: its purpose is to stop ONE BODY'S INFERENCE being
+  believed, and a binary-DECLARED parameter type is not an inference at all. The fix is a TIER
+  test, not a bigger count.
+  - **Ask of every threshold: can the evidence shape it grades ever produce the number?** A
+    constructor, a setter, a registrar entry, a vtable slot and a static initialiser are all
+    written exactly once; any bar of two over *bodies* is unsatisfiable for all of them.
+  - **The failure is silent and flattering** — the artifact says `candidate`, which reads as
+    "not enough evidence yet" when it means "this bar cannot be met here." Have the note say
+    which, as the sweep above eventually did: *"type T is carried by only 1 body of N"* is
+    actionable where *"multiple provable types"* is not.
 - **A check with two modes must be demonstrated in BOTH, or the mode you skipped stops
   being reproducible in silence.** The calibration above was added by a round that ran
   only the wide mode, quoted wide numbers in its commit message, and regenerated only the

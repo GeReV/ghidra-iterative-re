@@ -272,6 +272,29 @@ silent: a gate that refuses real evidence is indistinguishable from a gate worki
 asymmetry is why this survived two rounds of review with a comment beside it naming the
 expensive direction.
 
+**The same rule bites a CAREFUL regex, and there the failure is a confident wrong answer
+rather than garbage.** A later sweep — hunting pointee types named in artifact *prose*, where
+no decoder can be asked because the text is not a symbol — narrowed the pattern properly to
+the pointer/reference introducers and anchored it on a word boundary:
+`\b(?:PAV|ABV|AAV|PBV)([A-Za-z0-9_]+)@`. **A mangled type code sits INSIDE one unbroken
+token, so a leading `\b` can never match one.** In
+
+```
+?SetPosition@CMover@@UAEXABVCLVector@@@Z
+                        ^ the ABV is preceded by X -- no word boundary, no match
+??0CMover@@QAE@ABV0@@Z
+                ^ this ABV DOES follow an @, so the back-reference matches
+```
+
+the scan silently skipped the real pointee and reported **`0`** — the numeric
+back-reference — as the type of the one cell the sweep existed to settle, and its strong
+bucket read 2 rows where it held 8. The `\b` habit is imported from ordinary word matching,
+where it is right, and it is wrong here by construction; so is admitting a digit as a class
+name. Where the text genuinely is a symbol, ask the decoder as above. Where it is prose and
+you must match, **anchor on nothing, require the pointee to start with a letter, and pin
+both in a test** — the failure mode is not noise you would notice but an answer you would
+believe.
+
 `msvc_demangle` exposes the decoded set as `Symbol.udts` (and a `udts` column in `--tsv`)
 so the correct thing is not more work than the regex.
 
