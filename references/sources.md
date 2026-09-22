@@ -51,3 +51,13 @@ default in 12.0 (with 3.0 deprecations), `SymbolicPropogator`'s recording defaul
 `AddVfunctionCallRefScript` is 12.1. **Re-verify against your install before
 relying on any of them** — the same discipline as stamping evidence rows with a program
 version, applied to the tool.
+
+**The project these notes came from moved to Ghidra 12.3-DEV** (master `d6192cb3f900`, 2026-09-22),
+to get a decompiler fix no release carried (GP-7167; see `applying-changes.md`, "A correct float
+return on a typed slot"). Claims marked as measured on 12.1.2 were NOT re-verified on 12.3. One API
+break met in practice: `DataTypeManager.remove(DataType, TaskMonitor)` is gone on 12.3, and only
+`remove(DataType)` remains. What the move itself taught: rehearse a Ghidra upgrade on a copy of the
+VERSIONED project, not on an imported snapshot, because anything that opens historical versions
+read-only is exactly what a format change can break, and an unversioned copy has no history to
+test. On that project all historical versions opened and a ledger derived from them came back
+identical.

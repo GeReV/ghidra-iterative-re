@@ -99,32 +99,53 @@ types, or decide which apply is worth the round.
   `vftable\[\d+\]` BEFORE applying, and treat the dispatching object's type, not the definition,
   as the defect at those sites.
 
-  **A CORRECT FLOAT RETURN ON A TYPED SLOT CAN MAKE THE C WORSE, AND THE CAUSE IS A KNOWN DECOMPILER
-  BUG (Ghidra 12.1.2, still present on `master` at the time of writing).** On 32-bit x86, a virtual
+  **A CORRECT FLOAT RETURN ON A TYPED SLOT CAN MAKE THE C WORSE, AND THE CAUSE IS A DECOMPILER BUG
+  PRESENT IN EVERY RELEASE THROUGH 12.1.4 AND FIXED ON `master` (GP-7167, 2026-08-25).** On 32-bit x86, a virtual
   call through a vtable struct whose `FunctionDefinition` returns `float` or `double` renders as a
   bare statement, and the caller's use of the result appears later as `extraout_ST0`. The UNTYPED
   call `(float10)(**(code **)...)()` had bound the result correctly, because with no declaration the
   decompiler infers outputs from what the caller reads. Measured on one project: four DLL-implemented
   slots returning on the x87 stack, established by two witnesses, and typed correctly, made **31
   callers that previously produced trustworthy C worse**; left untyped, none got worse.
-  - **The cause is diagnosed upstream in PR #6715** (<https://github.com/NationalSecurityAgency/ghidra/pull/6715>,
-    open and unreviewed since July 2024). A `float`/`double` is smaller than the 10-byte ST0, so
-    `ParamEntry::getAddrBySlot` records it through `constructFloatExtensionAddress` as a JOIN entry.
-    For a definition reached through a pointer TYPE, that entry is created in `GhidraTranslate`'s
-    address-space manager but looked up in `GhidraArchitecture`'s, where the same join offset names
-    EDX:EAX. The return is modelled in EDX:EAX, nothing reads it, dead-code removal deletes it, and
-    the real ST0 read is left dangling. Direct calls to a `Function` do not take this path, which is
-    why float returns on direct calls bind.
-  - **Refuted candidates, so nobody re-tests them:** the return WIDTH (`float10`, `double` and
-    `float` rendered identically in the measurement, though a 10-byte `float10` should skip the join
-    path — an unexplained case, recorded open) and a missing ST0 output in the calling-convention
+  - **The cause, verified by instrumenting the 12.1.2 decompiler.** A `float`/`double` is smaller
+    than the 10-byte ST0, so `ParamEntry::getAddrBySlot` asks for a float-extension JOIN address
+    through `spaceid->getManager()` -- the manager that created the REGISTER space, which is the
+    `Translate` object, not the `Architecture`. Only the Architecture has a join space
+    (`Architecture::restoreFromSpec` inserts it after `copySpaces`), so the join record is built with
+    a null space and the address comes back INVALID. Storage assignment then falls through to the
+    next output entry: **EAX for a `float`, EDX:EAX for a `double`**, type-locked. Nothing reads those
+    after the call, the output is removed as dead, and the caller's real ST0 read is left dangling
+    as `extraout_ST0`. Direct calls to a `Function` get their storage from the Java side and never
+    take this path, which is why float returns on direct calls bind. PR #6715
+    (<https://github.com/NationalSecurityAgency/ghidra/pull/6715>, open and unreviewed since July
+    2024) diagnoses the same bug and proposes forwarding the translator's join lookups; **`master`
+    fixed it differently in GP-7167 (f17a0b5719)**, by passing the owning manager into
+    `getAddrBySlot`. A standalone datatest -- a `__thiscall` vtable call with an argument, returning
+    `float4`/`float8` -- fails 0/3 on 12.1.2 and passes 3/3 on master. A no-argument pointer call does
+    NOT reproduce it (the decompiler's output recovery rescues it), so a test of this bug needs the
+    vtable shape.
+  - **You cannot fix it by dropping a master `decompile` into a release.** The native decompiler and
+    the Java side change the pipe protocol in lockstep; master's GP-6985 added a message type that
+    12.1.x Java rejects as an alignment error. The fix is the whole Ghidra (build master, pinned to a
+    commit) or a local backport of GP-7167's `getAddrBySlot` change.
+  - **Refuted candidates, so nobody re-tests them:** the return WIDTH as the cause (`float` and
+    `double` both fail, by the mechanism above), and a missing ST0 output in the calling-convention
     model (`x86win.cspec` gives `__thiscall` the same `ST0, EAX` output list as the other
-    conventions).
+    conventions). A `float10` return fails too, but by a DIFFERENT path: it is turned into a hidden
+    return pointer, consistent with its padded size exceeding ST0's `maxsize="10"` in the fallback
+    assignment -- not investigated further, and not a workaround.
   - **The rule: before KEEPING a type, measure what the decompiler does with it at the call sites,
     not only whether it is right.** Dump the affected callers under both arms (typed and untyped,
     restoring the program afterwards) and score both with the same rule the quality gate uses; hold
     the type if it regresses, record the fact separately, and look for the decompiler bug. The
     correct type should still win in the end: hold it only until the bug is fixed upstream or locally.
+  - **And audit the checks that were calibrated while the bug was live.** Measured on one project after
+    moving to a build with the fix: a prototype-audit tool's calibration arm had pinned "this float slot
+    loses its return at this caller" as ground truth, and failed on the fixed decompiler -- correctly.
+    The same tool's defect list went from 27 rows to 0, because every row was the decompiler's failure
+    on a float-DECLARED slot, filed as a defect in the slot typing. When every row of a defect list
+    shares one shape, test the TOOL for that shape before repairing the rows; and grade a calibration
+    whose positive case is a tool bug on a pinned fixture, not on the live output.
 - **Struct layouts.** Field accesses become named. Can *change* signatures as a side
   effect: a large struct returned by value switches to the hidden return-storage-pointer
   convention, so `T Func(this)` becomes `T * Func(this, T *__return_storage_ptr__)`.
