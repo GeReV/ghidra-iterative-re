@@ -419,6 +419,21 @@ reach estimate it produced.
   half. Whenever a guard's condition is a comparison, ask what each side of the boundary means
   separately — this is the "absent row hides better than a blank cell" failure moved one level
   up, into the PREDICATE rather than the reader, where no census of the output can see it.
+- **A census read from decompiled C must also read the spelling its own apply will produce.** A
+  census that licenses typing a vtable matched the untyped call render
+  `(**(code **)(*(int *)g + 0x78))(...)`. The apply it licensed replaced that spelling with
+  `(*g->vftable->slot_30)(g, ...)` (typed, `this` now rendered) and `(*(code *)g->vftable->slot_30)(...)`
+  (held). Re-derived after the apply, it found **0 of 303** call sites. Worse, one slot had been held
+  because an exe-side witness contradicted the DLL side, and with that witness's spelling gone the
+  re-derivation would have TYPED it. Taught all three spellings, the post-apply census was *richer*
+  than the pre-apply one: 16 call sites invisible before the apply surfaced (the 303 had been a
+  floor), the new prototypes had resolved every arity mismatch, and one slot declared `void`
+  turned out to have its result consumed. **If a census is meant to be re-checked after the
+  mutation it licenses, list the spellings the mutation creates before writing the matcher**, and
+  make the re-check run on the post-apply output, not just the pre-apply one. Two narrower traps
+  in the same instrument, both silent: a "result consumed?" test that looked one character before
+  the call (a `(int *)` cast hid 24 of 25 consuming sites), and a call pattern that required the
+  argument list on the same line (the decompiler splits long calls; 257 of 303 found).
 ### Calibrating and pricing a witness
 
 - **A RANKING TELLS YOU WHERE TO LOOK AND NEVER WHAT YOU WILL FIND — SO A READ-IT-BY-HAND ROUND

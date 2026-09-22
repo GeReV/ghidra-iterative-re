@@ -118,6 +118,29 @@ both a spelling and a width, the width is the fact.** Emit `uint32_t` for a 32-b
 and name the real type in a comment. The header then compiles anywhere, which is the difference
 between a check that runs and a check that rots.
 
+**CORRECTION, measured on the same project a year later: "compiles anywhere" is the defect, not the
+virtue.** A header that spells every pointer `uint32_t` compiles IDENTICALLY on a 32- and a 64-bit
+host, so it contains nothing that could be the wrong width, and **no pointer-width error is
+detectable by construction**. The compile check had been described as the one step that recomputes
+every offset from the C object model, and it passed for months while verifying a proxy. It also
+discarded decided evidence at the last step: 75 pointer cells, 32 with a named pointee, reached the
+header as bare integers with the pointee recorded nowhere. The fix was to compile for the TARGET
+(`-m32` with the multilib installed) and emit the real pointers, spelled `struct X *` against
+forward-declared tags. After the change all three headers compiled under `-m32` and FAILED on the
+host, with 5, 627 and 138 errors: the check could now tell the two apart. Two rules generalise:
+
+- **Ask of any check what input would make it fail. If the answer does not include the property it
+  exists to verify, it is a proxy**, and a passing proxy looks exactly like a passing check.
+- **Make the target-width check refuse rather than fall back.** Compile a probe asserting
+  `sizeof(void *) == 4` first, and on failure name the missing packages and say not to drop `-m32`.
+  Without it, a machine lacking multilib fails inside `<stdint.h>` with an error about glibc, whose
+  obvious "fix" is to drop the flag and silently return to the 64-bit proxy. Asserting the PROPERTY
+  also catches a toolchain that accepts `-m32` and ignores it.
+
+The width-over-spelling rule above still holds for the ARTIFACT (record the width; it is the fact).
+What changed is the emitted C: once the target can be compiled for, a 4-byte pointer is emitted as a
+pointer and checked as one.
+
 **2. In a RECOMPILE-AND-DIFF it is quiet, and it invalidates the comparison.** Every displacement
 in the emitted object code is computed from the host's layout, so a struct the host resized
 produces instruction-level differences that are artifacts of your build rather than of your

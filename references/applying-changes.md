@@ -98,6 +98,33 @@ types, or decide which apply is worth the round.
   itself many times over, but the two were foreseeable: grep the decompiled output for
   `vftable\[\d+\]` BEFORE applying, and treat the dispatching object's type, not the definition,
   as the defect at those sites.
+
+  **A CORRECT FLOAT RETURN ON A TYPED SLOT CAN MAKE THE C WORSE, AND THE CAUSE IS A KNOWN DECOMPILER
+  BUG (Ghidra 12.1.2, still present on `master` at the time of writing).** On 32-bit x86, a virtual
+  call through a vtable struct whose `FunctionDefinition` returns `float` or `double` renders as a
+  bare statement, and the caller's use of the result appears later as `extraout_ST0`. The UNTYPED
+  call `(float10)(**(code **)...)()` had bound the result correctly, because with no declaration the
+  decompiler infers outputs from what the caller reads. Measured on one project: four DLL-implemented
+  slots returning on the x87 stack, established by two witnesses, and typed correctly, made **31
+  callers that previously produced trustworthy C worse**; left untyped, none got worse.
+  - **The cause is diagnosed upstream in PR #6715** (<https://github.com/NationalSecurityAgency/ghidra/pull/6715>,
+    open and unreviewed since July 2024). A `float`/`double` is smaller than the 10-byte ST0, so
+    `ParamEntry::getAddrBySlot` records it through `constructFloatExtensionAddress` as a JOIN entry.
+    For a definition reached through a pointer TYPE, that entry is created in `GhidraTranslate`'s
+    address-space manager but looked up in `GhidraArchitecture`'s, where the same join offset names
+    EDX:EAX. The return is modelled in EDX:EAX, nothing reads it, dead-code removal deletes it, and
+    the real ST0 read is left dangling. Direct calls to a `Function` do not take this path, which is
+    why float returns on direct calls bind.
+  - **Refuted candidates, so nobody re-tests them:** the return WIDTH (`float10`, `double` and
+    `float` rendered identically in the measurement, though a 10-byte `float10` should skip the join
+    path — an unexplained case, recorded open) and a missing ST0 output in the calling-convention
+    model (`x86win.cspec` gives `__thiscall` the same `ST0, EAX` output list as the other
+    conventions).
+  - **The rule: before KEEPING a type, measure what the decompiler does with it at the call sites,
+    not only whether it is right.** Dump the affected callers under both arms (typed and untyped,
+    restoring the program afterwards) and score both with the same rule the quality gate uses; hold
+    the type if it regresses, record the fact separately, and look for the decompiler bug. The
+    correct type should still win in the end: hold it only until the bug is fixed upstream or locally.
 - **Struct layouts.** Field accesses become named. Can *change* signatures as a side
   effect: a large struct returned by value switches to the hidden return-storage-pointer
   convention, so `T Func(this)` becomes `T * Func(this, T *__return_storage_ptr__)`.
