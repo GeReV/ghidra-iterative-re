@@ -111,6 +111,30 @@ an `undefined` PLACEHOLDER data unit, not `None`; `getDefinedDataAt(addr)` is th
 own post-check then failed on type `undefined` vs `undefined4`. An earlier run of the same revert
 had passed only because the address happened to be defined at the time.
 
+**`SymbolTable.getAllSymbols(True)` yields Function and Label symbols -- never a namespace.**
+Measured twice on 12.x (`{'Function': 3732, 'Label': 1728}` by type). A check that looks for
+namespace symbols in that iteration can never fire; reach a namespace's symbol through
+`label.getParentNamespace().getSymbol()`, and do not count namespaces in an AI-symbol delta
+computed from it.
+
+**The decompiler LOCKS the first prototype that reaches an indirect call -- and a call-site
+override beats it.** `FuncCallSpecs::forceSet` (fspec.cc) commits the first function-pointer
+type that arrives at a CALLIND and "locks the prototype so it doesn't happen again". So when a
+global's element type binds a virtual call to the BASE class's vtable first, a receiver local
+retyped to the derived class later renames the field (`this->vftable->SetHomePos`) but keeps the
+base slot's arguments (`HitMe`'s four, invented as `unaff_*`). A field name and argument types
+from two different slots is the signature of the lock. The fix is
+`HighFunctionDBUtil.writeOverride(function, callAddress, signature)`, which the decompiler reads
+BEFORE analysis. Three things about it, all measured:
+- it creates a label `prt_<hash>_<addr>` in a per-function `override` namespace and the namespace
+  itself **both SourceType.USER_DEFINED** -- re-tag them if your trust model filters on source;
+- it stores a **COPY** of the signature in `/auto_proto` (identical signatures shared), so a later
+  change to the slot's definition does NOT reach the call. Gate every override against the
+  CURRENT definition it was copied from, not against your own ledger of what you wrote;
+- `HighFunctionDBUtil.readOverride(label)` returns it for such a gate.
+Measured on one binary: 144 overrides on a typed handle table took the render trade of typing
+that table from D5 -57 to +2 on the 365 functions touching it.
+
 **A measurement that mutates can end by DISCARDING rather than reverting.** After apply -> measure
 -> revert, the program holds uncommitted transactions whose net effect is nothing, and the next
 save/check-in writes an empty version. If nothing is to be kept, close the program without saving
