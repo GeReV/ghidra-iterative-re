@@ -434,6 +434,32 @@ reach estimate it produced.
   in the same instrument, both silent: a "result consumed?" test that looked one character before
   the call (a `(int *)` cast hid 24 of 25 consuming sites), and a call pattern that required the
   argument list on the same line (the decompiler splits long calls; 257 of 303 found).
+- **Some witnesses cannot be re-taught at all, because the apply does not change their SPELLING — it
+  changes who is speaking. Move those to the listing BEFORE the apply.** Same instrument, one round
+  later. Its second witness for "this slot returns a float" was the decompiler's `(float10)` cast at
+  the call sites. That cast is what the decompiler writes for an *untyped* call leaving a value in
+  ST0; declare the slot `float` and it disappears, and the render that remains
+  (`fVar2 = (*g->vftable->GetTerrainHeight)(...)`) merely restates the type the round itself applied.
+  Teaching the matcher the new spelling would not have helped: post-apply **the witness is our own
+  declaration read back**, which is the self-harvest trap wearing the clothes of a text pattern. The
+  fix was to ask the same question of the instructions, where no type can reach it — from the CALL,
+  does the caller use ST0 before pushing anything of its own? Ground truth both ways on that binary:
+  ST0 used or discarded after every attributed call on all four called x87 slots, and on **0 of the
+  36 called non-x87 slots** — a negative control the C-level witness could not have produced at all.
+  **Before an apply, sort each witness into "still independent afterwards" and "about to be quoting
+  me"; the second kind must move to a lower level — disassembly, relocations, the file — or retire.**
+- **A PARSER DEFECT DOES NOT LOOK LIKE A CRASH. IT LOOKS LIKE A CENSUS.** A census keyed on rendered
+  prototypes read each function's block out of a concatenated corpus stream. Run one kept the
+  stream's own delimiter line (`0x00484d20 SetUnitParams`), so every "return type" parsed as a
+  function name: **0 decidable rows, 222 contradictions**. Run two stripped comment LINES but not
+  comment BLOCKS, and a multi-line provenance comment left its tail in the prototype, so every return
+  parsed as the last word before `*/`: **0 decidable, 563 contradictions**. Both runs printed a
+  well-formed, internally consistent, confidently formatted census; nothing in either output looked
+  like a bug. What caught it was the instrument's CALIBRATION — *where the decompiler has an opinion,
+  does it match the binary's own declaration?* — reading **0.0%**, which is not a plausible statement
+  about a working decompiler. **Give a census one number whose healthy value you know independently
+  of the census, and make an implausible value a REFUSAL rather than a headline.** Both defects are
+  now poisons: each one, reintroduced, drives that number to zero and the run refuses.
 ### Calibrating and pricing a witness
 
 - **A RANKING TELLS YOU WHERE TO LOOK AND NEVER WHAT YOU WILL FIND — SO A READ-IT-BY-HAND ROUND

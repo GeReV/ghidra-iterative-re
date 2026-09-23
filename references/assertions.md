@@ -419,6 +419,19 @@ just fired and you are deciding what it means.
   And **print what the audit cannot see, as a number**: a ledger join is blind to a
   project-derived name applied at a HIGHER tier, as are every other ledger-based gate. That is
   not a hole in the audit — it is the reason the tier discipline exists.
+
+- **AN ARM WHOSE SUBJECT IS THE ROUND'S OWN UNAPPLIED WORK FAILS THE DAY THAT WORK LANDS.** A
+  census tool gained a ground-truth arm reading *"the live census decides rows and calibrates above
+  its floor"*. The round then applied all 79 decidable rows and the arm failed — correctly by its
+  own wording, uselessly in fact, because "nothing left to decide" is the round SUCCEEDING. This is
+  the converse of the familiar trap (*a calibration pinned to a defect stops firing the day the
+  defect is fixed*) and it costs more, because it fails loudly inside the expensive tail instead of
+  going quiet. The repair is a POSITIVE CONTROL that manufactures its own subject: mutate the tool's
+  definition of "undecided" for one run — here, treat `int` as undefined — and require that every row
+  which then becomes decidable carries its donor, that donor's mangled name and a resolved type. It
+  exercises the whole decision path, needs no unapplied work to exist, and cannot rot as the
+  population empties. **Before pinning an arm to live data, ask what it will read once this round has
+  done what it set out to do.**
 ### The stability harness
 
 - **Run every read-only sweep after every apply and require byte-identical output.**

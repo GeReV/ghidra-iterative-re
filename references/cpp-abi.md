@@ -670,6 +670,39 @@ Preconditions, all of which must be checked, not assumed:
   better warrant for applying it than any candidate-level argument. Make that split an
   assertion that raises if either side empties or either regime stops separating.
 
+  **The member NAME is not a safer key than the index — it is a worse one.** Reaching for
+  the name when the index looks unsafe is the obvious move and it fails harder, because a
+  name is not unique across a hierarchy at all. Measured on the same binary, over every
+  exported vtable target: **20 of 239 exported member names span more than one slot** —
+  `MoveTo` occupies **four** (7, 19, 179, 180) with four different signatures, and
+  `GetMaxOffensiveRangeSq` is `float(int)` at slot 13 and `void(float&,float&)` at slot 14,
+  so a name-keyed rule would hand a `void` member a float return. The index side of the
+  same binary: **42 of 214 slot indices carry more than one distinct exported member**.
+  Neither key establishes *same declared member* on its own; the pair (declaring class,
+  slot) resolved through the hierarchy does, and it is worth CHECKING rather than assuming
+  — ask whether a family's exported implementations name the same member, and refuse the
+  family when they do not. On that binary 65 families held two or more exported
+  implementations and **0 disagreed**, which is what licensed the rule; the check costs one
+  join and is the only thing standing between it and the two failures above.
+
+- **A virtual's RETURN TYPE is declared once, by the class that declares the member — so one
+  exported implementation types the whole family.** MSVC mangled names carry the return type
+  (`?GetToolbarInfo@CMessage@@UAEPAUCToolbarInfo@@XZ` → `CToolbarInfo *`), and every
+  implementation of that slot implements that one declared member. This settles returns the
+  decompiler left `undefined` at a tier no body-reading can reach: it is the binary's own
+  declaration, not an inference. **The tier of the DONOR is the whole rule.** The same
+  project had already asked the same question about PARAMETER types using a *sibling's
+  decompiler-inferred* type as the donor and measured the family's typed siblings
+  contradicting each other in **17 of 62 families** (`CLVector *` vs `float *` vs `int *` for
+  one slot) — because a family of inferences is several independent guesses, not one fact
+  repeated. Restricted to exported donors the same shape returned **447 of 484 agreements
+  (92.4%) and 0 disagreeing families**. Two corollaries worth copying: take the Ghidra
+  SPELLING of the type from the donor's own applied signature rather than mapping declared
+  types to tool names by hand (a hand table mapped `unsigned long` to `uint` where that
+  program spells it `ulong`), and exclude the exported implementations themselves from the
+  agreement denominator — a declaration agreeing with itself is a tautology, and there can be
+  many of them per slot.
+
   **And before pricing this route at all, check whether the project has already APPLIED
   it.** In the incident above the repo had shipped an applier using the correct
   ancestor-form rule 56 program versions earlier, carrying its own calibration in its
