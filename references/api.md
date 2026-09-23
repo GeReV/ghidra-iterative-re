@@ -104,6 +104,19 @@ currentProgram.getSourceFileManager()
 `getReferencesFrom(addr)`, `getSymbolAt(addr)`, `createLabel(addr, name, makePrimary)`,
 `getScriptArgs()`, `createFunction(entry, name)`, `disassemble(addr)`.
 
+**`Listing.getDataAt(addr)` is not an existence test.** For bytes with nothing defined it returns
+an `undefined` PLACEHOLDER data unit, not `None`; `getDefinedDataAt(addr)` is the call that means
+"is something defined here". Measured (12.3-DEV): a revert's converge step tested
+`getDataAt(...) is None`, read the placeholder as "already re-created", skipped the step, and its
+own post-check then failed on type `undefined` vs `undefined4`. An earlier run of the same revert
+had passed only because the address happened to be defined at the time.
+
+**A measurement that mutates can end by DISCARDING rather than reverting.** After apply -> measure
+-> revert, the program holds uncommitted transactions whose net effect is nothing, and the next
+save/check-in writes an empty version. If nothing is to be kept, close the program without saving
+and reopen it: that returns the exact checked-in state. Keep the revert anyway if the tail needs
+the program live, and prove it with a re-measure before discarding.
+
 **Count functions consistently.** `getFunctionCount()` **includes** external functions;
 `getFunctions(boolean)` returns **non-external** functions only. They differ, so record
 which you used — and note two things the obvious reading gets wrong: the boolean is
