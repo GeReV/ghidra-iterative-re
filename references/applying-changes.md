@@ -1075,6 +1075,18 @@ Two changes close it, and the second must be exercised, not assumed:
 Origin: re-metal-fatigue §421 (`notes/LESSONS.md`); the same "a dry run cannot test the code after
 the mutation" failure had been recorded one round earlier, and recording it did not prevent it.
 
+**A REVERT IS A MUTATION, and it is the path that gets written without the wrapper.** Measured again
+(§468, Ghidra 12.3): an applier whose apply path carried the `try/except: end(False)` wrapper gained a
+`revert` mode after its render trade lost, written in a hurry and outside that wrapper. Its first run
+cleared a 256 KB array and re-created the old pointer, then raised on `DataTypeManager.remove(dt,
+monitor)` -- an overload recalled from memory that does not exist (it is `remove(DataType)`). The
+clear and re-create were committed. What recovered it cleanly was writing the revert to CONVERGE --
+every step reads the state it finds and does only what is still undone -- and then proving the end
+state by re-rendering: every function touching the global re-dumped, and only the ones the kept
+changes explain differed from the pre-round corpus. Two rules: **every mutating mode, the undo
+included, sits inside the wrapper**, and **a revert is written idempotent**, because the first time
+it runs is usually the time something already went wrong.
+
 ## A NEW APPLIER INHERITS NONE OF THE REFUSALS THE OLD APPLIERS OF ITS KIND CARRY
 
 A project policy that lives as a refusal inside each applier -- "a member name under a placeholder
