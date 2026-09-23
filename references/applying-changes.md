@@ -155,6 +155,23 @@ types, or decide which apply is worth the round.
   per-memory-block via the Memory Map. Marking genuinely read-only sections constant is
   factually correct, cheap, and high-leverage. Marking hardware registers **volatile**
   stops the decompiler folding away repeated reads.
+- **"Exceeded maximum restarts with more pending" is a hard-coded cap, and better typing
+  hits it.** Read from the decompiler source (master `d6192cb`, 12.3-DEV): `coreaction.cc`
+  builds the main loop as `ActionRestartGroup(..., "universal", 1)`, allowing ONE restart, and
+  `FuncCallSpecs::forceSet` (`fspec.cc`) requests a restart whenever a function-pointer type
+  reaches an indirect call after data flow has committed. A typed virtual call whose receiver is
+  the RETURN of another typed call (`obj->GetDerived()` then `derived->Method()`) is discovered
+  only after the first restart and needs a second, so typing vtables makes the warning MORE
+  common. The C it leaves looks like a slot-definition bug (the second call is rendered without
+  its `this`) and is not one. Measured on one binary: 15 of 15 such functions cleared either by
+  persisting the decompiler's own discovered prototypes as call-site overrides
+  (`HighFunctionDBUtil.writeOverride`) or by rebuilding `decompile` with the cap at 4, and the two
+  produced byte-identical C. Prefer the rebuild if you can pin a build: an override stores a COPY
+  of the prototype, so a later slot retype silently misses every overridden call site. The cap is
+  consulted only when exceeded, so a rebuild changes EXACTLY the functions carrying the warning;
+  predict that, then check it (0 of 400 random controls changed, 15 of 5,649 over the full
+  program). **General rule: when a decompiler warning recurs, grep its text in
+  `Ghidra/Features/Decompiler/src/decompile/cpp/` before designing around it.**
 
 ### Emit a C header, and add the assertions yourself
 
