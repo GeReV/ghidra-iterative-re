@@ -196,6 +196,19 @@ order of cost. See **Target ABI vs host ABI** in `references/oracles-and-abi.md`
   undo that `canUndo()` refuses to give you for a previous script run's transaction.
   Version control works in a local, non-shared project, and Program Differences can diff
   against a version picked from the Version History table.
+- **A confirmation pass earns its cost only when something CHANGED between passes.** A post-apply
+  stability check (every read-only sweep re-run, outputs byte-compared) is run once to SURFACE
+  what moved and again to CONFIRM the fixes. The second run tests the FIXES — a repaired script,
+  a moved pinned count, a newly registered producer — so if the first run's only findings are
+  changed artifacts, and a join of every changed row against the addresses the round itself
+  wrote finds none outside it, the join IS the confirmation. A second run would compare against
+  files the first run wrote, and could only catch a sweep that is nondeterministic on identical
+  input. Measured on one project, where a pass costs ~30 minutes: a 12-row signature round found
+  exactly the two predicted artifacts, 12 rows each, 0 outside the round, having made every
+  predictable knock-on edit (pinned counts, producer registrations) BEFORE the first pass — the
+  second pass bought nothing. The rule that saves the pass is the same one that avoided a third:
+  **predict and pre-apply the knock-ons of your own apply, then run one pass.** Run the second
+  when the first raised, found an unexplained row, or needed any edit to a check.
 - **Scope address sets as narrowly as the operation allows.** Broad set + large archive
   is the dangerous combination; the incident did not reproduce narrowly.
 - **`Function.setName(sameName, SourceType.X)` IS A NO-OP FOR THE SOURCE — and a mutation
