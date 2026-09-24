@@ -929,6 +929,13 @@ through Ghidra, these apply:
   loop silently replaces `end()`. Measured: a rehearsal's rollback `end(False)` then raised
   `TypeError: 'int' object is not callable`, and — per the rule above — the runner's `end(true)`
   COMMITTED every rehearsal write into the open program. Only the next dry run's guards noticed.
+  The same class has a SECOND failure mode: a JPype bean PROPERTY (`getControls()` -> `controls`) is
+  not shadowed but refuses assignment (`property ... has no setter`), raising at that line. Derive the
+  name set from the javadoc (methods + get/is-derived properties), not the Python stubs -- a stub-based
+  sweep missed `end` itself.
+- **`setNoReturn(True)` is a program-wide mutation.** Measured: one flag on a 468-site error helper made
+  the cascade create a function, clear code outside its predicted fall-through, rewrite 12 unrelated
+  prototypes and demote AI-sourced signatures (the AI = ANALYSIS tie). Rehearse it ALONE.
 - **Splitting a merged decompiler variable is scriptable.** Ghidra's "Split Out As New Variable"
   (`IsolateVariableTask.commit`) is `nhv = highFunction.splitOutMergeGroup(high, vn)` followed by
   `HighFunctionDBUtil.updateDBVariable(nhv.getSymbol(), newName, dataType, SourceType.AI)`; the
