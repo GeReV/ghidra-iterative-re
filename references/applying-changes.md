@@ -172,6 +172,22 @@ types, or decide which apply is worth the round.
   predict that, then check it (0 of 400 random controls changed, 15 of 5,649 over the full
   program). **General rule: when a decompiler warning recurs, grep its text in
   `Ghidra/Features/Decompiler/src/decompile/cpp/` before designing around it.**
+- **Measure a type change's render trade over the CALLGRAPH of what changed, not over a
+  pattern.** Before check-in, dump and score every function the change can re-render, then keep
+  it only if the quality measure does not drop. Measured on one binary: a set chosen by call
+  SPELLING (the vtable-slot renders expected at the call sites) missed a direct caller of a
+  retyped function, which lost D5 and was found only in the whole-program measurement. The
+  post-apply join then found two more spellings of the same typed call (`(member.vftable)->slot_N`
+  on an embedded object, `pVtable->slot_N` through a copied vtable pointer). Build the set from
+  the callgraph of every changed signature plus the slot targets, and treat the pattern-based set
+  as a lower bound.
+- **A census that reads UNTYPED renders must be pinned to the program version it was approved
+  against.** The census that licensed a vtable struct counted call sites whose result is read,
+  in the untyped spelling `(**(code **)(vtable + K))(...)`. After its own apply those calls render
+  typed (`vtable->slot_N(...)`), the read vanishes from its pattern, and re-run it would declare
+  a read slot `void`, i.e. it reads its own apply back. Name the approval version in the tool and
+  refuse to re-derive from a later program; a typed-spelling matcher is not a safe substitute when
+  several classes' structs render the same field names.
 
 ### Emit a C header, and add the assertions yourself
 
