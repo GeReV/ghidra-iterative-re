@@ -924,6 +924,18 @@ through Ghidra, these apply:
   in a `finally`, so an exception COMMITS whatever was written: a rehearsal must abort BEFORE
   evaluating any check that can raise, and an apply-mode post-check that raises leaves the
   mutation in the (unsaved) program — write the recovery path into the script header.
+- **Never bind a GhidraScript builtin as a variable** — `end`, `start`, `monitor`, `currentProgram`,
+  `askString` and the rest are module-level names in a PyGhidra script, so `end = off + width` in a
+  loop silently replaces `end()`. Measured: a rehearsal's rollback `end(False)` then raised
+  `TypeError: 'int' object is not callable`, and — per the rule above — the runner's `end(true)`
+  COMMITTED every rehearsal write into the open program. Only the next dry run's guards noticed.
+- **Splitting a merged decompiler variable is scriptable.** Ghidra's "Split Out As New Variable"
+  (`IsolateVariableTask.commit`) is `nhv = highFunction.splitOutMergeGroup(high, vn)` followed by
+  `HighFunctionDBUtil.updateDBVariable(nhv.getSymbol(), newName, dataType, SourceType.AI)`; the
+  committed local is type-locked, hence isolated, and survives re-decompilation. Two traps: on a
+  variable with ONE merge group it silently returns the same variable (so the "split" retypes
+  every use — check `len({vn.getMergeGroup()})>=2` first), and the remainder may move to other
+  storage (a unique temporary), so re-assert it by the defining PCs recorded before the write.
 - Dispose decompilers and close files explicitly; pass `monitor` to long operations.
 - **Discover API from the local install, not memory or the web.** A Ghidra install ships
   `docs/ghidra_stubs/pypredef/` (hundreds of greppable, exact-version stub files covering
