@@ -1208,3 +1208,20 @@ precisely because the dry run "regenerates" it.
   population is stable. Re-read it whenever that population gains an arm.
 
 Origin: re-metal-fatigue §426.
+
+### An applier run for ONE target applies to all of them
+
+- **A generic applier invoked to create one type rebuilds its whole population.** Measured: the struct
+  applier that was the right producer for one new embedded class would also have re-created every embedded
+  element's vtable struct with a REPLACE conflict handler -- erasing slot definitions the previous round had
+  typed -- and re-applied a stale cell nobody had approved. Its dry run said so (`stale=[...]`). Give the
+  applier a narrowing argument that REFUSES an unknown target, rather than copying it for the one case.
+- **A comment's invariant rots on the path nothing runs.** "The plan tuple is identical either way" stayed
+  true until the tuple gained a type column; the create-new path that relied on it had not run since, and it
+  raised on first use after writing half its changes (recovered by closing without saving). When a record
+  gains a column, grep for the comments that promise equality over it.
+- **Moving a function between two CLASS namespaces re-spells every ledgered prototype.** The auto-`this`
+  follows the namespace, so a signature gate that tolerates `void` or the current class reads a class-to-class
+  move as a partial revert. Ledger the move as its own signature row.
+
+Origin: re-metal-fatigue §479.

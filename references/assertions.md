@@ -3199,3 +3199,9 @@ HEAD cannot be read.** And **a denominator printed beside a zero is a measuremen
 below what you know the file holds is the finding, however healthy the zero beside it looks. The
 strongest arm is the history itself (the truncating commit against its parent: 1 heading vs 279),
 not a constructed poison. (Origin: re-metal-fatigue §439.)
+
+**A gate's verdict is its OWN exit status -- `gate | tail; echo $?` prints `tail`'s.** Measured: a
+completeness gate exited 2 (a refusal) at the start of a session and the check printed `EXIT 0`, because the
+status read was the pipe's last stage; the red gate stood until an agent ran the tool bare, hours later.
+Run a gate unpiped, or redirect it to a file and read `$?` before any other command -- and treat a gate whose
+status you did not read directly as NOT RUN. (Origin: re-metal-fatigue §479.)
