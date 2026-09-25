@@ -122,7 +122,13 @@ FUNCTION_CLASS = {
     "Y": ("", False, False),  # free function
     "Z": ("", False, False),
 }
-STATIC_OR_FREE = set("CDSTYZ")
+# Derived from FUNCTION_CLASS, never restated: a static member or free function
+# carries no `this` cv-qualifier, so the next character is the calling
+# convention. The hand-written set this replaced omitted K/L (protected static),
+# and `??2CGobject@@KAPAXI...` then ate its `A` (__cdecl) as a cv-qualifier and
+# decoded the return type as `void &` instead of `void *`.
+STATIC_OR_FREE = {c for c, (access, is_static, _v) in FUNCTION_CLASS.items()
+                  if is_static or not access}
 
 # A DATA symbol puts a storage class where a function puts its access character,
 # and follows it with `<type><cv-modifier>` -- `?pWorld@@3PAVCWorld@@A` is
@@ -691,6 +697,10 @@ def pe_import_names(path: Path) -> list[tuple[str, str]]:
 #: from the same misreading as the code agrees with it. `--oracle DIR` is the
 #: tier that corroborates, and it needs a project that has ground truth.
 VECTORS: list[dict] = [
+    dict(name="??2CGobject@@KAPAXIHHKTHGOBJECT@@@Z", oracle=False,
+         kind="operator", cls="CGobject", member="operator new", static=True,
+         virtual=False, ret="void *",
+         params=["unsigned int", "int", "int", "unsigned long", "HGOBJECT"]),
     dict(name="?Dwim@CMessage@@UAEXTHGOBJECT@@ABVCVector@@@Z", oracle=True,
          kind="function", cls="CMessage", member="Dwim", static=False, virtual=True,
          ret="void", params=["HGOBJECT", "const CVector &"]),
