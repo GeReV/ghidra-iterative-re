@@ -1247,3 +1247,18 @@ guards on a copy, and checking the diff touches only the lane's files.
 here: a catalog rewrite that would have changed every line's terminator, and 47 planned data items whose bytes held
 auto-analysis strings. The second was visible in the exported strings index all along, so the right fix was a census
 rule (demonstrated by mutation) and a re-emitted plan -- never a hand-edited plan to get past the guard.
+
+## TYPING A RECEIVER CAN BREAK A CALL THROUGH IT — and ask which GATE owns an artifact before adding a row
+
+**Origin: re-metal-fatigue §486 (2026-09-27).** Replacing an opaque `base` byte array with the real base layout
+typed a member that a virtual call went through. While the member was an untyped offset, the call's float return
+bound; once the member was typed as a base-class pointer, the call's slot lay PAST that class's vtable and the
+decompiler lost the return (`extraout_ST0`, a trustworthy-C regression). No slot was retyped -- only the receiver.
+Any retype of a receiver can expose an out-of-range virtual call; rehearse with the artifact-variable grade on,
+and hold the class (with the reason recorded in the census) until the call has a call-site prototype override.
+
+**A file that looks like "where X lives" may be one phase's verified record.** Two new type sizes were appended to
+a leaf-type file because a size reader read it; every downstream check passed and the gate that owns the file
+refused 23 ways, because each of its rows must be witnessed in an evidence file that is never regenerated. The size
+already had a decided home elsewhere. Before writing a row, find the gate that verifies the file, not the reader
+that consumes it.
