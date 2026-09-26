@@ -1225,3 +1225,25 @@ Origin: re-metal-fatigue §426.
   move as a partial revert. Ledger the move as its own signature row.
 
 Origin: re-metal-fatigue §479.
+
+## CUT A WIDE WAVE FROM A CAUSE CENSUS — and read a dry-run guard refusal as a missing census rule
+
+**Origin: re-metal-fatigue §485 (2026-09-26).** Three good narrow rounds each aimed at one or two defects and paid the
+full per-version verification tail. The wider round started from ONE pass over the per-function score artifact: for
+every failing function, which defect causes fail it, and how many fail on exactly one (745 of 1,497). One read-only
+investigator per cause priced its lane by simulating the fix with the grader's own code; builders built the lanes in
+parallel, each followed by an adversarial verifier; all appliers went into ONE version bump. Measured: the lanes'
+flip lists were disjoint, and the whole-program gain beat the sum of the lanes' rehearsals by exactly the functions
+that needed two lanes' fixes at once -- gains a sequence of narrow rounds can only reach after all of them land.
+Four of five cause investigators refuted their own lane's premise, and two lanes converged independently on the same
+repair group, which is a strong selection signal.
+
+**A verifier per builder is not ceremony.** It found blocking defects in 4 of 5 builds, including this project's own
+applied names propagated into type component names (types carry no SourceType, so that launders them) and a selftest
+reported green that was red. Its brief must require re-verifying sampled rows from the DISASSEMBLY, mutating two
+guards on a copy, and checking the diff touches only the lane's files.
+
+**When an applier's guard refuses at the first dry run, ask whether the offline census could have seen it.** Two did
+here: a catalog rewrite that would have changed every line's terminator, and 47 planned data items whose bytes held
+auto-analysis strings. The second was visible in the exported strings index all along, so the right fix was a census
+rule (demonstrated by mutation) and a re-emitted plan -- never a hand-edited plan to get past the guard.
