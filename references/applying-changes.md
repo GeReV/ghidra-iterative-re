@@ -1262,3 +1262,29 @@ a leaf-type file because a size reader read it; every downstream check passed an
 refused 23 ways, because each of its rows must be witnessed in an evidence file that is never regenerated. The size
 already had a decided home elsewhere. Before writing a row, find the gate that verifies the file, not the reader
 that consumes it.
+
+## THE CASCADE CAN RUN AN ANALYZER THAT WRITES `USER_DEFINED` — the Variadic Function Signature Override analyzer
+
+**Measured (Ghidra 12.3, one MSVC/x86 game binary, 2026-09-27).** A signature apply changed one function's return
+type and the apply's own `analyzeChanges` re-analysed that function. The **Variadic Function Signature Override**
+analyzer — *enabled by default* — parsed the format strings of the function's 17 `printf` calls and wrote a call-site
+prototype override at each one, as **`SourceType.USER_DEFINED`**: the tier a human decision carries, and the one a
+`SourceType.AI`-filtered harvest treats as evidence. It recognised `printf` only because an earlier round of ours had
+NAMED the CRT function (tagged AI) — so our own label came back out of the cascade as a top-tier override. That is a
+laundering path the trust model's "tag your writes AI" rule does not close: the write is the analyzer's, not yours.
+
+It had never fired before on that project for a structural reason — it runs on functions the cascade re-analyses,
+and no earlier apply had re-typed a `printf` caller since the CRT names existed. So its absence across many rounds
+proved nothing.
+
+What caught it: a gate that checks **every** override label in the program against the apply ledger in BOTH
+directions and requires `SourceType.AI` (17 unledgered labels + their `override` namespace, not AI). A gate keyed
+only on the rows you wrote would have passed. What repaired it: a gated script that removes exactly the unledgered,
+non-AI override labels inside functions that call a variadic CRT function (refusing anything else), and turns the
+analyzer off (`currentProgram.getOptions("Analyzers").setBoolean("Variadic Function Signature Override", False)`)
+so the next cascade cannot write them again. The information is recoverable from the format strings at any time; the
+provenance is not.
+
+Before relying on "the cascade only propagates what I applied", list the enabled analyzers that WRITE on a
+function-changed event (`analysis_options` / `pyghidra.analysis_properties`) and ask which of them write a source tier
+above `ANALYSIS`.
