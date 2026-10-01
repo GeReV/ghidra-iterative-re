@@ -3205,3 +3205,14 @@ completeness gate exited 2 (a refusal) at the start of a session and the check p
 status read was the pipe's last stage; the red gate stood until an agent ran the tool bare, hours later.
 Run a gate unpiped, or redirect it to a file and read `$?` before any other command -- and treat a gate whose
 status you did not read directly as NOT RUN. (Origin: re-metal-fatigue §479.)
+
+**A selftest whose ground truth is the LIVE program goes red the moment its own apply succeeds.** Measured: three
+census tools of one wave each carried arms like "this address is a planned string" or "12 datums will be absorbed",
+read from the current export of the program; the apply is precisely what makes those false, so after a clean apply
+4, 13 and 2 arms failed -- and the previous round had hit the same shape in one tool and fixed only that tool. Pin a
+ground-truth arm to a COMMITTED pre-apply fixture (the facts it needs, captured once), refuse when the fixture is
+absent rather than pass, and run the selftest against the post-apply state during the rolled-back rehearsal, where
+the failure is free. "Passes before and after its own apply" is a run, not a sentence. Related: **two checks that
+must agree about one ledger need one rule** -- two verifier fixes, each right for its own lane (accept a row a later
+container absorbs; accept only MISSING rows), contradicted each other on the same absorbed value after the apply;
+the shared predicate now lives in one imported module. (Origin: re-metal-fatigue §489.)
