@@ -973,6 +973,35 @@ Two rules:
   The fix here was to call the merge function with the poisoned directory as its parameter, which has
   no such layer.
 
+## A mutation harness grades its own kills, or it grades nothing
+
+*Origin: `pe32emu`'s `tools/mutate.py` (re-metal-fatigue, 2026-10-10).* Applying one source mutation
+to a copy and requiring a named test to fail is the strongest form of "demonstrated failing". It has
+five ways to report success it did not earn, and **all five occurred in one build**:
+
+- **Any non-zero exit read as a kill.** pytest exits 4 for a missing test id and 2 for a collection
+  error, so a mistyped target, or a mutation that breaks an import, reads as "KILLED". A kill is exit 1
+  **with a failure reported**. A hang is not a kill either: bound every run with a timeout.
+- **The mutated copy was not what imported.** With the package installed in editable mode, the
+  original source wins unless `PYTHONPATH` puts the copy first. Check `module.__file__` from inside
+  the copy before trusting any verdict.
+- **The mutation list and the test list were never joined.** A test with no mutation is an unproven
+  guard, and a mutation naming no real test proves nothing. Join them both ways: every collected test
+  has a mutation or a written exemption, and every entry names a collected test. Then demonstrate the
+  join failing both ways.
+- **A test that iterates over the constant it protects cannot catch it shrinking.**
+  `for t in TERMINALS: accept(t)` survives deleting a terminal from `TERMINALS`. Assert the literal
+  value as well.
+- **A guard enforced twice survives the mutation of either copy.** A divide error reached `fault`
+  through the emulator's own exception path as well as through the interrupt hook, so deleting the
+  hook's verdict changed nothing. Test each guard where it is the **only** route (`int3` here), and
+  exempt the doubly-covered test with the measured reason.
+
+The first harness run on a 42-test suite killed 10 of 12. Both survivors were tests too weak to
+fire, not code defects. One checked a region list the restore path rebuilds anyway, rather than the
+emulator's own mappings. The other attached no observer to the event the mutation removed. That is
+the result such a harness exists to produce.
+
 ## A condition CHANGED is an assertion UN-DEMONSTRATED
 
 An assertion that was demonstrated firing, then had its condition edited, is back to being an untested

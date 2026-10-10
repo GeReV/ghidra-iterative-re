@@ -179,6 +179,38 @@ For a project graded on functional equivalence, the corollary is that a clean de
 metric is evidence about the *database*, not about *behaviour*; the execution oracle is what
 closes the second.
 
+### Pitfalls measured building one
+
+*Origin: building `pe32emu` (re-metal-fatigue, 2026-10-10), a Unicorn 2.1.4 / capstone 5.0.6
+framework of this shape. Every item was found by a fresh whole-branch review and settled by a probe.*
+
+- **Capstone's read set is not a use set.** `regs_access()` reports `xor ecx,ecx`, `sub edx,edx`,
+  `sbb edx,edx`, `or ecx,-1` (MSVC's inline-strlen idiom) and `and ecx,0` as READING the register. An
+  input-liveness rule built on "the register was read" calls ECX/EDX real inputs of every function
+  that merely zeroes them. On one 1999 MSVC binary that is 266 functions with `xor ecx,ecx`, 198 with
+  `xor edx,edx`, and 83 with `or ecx,-1`. Treat "result independent of the operand" idioms as a
+  definition, and pin each form with a test.
+- **"Reached the return address" is not "returned".** Deciding the outcome by EIP alone accepts:
+  - a stack switch onto a fake frame that holds the sentinel;
+  - a callee that pops its caller's return address (`add esp,4; ret`);
+  - a `call $+5` get-PC that never returns.
+
+  Require a return observed at call depth 0 **and** ESP inside the frame. Exclude `call $+5` from the
+  shadow call stack.
+- **Unicorn's Python binding hides a hook's exception.** `emu_start` raises `UcError(status)` before
+  it re-raises the exception stored by a hook, so a bug in your own fetch or unmapped-memory hook, or
+  in a client callback, surfaces as an ordinary emulation error. A defect in the instrument then reads
+  as a fact about the target. Catch inside every hook, stop, and re-raise after `emu_start` returns.
+- **A fetch fault happens before the per-instruction hook.** An instruction cap counted in
+  `UC_HOOK_CODE` cannot see a retry loop that keeps resuming at bad targets: a resolver that always
+  answered with an unmapped address was called 100,000 times under a cap of 1,000. Count resumes
+  against the cap.
+- **Writing EIP from inside `UC_HOOK_CODE` works in 2.1.4**: the instruction at the old EIP is
+  skipped, which is how a stub model returns. `context_save`/`restore` covers the FPU (TOP 0 → 7 → 0).
+  `UC_X86_REG_FS_BASE` has **no effect in 32-bit mode**, so a TEB needs a GDT. `rdtsc` is **not
+  deterministic** across two identical restored runs, so model it or stub what executes it if output
+  must regenerate byte-identically.
+
 ## Target ABI vs host ABI — the width that breaks three things
 
 Nearly every target this document is about is 32-bit, and nearly every machine you will build on
