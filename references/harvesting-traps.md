@@ -261,6 +261,18 @@ reach estimate it produced.
   applying debug information changes BSim signatures and can degrade matching — so a
   correlation run *after* an apply round is not measuring the same thing as one before it.
   Capture similarity evidence early, or record which program version it came from.
+- **A decompiler-derived cache is stale when the DECOMPILER changes, and a program-version
+  stamp cannot see that.** Measured (re-metal-fatigue, 2026-10-10): the offline corpus was
+  stamped with program version and function count only, while the installed `decompile.exe`
+  carried a local patch a reinstall silently drops, and the project had moved 12.1.2 → 12.3
+  between rounds. Any corpus from the other build would have passed every staleness check
+  and answered with C the live decompiler no longer renders. Stamp the **toolchain** —
+  `Application.getApplicationVersion()` and the SHA-256 of the file
+  `Application.getOSFile("decompile.exe")` resolves to — and have the reader re-hash the
+  installed file and refuse on a mismatch. The reader can do this without Ghidra running,
+  which is what makes it a check rather than a note. (Prior art: REA keys a cached result on
+  target bytes + operation + parameters + tool version + analysis settings, and DX-Ball pins
+  the Ghidra archive and every provider JAR by hash.)
 ### Censuses, zeros and skip counters
 
 - **Distinguish measured-zero from structural-zero.** "I looked and found nothing" and

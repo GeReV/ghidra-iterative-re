@@ -43,6 +43,8 @@ sources below are cited at the tier the review gave them):
 - [REBench](https://arxiv.org/abs/2604.27319) · [REFORGE](https://arxiv.org/abs/2607.07738) · [OSPREY](https://yonghwi-kwon.github.io/data/osprey_sp21.pdf) — measured ceilings for LLM-assisted RE and Ghidra's own type-recovery baselines.
 - [ReVa](https://github.com/cyberkaida/reverse-engineering-assistant) — Ghidra-12-native agent tooling shipped as skills; direct prior art.
 - [Il2CppInspectorRedux](https://github.com/LukeFZ/Il2CppInspectorRedux) · [Il2CppDumper](https://github.com/Perfare/Il2CppDumper) · [gdsdecomp](https://github.com/GDRETools/gdsdecomp) — modern-engine dumpers.
+- [morluto/rea](https://github.com/morluto/rea) (read at `33d4761`, 2026-10-07) — multi-engine RE MCP (Hopper / Ghidra 12.1.4 / IDA) with an agent skill. Its evidence rules largely restate this skill's; what it adds is Ghidra-bridge API pitfalls (`references/api.md`, marked secondhand) and the body-as-AddressSet contract. Cited at the tier of a third-party tool's documentation and source comments.
+- [N0zoM1z0/dx-ball](https://github.com/N0zoM1z0/dx-ball) — REA's showcase: a 1990s MSVC/x86 Windows game rebuilt as C, graded by **executing the original x86 in Unicorn** against the C (`tests/target_oracle.py`, `docs/ORACLES.md`) and by pinned-VC4.0 COFF replay. The source for `references/oracles-and-abi.md` → "Execute the original code".
 
 **Version-sensitivity.** API claims here were checked against **12.1.2** and several are
 version-bound: source-map APIs are 11.3+, `SourceType.AI` is recent, PyGhidra became the

@@ -147,6 +147,21 @@ which you used — and note two things the obvious reading gets wrong: the boole
 **direction** (`true` = ascending address order), *not* a filter, and an internal
 thunk-to-DLL (a `JMP [IAT]` stub with an entry point in `.text`) **is** returned by it.
 
+**A function body is an `AddressSet`, not an interval — `entry + size` is not its end.**
+`f.getBody().getNumAddresses()` counts the set's addresses; the body's pieces are
+`f.getBody().getAddressRanges()`, each an `AddressRange` whose `getMinAddress()` and
+`getMaxAddress()` are both INSIDE it (verified: per-function sums of `max - min + 1` equal
+`getNumAddresses()` on all 5,655 functions of one binary). Measured on that 32-bit MSVC game:
+**10 of 5,655 bodies are fragmented** — a tail piece far past the entry (`0x004c68bd` owns
+`0x004cbefe..0x004cbf0a`, 0x5641 bytes on), pieces split around a switch table, one piece
+BEFORE its entry (a CRT `_strchr` owning `0x004c61a0..a4`, entry `0x004c61b0`). A
+containment tool built on `entry + size` answered wrongly for every address in those pieces
+and called the gaps owned. Export the ranges; bytes between two ranges of one body — switch
+data, a shared tail — belong to neither. (REA's Ghidra bridge reports exactly this as
+`total_bytes` vs `span_bytes` with inclusive range ends; DX-Ball measured 1,244 owned bytes
+inside a 1,315-byte span on one function.) `getFunctionContaining(addr)` is the live exact
+answer.
+
 ### `getCalledFunctions` returns a SET — the ORDER is the thing you wanted
 
 `Function.getCalledFunctions(monitor)` answers *which* functions this one calls. It is a
@@ -386,6 +401,20 @@ ifc.dispose()          # always
 For `this`-relative offset recovery over SSA, do not hand-roll a register tracker — see
 `FillOutStructureHelper` under "Read-only witnesses", including which of its arms writes to the
 DataTypeManager and why its reach dies on a `__cdecl` prototype.
+
+**Pitfalls REA's Ghidra bridge encodes — SECONDHAND, Ghidra 12.1.4, not measured here.** From
+the source comments of `bridge/ghidra/ReaGhidraBridge.java` (`morluto/rea@33d4761`). Treat each
+as a hypothesis to test the first time a script depends on it:
+- `PcodeOpAST.isDead()` *"can remain set after Ghidra decodes a live block"* — REA reports
+  actual syntax-tree block membership separately rather than trusting the flag.
+- `HighFunction.getJumpTables()`: the **default** case can be an ordinary in-range label, not
+  an OFF sentinel; a **negative** case label carries its unsigned magnitude, so
+  `getValue()`/`getScalar()` alone yields a wrong positive case; and
+  `JumpTable.getLoadTables()` does not say which backing table produced which case — do not
+  attach every table to every case. Shared case bodies keep every label.
+- Ghidra-defined string `Data`: when no terminator is reported missing, the API cannot
+  distinguish a present NUL from a fixed-length or Pascal layout (REA names the state
+  `present_or_not_required`).
 
 ## Demangling
 
@@ -678,6 +707,12 @@ Please use `PcodeEmulator` instead."* Keep it only for `enableMemoryWriteTrackin
 Run a routine without the target running — decompression, checksum, decryption, table
 generation. Set registers and memory, run to an address, read results. Course material:
 `docs/GhidraClass/Debugger/B2-Emulation`.
+
+**Emulation is also an ORACLE, not only a convenience** — and for that use an emulator
+OUTSIDE the database (Unicorn on the shipped PE image) is the stronger witness, because no
+applied type or prototype can reach it. The harness discipline (poisoned stack, callee-saved
+sentinels, ESP-after-return as a measured stack cleanup, dependency hooks recorded as ordered
+traces) is in `references/oracles-and-abi.md` → "Execute the original code".
 
 ## Version control and checkpointing
 

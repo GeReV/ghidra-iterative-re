@@ -11,6 +11,8 @@ layout that a 64-bit host will silently relay.
 **In this file:**
 
 - The external oracle — the only check that is not the program grading itself
+- Execute the original code — the behaviour oracle, and a witness Ghidra cannot bias
+  (Unicorn harness discipline; three ledgers; never transcribe decompiler output)
 - Target ABI vs host ABI — the width that breaks three things
 - The format's own integrity checks ARE the oracle — find them first
 - The binary's own instrumentation is an oracle — switch it back on
@@ -69,6 +71,12 @@ publishes a false-positive model. Nothing else here does.
 external *source*, but it is the program's own record of what you did rather than your
 memory of it.
 
+**5. Run the ORIGINAL machine code and compare.** Execute the binary's own unmodified
+functions in a CPU emulator and diff their effects against your reimplementation on the same
+inputs. Where routes 1–4 grade *layout and markup*, this is the only one that grades
+*behaviour*, and it is the natural oracle for a **functional-equivalence** target. Its
+discipline is in the next section.
+
 **AND IF YOU HAVE ONE, WIRE IT TO SOMETHING THAT RUNS IT — AN UNWIRED ORACLE ROTS SILENTLY AND
 NOTHING ELSE CAN NOTICE.** Measured, and it is the worst-placed instance of this document's "a
 harness is blind to what it does not run" rule: a project that emits its recovered layouts as C
@@ -98,6 +106,78 @@ on its own:
 own guesses should want, more than anything, one check it cannot influence. If none of these
 is reachable, say so explicitly in the round's record — "no external oracle available" is a
 finding about the project's confidence ceiling, not an absence worth passing over in silence.
+
+## Execute the original code — the behaviour oracle, and a witness Ghidra cannot bias
+
+*Source: the DX-Ball reconstruction (`N0zoM1z0/dx-ball`, `tests/target_oracle.py`), the
+showcase project of the REA MCP (`morluto/rea`); read 2026-10-10. Its numbers are that
+project's, quoted for calibration, not measured here.* A 1990s 32-bit MSVC Windows game was
+rebuilt as C and graded by running the shipped `.exe`'s own functions in **Unicorn**
+(`UC_ARCH_X86, UC_MODE_32`): map `SizeOfImage` at `ImageBase`, write
+`pefile.get_memory_mapped_image()`, push a sentinel return address and the arguments, run to
+the sentinel. **82,709 cases over 168 functions**, each comparing the original's effects with
+the reimplementation's on identical inputs. About 150 lines of Python; `unicorn`, `pefile` and
+`capstone` hash-pinned.
+
+The harness is small, and every line of it is a check you would otherwise infer:
+
+- **Hook every dependency at its address and RECORD the call as an ordered event.** A hooked
+  callee reads its arguments off the stack, appends `(name, args…)` to a trace, sets EAX, pops
+  its return address *and its own callee-cleanup bytes* (a `__stdcall` COM method: 24), and
+  jumps back. The comparison is then over **traces, not return values** — call order, RNG
+  draw order, mutation order — which is what "observable behaviour" means at function grain.
+- **Fill the stack with a poison byte (`0xA5`) before every call.** A function that reads an
+  uninitialised local now produces a recognisable value instead of whatever the last case
+  left — the harness found real target inputs that read uninitialised memory, and recorded
+  the domain as excluded rather than claiming equality there.
+- **Seed EBX/ESI/EDI/EBP with distinct sentinels and assert them unchanged on return**, and
+  **assert ESP after return equals entry + 4 + the expected cleanup.** These two asserts are
+  a *measured* calling convention: stack cleanup (`RET n`), callee-saved discipline, and —
+  by leaving ECX/EDX unset or poisoned — whether a register is a real input.
+- **Cap the instruction count and assert EIP reached the sentinel**, so a runaway loop is a
+  failure, not a hang.
+- **Execute the real constructor to get a real object.** Vtables live in the image, so a
+  `__thiscall` method on an object the original constructor built dispatches correctly; a
+  hand-built object only tests your layout guess.
+
+**Why this belongs in an iterative-RE skill and not only in a reimplementation one:** most of
+the hardest per-function facts a Ghidra round *infers* are things an emulator *measures* —
+how many argument bytes a body pops, whether ECX/EDX are live on entry, whether EAX or ST0
+holds a value at every `RET` (a hidden return buffer, an x87 return), which globals a body
+writes. Rounds that census those facts from disassembly patterns and calibrate the pattern
+against exports are building an approximation of a measurement that is available. **Ask
+first whether the question can be answered by running the function.** Two limits keep it
+honest: an emulated run covers only the inputs you drive (state the domain, as DX-Ball does
+per suite), and a stubbed dependency is a boundary you declared, not behaviour you verified.
+
+Ghidra's own `PcodeEmulator` (`references/api.md` → "Emulation") is the in-database
+alternative. Unicorn's advantage is that it runs **outside** Ghidra on the shipped bytes, so
+nothing in the database — no type, no prototype, no applied name — can influence the result.
+That independence is the point; a witness computed through the decompiler is not one.
+
+**What the assembly caught that the pseudocode did not** (DX-Ball, same source): x87
+expressions missing from the C entirely; a score clamp the pseudocode rendered as a SIGNED
+comparison when the jump was unsigned (`JA`/`JB`, not `JG`/`JL`); unequal projectile offsets
+the C merged; two labels shown wrong by the stride of a bank table. Each was settled by
+instruction evidence plus original-code execution, never by re-reading the C.
+
+### Keep three ledgers, and never promote one from another
+
+DX-Ball keeps *source present*, *behaviour accepted* (differential cases pass on a declared
+domain) and *byte-exact* (a cold rebuild with the pinned period compiler reproduces every
+function byte after reviewed relocations) as **independent records**, and states the rule
+plainly: *"a passing source build alone is never recorded as an exact match."* Two more of its
+rules are worth adopting verbatim:
+
+- **Never transcribe decompiler output into source.** The decompiler's C is an inference about
+  the bytes. Copying it makes the reimplementation agree with the inference by construction —
+  the self-harvest trap (`references/harvesting-traps.md`) moved from evidence into code.
+- **Count each suite's cases once.** One case set attached to several ledger rows, summed per
+  row, repeats the same evidence — a denominator defect wearing a test-count costume.
+
+For a project graded on functional equivalence, the corollary is that a clean decompilation
+metric is evidence about the *database*, not about *behaviour*; the execution oracle is what
+closes the second.
 
 ## Target ABI vs host ABI — the width that breaks three things
 
