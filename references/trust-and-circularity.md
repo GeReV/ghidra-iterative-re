@@ -168,6 +168,27 @@ type on one project, **750 were explained by the mangled name and were ground tr
 the question is never "does our name appear", it is "would it be here if we had done
 nothing".
 
+### A MATCH between two of your structs proves nothing when one was built from the other
+
+The type-axis trap has a structural form that no name filter catches. Flattening a class hierarchy
+COPIES the base's components into every derived struct, so *"the derived struct begins with all of the
+base's components, unchanged"* is guaranteed by your own apply and says nothing about the binary. Measured
+on one project: a narrowing rule ("B derives from A if B's struct begins with every component of A's")
+was written, calibrated 54 of 54 on two AI classes, and used in an apply -- and a reviewer then asked
+where those structs came from. An earlier round had filled them in place, prefix included. The decision
+survived only because three BINARY witnesses existed independently: the derived constructor CALLS the
+base constructor and then stores its own vtable, the allocation sizes differ (676 vs 496), and the
+body writes past the base's end. The rule was replaced by an artifact whose edges come from that
+constructor chain.
+
+The general test, for any rule of the form *"these two agree, therefore…"*: **could your own pipeline
+have produced the agreement?** If either side was derived from the other -- a flattened copy, a header
+generated from the struct, a layout row regenerated from the program, a census computed from the
+types it is grading -- the agreement is a consistency check, never evidence. Consistency checks are
+worth having (they catch a copy that drifted); they just cannot license a decision. Comparisons over
+data the binary carries -- vtable slot targets, shared destructor bodies, save records -- are not
+affected, which is how a sweep for this pattern tells the evidence rules from the circular ones.
+
 ### `SourceType` is necessary but not sufficient
 
 **Confirmed live in this project: `SourceType` cannot distinguish two different naming
