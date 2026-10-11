@@ -29,8 +29,10 @@ wrong, so `--selftest` runs two tiers and reports them apart:
             `symbols/demangled_type_witness.csv` with a `ghidra_return` column,
             and `symbols/demangled_udt_witness.csv` with a
             `ghidra_udt_tokens` column (pipe-joined `<tag>:<name>`, e.g.
-            `class:CVector|union:HGOBJECT`). This CORROBORATES, because those
-            values came from somewhere else.
+            `class:CVector|union:HGOBJECT`) and a `ghidra_signature` column
+            (the other decoder's whole rendering, compared as a parameter
+            COUNT). This CORROBORATES, because those values came from
+            somewhere else.
 
 Both tiers have caught a real bug that the other could not see. The oracle
 found the type back-reference table and pointer-to-member-function missing. The
@@ -39,6 +41,11 @@ an oracle that compares only names, flags and return types. The UDT witness
 found DATA symbols losing their type entirely: `?pWorld@@3PAVCWorld@@A` decoded
 to a name with no type at all, so six classes that one binary's export table
 names ONLY as the pointee of a global were invisible to every consumer.
+The parameter COUNT found two ways of ending a parameter list early, every
+other field agreeing: an ellipsis (`...`, mangled `Z` with no `@`) was dropped,
+and a function-pointer parameter's own throw spec was taken for the end of the
+OUTER list, losing the parameter after it. A decode that does not consume the
+whole name is now refused rather than returned.
 
 What a decoded symbol carries
 -----------------------------
@@ -419,6 +426,7 @@ class Parser:
             self.take()  # calling convention
             ret = self.read_type()
             params = self.read_parameter_list()
+            self.read_throw_spec()
             return f"{ret} (*)({', '.join(params) or 'void'})"
         if self.peek() == "8":  # pointer to member function
             self.i += 1
@@ -427,6 +435,7 @@ class Parser:
             self.take()  # calling convention
             ret = self.read_type()
             params = self.read_parameter_list()
+            self.read_throw_spec()
             return f"{ret} ({owner}::*)({', '.join(params) or 'void'})"
         inner = self.read_type()
         prefix = "const " if const else ""
@@ -441,6 +450,16 @@ class Parser:
                 prefix = "const "
         return prefix + self.read_type()
 
+    def read_throw_spec(self) -> None:
+        """The exception specification after a function type's parameter list:
+        `Z` for none, which is all MSVC emits. Left unconsumed inside a function
+        pointer parameter, it ends the OUTER list early and drops every parameter
+        after the pointer -- `AddClassId(const char *, CGobject * (*)(HGOBJECT),
+        void *)` decoded with two parameters until this was read explicitly."""
+        if self.peek() != "Z":
+            raise DemangleError(f"expected throw spec 'Z' at offset {self.i}")
+        self.i += 1
+
     def read_parameter_list(self) -> list[str]:
         params: list[str] = []
         while True:
@@ -451,7 +470,9 @@ class Parser:
             if c == "X" and not params:  # (void)
                 self.i += 1
                 return []
-            if c == "Z":  # varargs terminator reached without '@'
+            if c == "Z":  # ellipsis: the list ends in `...` and carries no '@'
+                self.i += 1
+                params.append("...")
                 return params
             params.append(self.read_type())
 
@@ -576,6 +597,11 @@ def _decode(name: str, p: Parser) -> Symbol:
     else:
         sym.return_type = p.read_type()
     sym.parameters = p.read_parameter_list()
+    p.read_throw_spec()
+    # A decode that stops short of the end has misread something, and what it
+    # returns is a plausible signature with parameters missing. Refuse instead.
+    if p.i != len(name):
+        raise DemangleError(f"trailing input at offset {p.i}: {name[p.i:]!r}")
     return sym
 
 
@@ -782,13 +808,45 @@ VECTORS: list[dict] = [
     dict(name="?ppPaletteSource@CPlayerManager@@0PAPAVCRendPalette@@A", oracle=True,
          kind="data", cls="CPlayerManager", member="ppPaletteSource", static=False,
          virtual=False, ret="CRendPalette * *", params=[]),
+    # -- PARAMETER-LIST ENDINGS. An ellipsis ends the list with `Z` and no `@`;
+    # a function-pointer parameter carries its OWN throw spec, which must be
+    # consumed or the outer list ends there. All three were decoded short
+    # (`...` dropped, `void *` dropped after the pointer) until the parameter
+    # COUNT was compared against Ghidra's rendered signature; their expected
+    # lists are that rendering's.
+    dict(name="?vbail@@YAXPBDZZ", oracle=True,
+         kind="function", cls="", member="vbail", static=False, virtual=False,
+         ret="void", params=["const char *", "..."]),
+    dict(name="?SetDebugString@CBasicGobject@@QAAHPBDZZ", oracle=True,
+         kind="function", cls="CBasicGobject", member="SetDebugString", static=False,
+         virtual=False, ret="int", params=["const char *", "..."]),
+    dict(name="?AddClassId@CGobject@@SAKPBDP6APAV1@THGOBJECT@@@ZPAX@Z", oracle=True,
+         kind="function", cls="CGobject", member="AddClassId", static=True, virtual=False,
+         ret="unsigned long",
+         params=["const char *", "CGobject * (*)(HGOBJECT)", "void *"]),
+]
+
+#: Names that are NOT valid manglings and must be refused, not decoded into a
+#: plausible signature. The first two are real: truncated names copied into
+#: notes by hand, which the decoder once returned as complete symbols.
+REFUSALS: list[str] = [
+    "?Load@CGobject@@UAEXPAU_iobuf@@Z",                # parameter list never closed
+    "?GetRobotHandle@CRobotAssemblyBay@@UAEK?AV1@XZ",  # a return type where a parameter belongs
+    "?InitFOW@CFogOfWar@@SAXXZQ",                      # trailing input after the throw spec
 ]
 
 
 def run_vectors() -> tuple[int, int, list[str]]:
-    """The portable tier. Returns (passed, total, failures)."""
+    """The portable tier, decodings and refusals. Returns (passed, total, failures)."""
     failures: list[str] = []
     passed = 0
+    for name in REFUSALS:
+        try:
+            demangle(name)
+        except DemangleError:
+            passed += 1
+        else:
+            failures.append(f"  ACCEPTED {name}: an invalid mangling decoded without error")
     for v in VECTORS:
         try:
             sym = demangle(v["name"])
@@ -807,7 +865,7 @@ def run_vectors() -> tuple[int, int, list[str]]:
             ):
                 if a != b:
                     failures.append(f"  {label.upper()} {v['name']}: {a!r} != expected {b!r}")
-    return passed, len(VECTORS), failures
+    return passed, len(VECTORS) + len(REFUSALS), failures
 
 
 # ---------------------------------------------------------------- self-test
@@ -871,18 +929,33 @@ def selftest(oracle_dir: Path | None) -> int:
     # its name; this self-test compares names, since `Symbol.udts` has no kind.
     udt_path = oracle_dir / "symbols/demangled_udt_witness.csv"
     udt_witness = {}
+    # The same file's `ghidra_signature` is that decoder's whole rendering, so it
+    # also says how many PARAMETERS each function takes. Compared as a COUNT:
+    # the spellings differ (`char const *` / `const char *`) but the number does
+    # not, and a dropped parameter is exactly the failure a name-and-flags
+    # oracle cannot see -- `...` and the parameter after a function pointer
+    # were both lost that way, every other field agreeing.
+    param_witness: dict[str, int] = {}
     if udt_path.is_file():
+        udt_rows = list(csv.DictReader(io.open(udt_path, encoding="utf-8", errors="replace")))
         udt_witness = {
             r["mangled_name"]: {t.split(":", 1)[1] for t in
                                 r["ghidra_udt_tokens"].split("|") if t}
-            for r in csv.DictReader(io.open(udt_path, encoding="utf-8", errors="replace"))
+            for r in udt_rows
         }
+        for r in udt_rows:
+            n = ghidra_param_count(r.get("ghidra_signature", ""))
+            if n is not None:
+                param_witness[r["mangled_name"]] = n
     rows = [r for r in exports if r["mangled_name"].startswith("?")]
     tally = {"parsed": 0, "class": 0, "member": 0, "flags": 0, "return": 0}
     udt_checked = 0
     udt_agree = 0
     udt_disagreements: list[str] = []
     return_checked = 0
+    param_checked = 0
+    param_agree = 0
+    param_disagreements: list[str] = []
     failures: list[str] = []
     for r in rows:
         name = r["mangled_name"]
@@ -933,6 +1006,16 @@ def selftest(oracle_dir: Path | None) -> int:
                     f"  UDT {name}: {sorted(sym.udts)} != {sorted(udt_witness[name])}"
                 )
 
+        if name in param_witness and sym.kind not in NO_PARAMETER_LIST:
+            param_checked += 1
+            if params_agree(sym, param_witness[name]):
+                param_agree += 1
+            elif len(param_disagreements) < 12:
+                param_disagreements.append(
+                    f"  PARAMS {name}: {len(sym.parameters)} {sym.parameters} != "
+                    f"{param_witness[name]} in Ghidra's signature"
+                )
+
         w = witness.get(name)
         # A constructor or destructor has NO return type in the mangling.
         # Ghidra supplies a placeholder ("undefined" / "void") so its column is
@@ -963,9 +1046,17 @@ def selftest(oracle_dir: Path | None) -> int:
     else:
         print("  user-defined types   : no witness file; the `udts` field is "
               "UNCORROBORATED here")
+    if param_checked:
+        print(f"  parameter count      : {param_checked - param_agree} disagreement(s) "
+              f"over {param_checked} functions   (vs Ghidra's rendered signature)")
+    else:
+        print("  parameter count      : no `ghidra_signature` witness; parameter "
+              "lists are UNCORROBORATED here")
     for line in failures[:12]:
         print(line)
     for line in udt_disagreements:
+        print(line)
+    for line in param_disagreements:
         print(line)
 
     # POISON. The agreement above means nothing unless the comparison can
@@ -1000,17 +1091,36 @@ def selftest(oracle_dir: Path | None) -> int:
     for name, want in list(udt_witness.items())[:50]:
         if set(demangle(name).udts) != (want | {"CPoisonedType"}):
             poison_udt += 1
+    # And the count comparison: one parameter added to each expected count must
+    # make every checked function disagree.
+    poison_params = 0
+    poison_params_total = 0
+    for name, want in list(param_witness.items())[:50]:
+        sym = demangle(name)
+        if sym.kind in NO_PARAMETER_LIST:
+            continue
+        poison_params_total += 1
+        if not params_agree(sym, want + 1):
+            poison_params += 1
     print(
         f"  poison: {caught_class}/{len(poison_rows)} bad classes, "
         f"{caught_flags}/{len(poison_rows)} inverted flags, "
         f"{poison_return} bad return types, "
-        f"{poison_udt} corrupted UDT sets -- all rejected"
+        f"{poison_udt} corrupted UDT sets, "
+        f"{poison_params}/{poison_params_total} shifted parameter counts -- all rejected"
     )
     if caught_class != len(poison_rows) or caught_flags != len(poison_rows) or poison_return == 0:
         print("  POISON FAILED: a deliberately wrong expectation compared equal")
         return 1
     if udt_witness and poison_udt != len(list(udt_witness)[:50]):
         print("  POISON FAILED: a corrupted UDT set compared equal")
+        return 1
+    if param_witness and (poison_params_total == 0 or poison_params != poison_params_total):
+        print("  POISON FAILED: a shifted parameter count compared equal")
+        return 1
+    if param_checked != param_agree:
+        print("  PARAMETER DISAGREEMENT: one of the two decoders is wrong -- this is a "
+              "finding, not a tolerance")
         return 1
     if udt_checked and udt_agree != udt_checked:
         print("  UDT DISAGREEMENT: one of the two decoders is wrong -- this is a "
@@ -1029,6 +1139,54 @@ def selftest(oracle_dir: Path | None) -> int:
         return 1
     print("  all fields at or above the recorded baseline")
     return 0
+
+
+#: Symbol kinds with no parameter list of their own to compare.
+NO_PARAMETER_LIST = ("data", "vftable", "local-static", "local static guard")
+
+
+def params_agree(sym: "Symbol", want: int) -> bool:
+    """The parameter-count comparison, ONE copy: the poison goes through it too,
+    so a comparison that always agrees fails the poison rather than passing."""
+    return len(sym.parameters) == want
+
+
+def ghidra_param_count(signature: str) -> int | None:
+    """How many parameters a demangler's rendered signature declares, or None
+    when it renders no parameter list (a data symbol, a vftable).
+
+    Reads the LAST parenthesised group, matched from the end so a function-
+    pointer parameter's own `(__cdecl *)(...)` stays inside it, and splits it on
+    top-level commas. `(void)` and `()` are zero; `...` counts as one, which is
+    how this decoder lists it.
+    """
+    s = signature.strip()
+    if s.endswith(" const"):
+        s = s[: -len(" const")].rstrip()
+    if not s.endswith(")"):
+        return None
+    depth = 0
+    for i in range(len(s) - 1, -1, -1):
+        if s[i] == ")":
+            depth += 1
+        elif s[i] == "(":
+            depth -= 1
+            if depth == 0:
+                break
+    else:
+        return None
+    inner = s[i + 1 : -1].strip()
+    if inner in ("", "void"):
+        return 0
+    count, depth = 1, 0
+    for ch in inner:
+        if ch in "(<":
+            depth += 1
+        elif ch in ")>":
+            depth -= 1
+        elif ch == "," and depth == 0:
+            count += 1
+    return count
 
 
 #: Ghidra's demangler renders some types differently from the mangling's own
