@@ -210,6 +210,23 @@ framework of this shape. Every item was found by a fresh whole-branch review and
   `UC_X86_REG_FS_BASE` has **no effect in 32-bit mode**, so a TEB needs a GDT. `rdtsc` is **not
   deterministic** across two identical restored runs, so model it or stub what executes it if output
   must regenerate byte-identically.
+- **Value sentinels are fooled by values that survive.** Recognising an input by its unique VALUE
+  (wherever it travels) fails two ways, both measured by a calibration's NEGATIVE controls ("a static
+  function never uses ECX", "nothing uses EDX") on one 1999 MSVC binary, both read as passes at ~98%
+  until the residue was read:
+  - a sub-register write that leaves the full value unchanged (`mov cl,[zeroed memory]` when the
+    label's low byte is 0) keeps the register "holding" the input, so the next full-width read is a
+    false use. Mark the parent register stale on any sub-register write;
+  - a sweep (`rep stosd`, an overrun) walks out of one input object into the next, and the pointer
+    passes the neighbour's label value. Put an unmapped guard page after every labelled object.
+- **A half-built object is worse than none.** A constructor that stops after the BASE vtable store
+  and before the derived one leaves an object that dispatches into another class's method; one with
+  a different `RET n` shifts every later stack read and manufactures argument reads. Use a stopped
+  constructor's object only if its own table is at +0; otherwise run on a zeroed object, which stops
+  cleanly at the first virtual call.
+- **Ask where a long run's instructions go before raising its cap.** Runs that returned only past the
+  default cap all spent the same 112,346 instructions scanning a registry that startup would have
+  filled, to a coincidental match: an artefact of empty state, not a slow function.
 
 ## Target ABI vs host ABI — the width that breaks three things
 
