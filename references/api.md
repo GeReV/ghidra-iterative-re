@@ -943,6 +943,15 @@ through Ghidra, these apply:
 
 ## Scripting rules (PyGhidra)
 
+- **Running one script from another: execute it in the CALLER'S OWN globals object, and bind
+  `print` to the builtin.** Measured (12.3, a wrapper run through an MCP script runner): a
+  script's globals are not a plain dict -- they resolve the flat API (`currentProgram`,
+  `monitor`, `toAddr` ...) on lookup -- so `exec(code, dict(globals()))` dies
+  `NameError: currentProgram`. And the `print` those globals supply is PyGhidra's console
+  writer, not the builtin: a wrapper that swaps `sys.stdout` to capture output catches only
+  the lines library modules print. Override `print` (and `println`) in the shared globals with
+  `builtins.print`, and keep the wrapper's own state in a function's locals, since the target
+  shares the module namespace and can rebind any global name.
 - **CPython 3 via PyGhidra**, not Jython — `except X as e`, f-strings, real imports. As
   of Ghidra 12.1 Jython is an opt-in extension, so a `# @runtime Jython` tag fails before
   the first line unless installed. Ghidra 12.1 needs JDK 21+.
