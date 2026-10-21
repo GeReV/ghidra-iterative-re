@@ -79,6 +79,7 @@ you open it.
 | read the exports of a binary you have NOT imported — a companion DLL, a demo build — run this skill's own `scripts/msvc_demangle` (`--pe FILE --tsv`) | `references/cpp-abi.md` |
 | write a script, or reach for any Ghidra API | `references/api.md` |
 | work a non-PC or pre-modern target | `references/platforms-eras.md` |
+| send readers through function bodies, or find that much has been read and little is understood — bottom-up order, records that outlive the reader, roll-ups, then top-down (a method under trial) | `references/reading-for-understanding.md` |
 | cite a claim, or check whether an API is version-bound | `references/sources.md` |
 
 **`references/api.md` is the one to read before writing scripts**, not after: recalling
