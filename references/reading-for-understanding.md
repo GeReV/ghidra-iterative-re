@@ -64,6 +64,13 @@ never independent **evidence** for a decision, which still needs instruction-lev
 A summary changes nothing in the program, so it needs none of the mutation apparatus (canary, replay tests,
 invariant bracket). It needs a **sampled adversarial verifier**: re-read a fraction of each batch's bodies
 against the records and grade them correct / incomplete / wrong, with a wrong-rate that sends a batch back.
+
+**Bottom-up reading propagates errors upward, and the verifier has to be built for that.** A caller's record
+rests on its callees' summaries; a verifier that re-reads the record against those same summaries cannot see a
+mistake it inherited. So the verifier reads the sampled function's body **and the bodies of the callees named in
+its `basis`**, grading those summaries too; sampling is **weighted by fan-in** (how many records rely on this
+one), so the leaves, whose errors spread furthest, get the most scrutiny; and a record found wrong re-queues
+every record whose `basis` reaches it.
 Decision rows keep the full pipeline, applied once at the end of the wave.
 
 ## Measure it
