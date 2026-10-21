@@ -73,6 +73,21 @@ one), so the leaves, whose errors spread furthest, get the most scrutiny; and a 
 every record whose `basis` reaches it.
 Decision rows keep the full pipeline, applied once at the end of the wave.
 
+## First pilot (Metal Fatigue §537: one class, 52 functions, five layers)
+
+- **A reader's cost is mostly fixed.** Three readers fit ~85k tokens per reader plus ~0.5k per function, so
+  batch size, not function count, sets the budget: make batches as large as a context comfortably holds.
+- **Summaries worked as context**: no reader needed to open a callee body a summary should have covered.
+- **The errors were where the decompiled C misstates the machine code** -- a value made `float` by a pointer
+  type, and a coroutine switch the C renders as an ordinary return (the function never returns to its caller).
+  Require the disassembly whenever the decompiler marks a body unsafe or a claim rests on how a value is typed.
+- **Propagation is real**: that one never-returns error sat under four caller records, none of which said so;
+  the `basis` closure found all four.
+- **Bottom-up still flows information downward**: callers answered several leaf records' open questions, and a
+  caller exposed a summary that did not fit it. Feed those back into the leaf record when they arrive.
+- **Empty virtual defaults have no readable purpose**: do not name them from their bodies; they need the
+  top-down pass (their overrides and callers).
+
 ## Measure it
 
 Make "functions in scope with a verified summary" a denominator beside the mechanical ones, and report cluster
