@@ -926,3 +926,25 @@ moves it?" -- if the answer is "the repair it licenses", the number tracks the w
 the rule's truth.** And a one-sided calibration (every row is a positive) still needs its negatives
 from somewhere; here they are exactly the rows no repair ever removes, so that arm does not consume
 itself either. (Origin: re-metal-fatigue §436.)
+
+## Siblings that AGREE on an analyzer-inferred type are guesses agreeing
+
+Copying a parameter type from the other implementations of the same virtual slot is sound: one
+slot is one declared member. It is only as good as the DONOR's tier, though, and unanimity among
+donors does not raise that tier. Measured: a slot-type census marked a menu slot `applicable: int`
+because every typed sibling said `int`, and none disagreed. All of them were Ghidra's inference,
+and the call sites refuted it at once: every caller passes a screen object or 0, and 17 of the 19
+bodies store the argument into a widget-pointer field. Two earlier rounds had already applied that
+`int`, one citing the census verdict by name, so the guess had become the project's own ledgered
+type. A later census found 42 applied signatures whose slot family has no binary-declared sibling
+at all, i.e. nothing but inference to have copied from.
+
+Two rules. **Admit a sibling's type as a decision only when the donor is binary-declared** (an
+export's mangled name, a debug record). Inferred donors are a LEAD for the call sites: callers
+pass the argument, and a wrong integer type shows there first, as a pointer or `this` being
+pushed. **And when a donor fixes ONE parameter, check the whole prototype against the body's
+stack cleanup before applying.** The same session's other donor was binary-declared and correct
+for its parameter, but the live prototype it would have patched was shifted one place: 16
+declared bytes against a `RET 0xc`, with the first parameter standing in for `this`. The right
+change restated the whole prototype from the declaration, not the one position. (Origin:
+re-metal-fatigue §545.)
