@@ -948,3 +948,18 @@ for its parameter, but the live prototype it would have patched was shifted one 
 declared bytes against a `RET 0xc`, with the first parameter standing in for `this`. The right
 change restated the whole prototype from the declaration, not the one position. (Origin:
 re-metal-fatigue §545.)
+
+
+## A VARIABLE ADMITTED BY ITS RENDERED TYPE IS ADMITTED BY WHATEVER TYPED IT -- including your own applies
+
+A reach probe admitted a decompiler local as evidence for class X when the decompiler RENDERED it `X *`. One later
+apply typed an unrelated function's receiver, the decompiler propagated a type this project had decided for a field
+into the loop variable through a single comparison (`cursor == this->owner->field`), the rendering became `Derived *`,
+and 108 witnesses left the artifact with nothing in the binary having changed. A rendered type is the decompiler's
+inference over every constraint it holds -- including the ones you applied -- so it is a circular witness the moment
+any of your types can reach the variable. Admit by what the BINARY declares at the call site: the local's address
+passed as an out-parameter of a function whose own mangling declares `X **`, or the local receiving a return declared
+`X *`. Read it from the call's operands (a `PTRSUB(ESP, #off)` matched to the local's stack slot), and keep the rendered
+type only as a predicate ("is it in X's subtree?"). The same rule, applied, also reached 52 cursors of sibling search
+functions the probe had never listed. And label what stays admitted on the rendering alone, so a consumer can tell.
+Origin: re-metal-fatigue §600, §601.

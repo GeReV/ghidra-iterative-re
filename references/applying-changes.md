@@ -1288,3 +1288,22 @@ provenance is not.
 Before relying on "the cascade only propagates what I applied", list the enabled analyzers that WRITE on a
 function-changed event (`analysis_options` / `pyghidra.analysis_properties`) and ask which of them write a source tier
 above `ANALYSIS`.
+
+
+## DISCARDING CUSTOM STORAGE IS NOT NEUTRAL FOR AN x87 RETURN -- and re-spelling a stale row can launder drift
+
+Four bodies with custom variable storage and a `float10` result were rewritten with dynamic storage on the premise
+that the custom storage only placed the receiver in ECX. The rehearsal refuted it: Ghidra's dynamic layout turned the
+10-byte return into a HIDDEN RETURN POINTER (`float10 * f(this, float10 *__return_storage_ptr__)`) and an `extraout_var`
+appeared. The custom storage was modelling the ST0 return. Before discarding custom storage, read what it holds --
+the return slot as well as the parameters -- and let a rehearsal grade the rewrite; and check every receiver too,
+since a dynamic `__thiscall` outside a class namespace types `this` as `void *`, silently dropping a `Class *` the
+custom storage carried.
+
+The neighbouring trap is in the plan, not the program. An applier refuses a row whose stated old prototype differs
+from the live one; that is how a function that changed since its reading is caught. Feeding the dry run's printed
+live prototype back into the rows (to fix spelling refusals) makes that check pass BY CONSTRUCTION. Compare the live
+prototype's SHAPE (return, parameter types and names, convention and implicit `this` aside) with what was recorded at
+reading time, and refuse a row a later round has already applied. When a fix makes a guard pass, re-check what the
+guard was for.
+Origin: re-metal-fatigue §607.

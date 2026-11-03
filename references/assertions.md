@@ -3245,3 +3245,18 @@ the failure is free. "Passes before and after its own apply" is a run, not a sen
 must agree about one ledger need one rule** -- two verifier fixes, each right for its own lane (accept a row a later
 container absorbs; accept only MISSING rows), contradicted each other on the same absorbed value after the apply;
 the shared predicate now lives in one imported module. (Origin: re-metal-fatigue §489.)
+
+
+## A GRADER THAT SCORES WHAT GOT WORSE CANNOT SEE INFORMATION DROPPED WITHOUT ANYTHING GETTING WORSE
+
+A rehearsal grader failed on D6 losses, gained artifacts and changed controls, and an apply was approved on a passing
+grade. One function had already failed D6, so losing its `CRender *` receiver to `void *` moved no counter; a by-hand
+before/after receiver comparison found it after the apply. The grader now fails TYPE LOST: a NAMED parameter type (a
+class, struct or typedef, or a pointer to one) that becomes `void *` / `undefinedN`, matched by name and, for
+parameters renamed in the same change, by position -- most signature rows rename `param_1`, and a type lost together
+with a rename is invisible to a name match. Calibrate on history before trusting it: positional matching first flagged
+`int * -> void *` and `float -> void *`, both re-readings, which is why width-only and floating-point scalars (and
+pointers to them) do not count as named; over 99 dumps it then flagged only the real case. A grade is a list of the
+regressions someone thought of -- before approving on one, ask what the change could LOSE that none of its counters
+measure.
+Origin: re-metal-fatigue §607 (two side reviewers).

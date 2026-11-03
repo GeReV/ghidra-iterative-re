@@ -3571,3 +3571,18 @@ The same shape in reverse degrades an instrument silently: a checker keyed its t
 on per-component type-history rows, and a newly CREATED struct has none -- 3,545 typed slots in 27
 new structs were outside its reach the moment they existed. Only its both-directions join noticed.
 Origin: re-metal-fatigue §421.
+
+
+## AN ARTIFACT EXCUSED FROM REGENERATION STILL DRIFTS IN EVERY COLUMN IT JOINS FROM THE REPO
+
+A census read the game's save files -- an input no gate can reach -- so every regeneration gate excused it, for a true
+reason. But half its columns (each cell's layout name and type) were a join against the repo's own layout artifacts,
+which every round moves. Regenerated 85 versions later, 63 cells' join had drifted, and six selftest arms of another
+tool turned out to be calibrated on the stale rows. An excuse covers the input the gate cannot reach, not the columns
+derived from inputs it can: give such an artifact a check that re-joins its committed rows against the current repo
+(it needs no external input), and refresh it wherever the input IS present. Two neighbours from the same rounds: a
+sort key with ties (`(class, offset, kind)`) leaves the output in INPUT order, so a pure relabel upstream re-ordered an
+artifact and read as a content change -- sort by the full row, and compare multisets before believing a byte diff; and
+a rule that reads a tool's PROPOSAL column as its witness loses the witness the moment the proposal is adopted (the
+tool stops proposing what the layout now states) -- key on the measured property, or on proposal OR agreement.
+Origin: re-metal-fatigue §601, §604.

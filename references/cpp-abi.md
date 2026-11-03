@@ -1453,3 +1453,14 @@ the same "last store wins" assumption without it, and a third module implemented
 properly and was connected to neither. **When a rule is documented as load-bearing in one
 producer, the question is never whether it is written down — it is which other producers make the
 same assumption without it.** Grep for the assumption, not for the sentence.
+
+
+## `[ESP+k]` MEANS NOTHING UNTIL ESP IS TRACED FROM ENTRY -- callee cleanup included
+
+A body was claimed to write its first stack argument before reading it ("the compiler reuses the argument slot"),
+from two filtered `[ESP+0x10]` instructions. Traced from entry -- every PUSH and POP, and the `RET 4` of a callee called
+in between -- all three accesses addressed the function's own `PUSH ECX` local, and the first argument at
+`[entry+4]` was never touched. A plain `RET` on a callee-clean `__thiscall` already said there was no stack argument.
+Before reading a stack offset as a parameter, trace ESP instruction by instruction from the entry, counting each
+callee's `RET n`; an `[ESP+k]` read off a filtered listing is a guess about the frame.
+Origin: re-metal-fatigue §607 (refuted by a peer session's trace).
