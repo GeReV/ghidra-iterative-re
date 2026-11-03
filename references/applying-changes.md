@@ -99,6 +99,22 @@ types, or decide which apply is worth the round.
   `vftable\[\d+\]` BEFORE applying, and treat the dispatching object's type, not the definition,
   as the defect at those sites.
 
+  **The same overrun can be CREATED by a signature fix, and it then reads as a refutation of the
+  fix.** Typing a function's `this` (or any pointer parameter) as a class whose `vftable` member
+  reaches a shorter ancestor struct turns its own virtual calls from untyped `(**(code **)...)()`
+  into indexed renders that borrow a definition — and a borrowed ARITY shifts the decompiler's
+  stack model. Measured: a body that ends in a plain `RET` (so, being callee-clean `__thiscall`,
+  takes no stack argument) was given that signature; the rehearsal grew `in_stack_00000004`,
+  `unaff_EBX` and `unaff_EDI`, and one round recorded the correct drop as REFUTED ("the body reads
+  its stack argument"). The artifact came from the FIRST call: slot 47 of a 48-slot table, typed
+  through the 47-slot base struct, rendered as `vftable[1].<other method>` with two phantom
+  arguments, so the stack drifted 8 and the function's own `PUSH ECX` scratch slot surfaced as an
+  incoming argument. Two rounds and a third reader carried the refutation forward; giving the class
+  its own vtable struct first, then re-rehearsing, showed **0** artifacts. **Before a rehearsal
+  artifact refutes a signature, find which call moved the stack** — grep the rehearsed body for
+  `vftable[`, and write the ESP column from entry (counting every callee's own `RET n`) before citing
+  any `[ESP+N]` as an argument. Order the repair struct-first, signature-second.
+
   **A CORRECT FLOAT RETURN ON A TYPED SLOT CAN MAKE THE C WORSE, AND THE CAUSE IS A DECOMPILER BUG
   PRESENT IN EVERY RELEASE THROUGH 12.1.4 AND FIXED ON `master` (GP-7167, 2026-08-25).** On 32-bit x86, a virtual
   call through a vtable struct whose `FunctionDefinition` returns `float` or `double` renders as a
