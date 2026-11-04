@@ -963,3 +963,23 @@ passed as an out-parameter of a function whose own mangling declares `X **`, or 
 type only as a predicate ("is it in X's subtree?"). The same rule, applied, also reached 52 cursors of sibling search
 functions the probe had never listed. And label what stays admitted on the rendering alone, so a consumer can tell.
 Origin: re-metal-fatigue §600, §601.
+
+## A checker that admits a new KIND of evidence is a policy change — put it in the approval by itself
+
+A citation verifier usually carries an enum of evidence kinds, some declared but refused for want of a checker. Writing
+the missing checker looks like tooling: a dozen lines, a poison that fires, and the rows that needed it go through. But
+the enum's refusal WAS the bar. Measured: a round named 50 functions; five of them had no citation the verifier
+accepted (no field access, no global, callers that carry only this project's own names), so the round gave a
+long-declared `caller_context` kind its checker. That checker proves one fact -- the cited function calls this body --
+and the NAME still rests on a reader's interpretation of the call site. The change sat in the round's README under
+"Tooling", and the approval question asked for "50 names"; a side reviewer had to point out that the bar had moved,
+permanently and for every later round. The user kept the five names and had the kind PINNED to their addresses: a
+true call edge at any other row is refused, demonstrated with a poison, and widening the set is a later round's own
+decision.
+
+Two rules follow. **When a round adds a checker for an evidence kind, the approval line names the kind, what it proves
+and what it does not, and the rows that depend on it -- as its own item, not inside the tooling paragraph.** And **admit
+a weak kind by its rows, not globally**: a pin costs one set and keeps the next round from inheriting a lowered bar it
+never chose. The structural limits that ride with such a kind (it can only support the lower tier; it alone never
+decides) are necessary and not sufficient -- they bound how strong one row can be, not how many rows the kind reaches.
+Origin: re-metal-fatigue §613.
