@@ -1323,3 +1323,14 @@ prototype's SHAPE (return, parameter types and names, convention and implicit `t
 reading time, and refuse a row a later round has already applied. When a fix makes a guard pass, re-check what the
 guard was for.
 Origin: re-metal-fatigue §607.
+
+**Correction: the route that keeps ST0 is the honest return TYPE, not a new storage writer.** The four bodies above were
+parked waiting for "a rewrite that keeps the x87 return"; the next round needed no tool change. `float10` is the
+decompiler's 10-byte guess and never a return type MSVC emits (`long double` is 8 bytes there); declared `float`, the
+same dynamic-storage rewrite returned in ST0 with no hidden pointer and no `extraout_`. The width comes from the
+callers' x87 stores (`FSTP float ptr` vs `double ptr`) and the bodies' own operand widths -- but note that a store
+shows how a result is USED: on x87 a `double` function whose callers all assign to `float` compiles to the same
+instructions, so record that limit with the decision, and prefer a binary-spelled witness (a mangled signature's
+`M` = float, `N` = double) when one exists. And before building a tool a parked row asks for, search the project's
+own lessons for the blocker's key term: the answer here had been written down by an earlier round.
+Origin: re-metal-fatigue §611.
