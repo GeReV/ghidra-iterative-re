@@ -3260,3 +3260,14 @@ pointers to them) do not count as named; over 99 dumps it then flagged only the 
 regressions someone thought of -- before approving on one, ask what the change could LOSE that none of its counters
 measure.
 Origin: re-metal-fatigue §607 (two side reviewers).
+
+## A POISON THAT IS ONLY IMPROBABLE GOES INERT WHEN THE DATA IMPROVES -- make its bound impossible by construction
+
+A census refused to ship when its calibration agreement fell below a floor, and the poison proving that refusal raised
+the floor to 0.999 and expected a refusal. A later round fixed the last disagreeing slot family; agreement reached
+280 of 280, the poisoned floor was MET, and the arm failed -- correctly, since a check that can no longer fire is not a
+check, but nothing about the census was wrong. The data had simply outgrown a bound that was chosen as "surely
+unreachable". Pick a poison's bound OUTSIDE the value's range (here 1.01 for a rate), or poison the comparison itself,
+so improving the program can never defuse it. The same applies to any poison phrased as an extreme value: ask what the
+value's ceiling is, not what today's value is.
+Origin: re-metal-fatigue §615.
