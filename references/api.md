@@ -398,6 +398,33 @@ ifc.dispose()          # always
 (`updateDBVariable(...)` commits decompiler-level variables to the database),
 `PcodeOp`, `Varnode`.
 
+**Committing a decompiler local by name -- read from the 12.3 source and measured on one binary (re-metal-fatigue
+§643, 2026-11-09).** Each of these cost a round when it was not known:
+- **`updateDBVariable` binds ONE live range** (the symbol's first whole map). A register / HASH variable with several
+  ranges is named whole only as a MERGE SET: database locals `name`, `name$1`, `name$2` ... with one type-locked,
+  EQUAL type (`LocalSymbolMap.mergeNamedSymbols`; `HighFunctionDBUtil.gatherMergeSet` is the write side). `undefined*`
+  types are not type-locked, so they never merge; a stack piece cannot join one.
+- **The decompiler may REFUSE part of a merge set** -- `/* WARNING: Unable to (fully) merge symbol: X -- Some merges
+  are forbidden */` -- and render the refused pieces as `X_1`, `X_2`: one variable under several names. Measured in 9
+  of 183 functions. Grade a rename's C for new `WARNING:` lines and `name_N` siblings, not only for who holds the
+  variable.
+- **Committing an x87 (ST0 / ST1) local can change the function's PROTOTYPE**: the decompiler inferred the function
+  returns the x87 stack top (`void` -> `unkbyte10`, with `in_ST0` / `extraout_ST0`). Compare the prototype too.
+- **Placeholders renumber after every commit** (`pcVar6` -> `pcVar5`), and a HASH local re-hashes
+  (`HASH:00000000:4` -> `HASH:<hash>:4`): re-find a variable by its varnodes (storage, size, defining PC and opcode;
+  skip MULTIEQUAL / INDIRECT, which sit at shared block-head and call PCs), never by its old name. A grade that counts
+  "another local's name changed" reports renumbering as damage.
+- **A register commit replaces the instruction's references**: `createLocalVariable` adds a WRITE register reference at
+  the first use, through `ReferenceDBManager.addRegisterReference`, which calls `removeAllFrom(fromAddr, opIndex)`
+  first. One operand therefore holds one such reference: `REP MOVSB` is the first use of both ESI and EDI, so naming
+  one pointer drops the other's reference; at `CALL [IAT]` it deletes the import's COMPUTED_CALL reference.
+- **Committing a wide stack local deletes the analyzer's placeholder database locals inside it**
+  (`clearConflictingLocalVariables`) -- normal, with the C unchanged -- but also NAMED ones it overlaps: an 8-byte
+  `EDX:EAX` commit deleted four named locals. Distinguish the two by name and `SourceType`, and prove the boundary.
+- `commitLocalNamesToDatabase` commits EVERY local at its current name, placeholders included -- not a rename tool.
+- Committing a local whose type is a pointer not yet stored in the datatype manager ADDS that datatype (`MpTxPacket **`):
+  an absolute datatype-count bracket moves.
+
 For `this`-relative offset recovery over SSA, do not hand-roll a register tracker — see
 `FillOutStructureHelper` under "Read-only witnesses", including which of its arms writes to the
 DataTypeManager and why its reach dies on a `__cdecl` prototype.
