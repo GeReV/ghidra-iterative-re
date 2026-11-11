@@ -1334,3 +1334,26 @@ instructions, so record that limit with the decision, and prefer a binary-spelle
 `M` = float, `N` = double) when one exists. And before building a tool a parked row asks for, search the project's
 own lessons for the blocker's key term: the answer here had been written down by an earlier round.
 Origin: re-metal-fatigue §611.
+
+**A compiler helper the decompiler mis-models gets a CALL FIXUP -- and the fixup belongs in the PROGRAM, not the
+install.** MSVC's `_ftol` converts ST0 to an int64 in EDX:EAX and POPS ST0; Ghidra keeps the x87 registers as fixed
+slots across a call, so a value pushed before the call renders `extraout_ST0` afterwards and variadic callers lose
+arguments. A `<callfixup>` p-code body fixes every caller at once, but three things decide whether it helps:
+(1) **the injection runs AFTER the CALL's return-address push**, so the body must model the RET (`ESP = ESP + 4`) --
+without it every later stack offset in every caller moved by 4 and 66 of 174 callers got worse; (2) **rehearse it over
+the WHOLE caller population**, never only the functions that motivated it (the six targets all improved in the broken
+version); (3) **put it in the program, not in the language's .cspec**: `ghidra.program.database.SpecExtension`
+(`addReplaceCompilerSpecExtension`, the program option "Specification Extensions") stores the `<callfixup>` document
+in the program database, versioned with it and live without a Ghidra restart, where a .cspec edit needs a restart and
+makes every result depend on a patched install. An extension may not reuse a BUILT-IN payload's name. Mark the helper
+with `Function.setCallFixup(name)` (it only WARNS on an unknown name, so check `getPcodeInjectLibrary().getPayload(...)`
+first) and gate that the payload is loaded: a Ghidra without it silently reverts every caller. Any rule that reads the
+call's rendering (`ftol(<expr>)`) must learn the injected form -- the decompiler's "replaced with injection" note.
+Origin: re-metal-fatigue §647.
+
+**A shifted-pointer type (`T * __offset(k)`) fixes a member cursor's ACCESSES and can break its STEP.** Typing a cursor
+that points at a member inside each array element makes the field reads spell correctly, but Ghidra keeps the step in
+the OLD variable's unit (`cursor + 0x13` was 0x13 dwords = one 0x4c-byte record; as C on a record pointer it is 0x13
+records). A token-based quality metric counts the function as typed C. Read the arithmetic of every typed pointer, not
+only its spelling; the byte form the decompiler writes when it knows (`(T)((int)c + 0x171)`) is correct. Origin:
+re-metal-fatigue §647 (13 cursors in 8 functions reverted).
